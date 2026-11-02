@@ -44,6 +44,14 @@ class Steps(unittest.TestCase):
             ('1. plan', 'done', '100', '', ''), ('2. build', 'running', '45', 'qa review', ''),
             ('review', 'running', '100', '', 'qa a9f3c2'), ('3. ship', 'not started', '', '', '')])
 
+    def test_a_step_keeps_a_short_name_and_its_details_as_a_note(self):
+        self.run_tool('step', '1. build', 'running', '40', '--note', '3 of 8 files', '--blocker', 'qa')
+        row = self.rows()[0]
+        self.assertEqual(('1. build', '3 of 8 files', 'qa'), (row['item'], row['note'], row['blocker']))
+        self.assertIn('session | 1. build | running | 40% | qa | 3 of 8 files', self.run_tool('show')[0])
+        reminder = json.loads(self.run_hook('prompt', {'session_id': SESSION, 'prompt': 'x'})[0])['hookSpecificOutput']['additionalContext']
+        self.assertIn('keep the name short, details go in --note', reminder)
+
     def test_a_new_request_goes_in_after_the_step_named_and_a_step_is_replaced_in_place(self):
         for step in ('1. plan', '2. build', '3. ship'):
             self.run_tool('step', step, 'not started', '0')

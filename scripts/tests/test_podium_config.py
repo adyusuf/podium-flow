@@ -300,7 +300,8 @@ class RetiredKeys(Tool):
         out, _, _ = self.run_tool('context', '--stdin', stdin=json.dumps({'session_id': 'abc-1'}))
         script = os.path.join(cfg.ROOT, 'scripts', 'podium_status.py')
         self.assertIn('status box and steps (steps.enforce: block): analyse every task first and write its steps', out)
-        self.assertIn('python3 "%s" --session abc-1 step "<n. step>" "<state>" <percent>' % script, out)
+        self.assertIn('python3 "%s" --session abc-1 step "<n. short name>" "<state>" <percent>' % script, out)
+        self.assertIn('[--note "<details>"]', out)
         self.assertIn('a new request mid-work goes in as steps with --after', out)
         self.assertIn('The hooks set now on each message and "waiting for you" at each turn', out)
         self.assertNotIn('status box', self.run_tool('context')[0])         # no session id, no line

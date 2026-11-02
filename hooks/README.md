@@ -43,7 +43,7 @@ What the mod runs and reads:
 It opens no network connection. The code is split so the drawing can be tested without the engine: `boxes.ts` (Settings,
 Agents, Promotion), `controls.ts` (the shared icons, options, aligned lines and hover cards), `help.ts` (what the hover
 cards say), `status.ts` (Status), `choose.ts` (pure decisions), `notices.ts` (chat lines); `register.tsx` is the
-engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (78 tests).
+engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (79 tests).
 
 ## The four boxes
 
@@ -59,10 +59,12 @@ whose folder is in no git repository, no code work happens: the pane shows only 
 boxes refresh after every turn, so a merge, a push or a `/podium:config` change shows without
 reopening them.
 
-- **Status.** What runs now and next, then the work's steps: step · state · % · blocked on, a running step in bold.
-  With subagents, each group of steps has a line naming who runs it and how much of it is done. Claude writes the steps
-  first, before any work, with `scripts/podium_status.py step`; a background gate or promotion writes its own
-  ([`standards/00-working-method.md`](../standards/00-working-method.md) §1a, §10d).
+- **Status.** What runs now and next, then the work's steps: step · state · % · note. The state is one short word (todo,
+  run, done, stuck, skip), the % sits right after it, the note column holds every other detail (the state's own detail,
+  `--note`, an older row's figure), and `-> what blocks it` sits under the step; a running step is bold. With subagents,
+  this session and each subagent open their group with a divider and a bold row giving the group's state and %. Claude
+  writes the steps first, before any work, with `scripts/podium_status.py step`; a background gate or promotion writes
+  its own ([`standards/00-working-method.md`](../standards/00-working-method.md) §1a, §10d).
 - **Settings.** Two tabs: **Session** (what this session runs on; a press changes this session only) and **System** (the
   saved defaults in `~/.claude/podium.json`, which every new session starts from). One tab shows at a time, Session at
   start; the chosen tab is at full strength (in brackets in the terminal), and the pane remembers it. Under the tabs, one

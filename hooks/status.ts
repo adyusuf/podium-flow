@@ -6,7 +6,7 @@ import { helpCard, hoverable } from './controls'
 import { STATUS_HELP } from './help'
 
 /** A step (user decision 02/11/2026): `percent` done ('' when not given), `blocker`, and `agent` ('' = this session). */
-type StatusRow = { item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string }
+type StatusRow = { item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string; note: string }
 export type StatusData = { now: string; next: string; rows: StatusRow[]; updated: string }
 
 /** The same caps as scripts/podium_status.py: the file is read as untrusted text, so a foreign file cannot flood the box. */
@@ -70,13 +70,19 @@ export function parseStatus(text: string): StatusData | null {
     .map(row => ({
       item: clean(row.item), state: clean(row.state), figure: clean(row.figure), waiting: clean(row.waiting),
       percent: /^\d{1,3}$/.test(clean(row.percent)) ? clean(row.percent) : '', blocker: clean(row.blocker), agent: clean(row.agent),
+      note: clean(row.note),
     }))
   return { now: clean(one.now), next: clean(one.next), rows, updated: clean(one.updated) }
 }
 
+/** The short state words (user decision 02/11/2026), so the State column stays narrow: a state is one of these. */
+const SHORT: Record<string, string> = {
+  'not started': 'todo', pending: 'todo', running: 'run', 'in progress': 'run', done: 'done', blocked: 'stuck',
+  'did not run': 'skip', skipped: 'skip',
+}
 /** The state of the step at work: the box draws it in bold. */
-const RUNNING = 'running'
-/** What a writer puts where it has nothing to say: the box leaves it out under a step. */
+const RUNNING = 'run'
+/** What a writer puts where it has nothing to say: the box leaves it out. */
 const PLACEHOLDERS = ['', '-', '—']
 
 const busy = (data: StatusData | null): data is StatusData =>
@@ -85,10 +91,30 @@ const busy = (data: StatusData | null): data is StatusData =>
 /** A cap on one table column, in cells: a longer text wraps inside its column instead of pushing the next one away. */
 const STATUS_COLUMN = 36
 
+/**
+ * A state as its short word and what else the writer put in it (`running: 3 of 8` -> run, `3 of 8`). A state that is
+ * none of the known ones keeps no word; all of its text goes to the note.
+ */
+export function splitState(state: string): { short: string; detail: string } {
+  const text = state.trim()
+  const lower = text.toLowerCase()
+  const known = Object.keys(SHORT).sort((a, b) => b.length - a.length)
+    .find(word => lower === word || (lower.startsWith(word) && /^[\s:,;(-]/.test(lower.slice(word.length))))
+  return known === undefined ? { short: '', detail: text } : { short: SHORT[known]!, detail: text.slice(known.length).replace(/^[\s:,;-]+/, '') }
+}
+
 /** How much of a group of steps is done: the mean of the steps that give a percentage, or '' when none does. */
 export function donePercent(rows: StatusRow[]): string {
   const given = rows.filter(row => row.percent !== '').map(row => Number(row.percent))
   return given.length === 0 ? '' : `${Math.round(given.reduce((sum, one) => sum + one, 0) / given.length)}%`
+}
+
+/** A group's state: run while one of its steps runs, else stuck while one is blocked, done when all are over, else todo. */
+export function groupState(rows: StatusRow[]): string {
+  const shorts = rows.map(row => splitState(row.state).short)
+  if (shorts.includes(RUNNING)) return RUNNING
+  if (shorts.includes('stuck')) return 'stuck'
+  return shorts.every(short => short === 'done' || short === 'skip') ? 'done' : 'todo'
 }
 
 /** The steps by who runs them: this session first, then each subagent in the order it first wrote. */
@@ -97,26 +123,30 @@ export function stepGroups(rows: StatusRow[]): Array<{ agent: string; rows: Stat
   return agents.map(agent => ({ agent, rows: rows.filter(row => row.agent === agent) })).filter(group => group.rows.length > 0)
 }
 
+/** Everything a step says besides its name, state and %: the state's own detail, its note, an older row's figure. */
+export function noteOf(row: StatusRow): string {
+  const figure = row.percent === '' && !PLACEHOLDERS.includes(row.figure) ? row.figure : ''
+  return [splitState(row.state).detail, row.note, figure].filter(text => !PLACEHOLDERS.includes(text)).join(' · ')
+}
+
 /**
- * The status box (user decisions 01/11 and 02/11/2026): what runs now and next, then the steps under step · state, a
- * running step in bold. Under a step, with no heading: how much of it is done, and `-> what blocks it`. With subagents,
- * each group of steps gets a line naming who runs it and how much of it is done. A row written the older way shows its
- * measured figure as the done line and what it waits on after the arrow.
+ * The status box (user decisions 01/11 and 02/11/2026): what runs now and next, then the steps under step · state · % ·
+ * note, a running step in bold. State is a short word, % sits right after it, and the note column at the end holds every
+ * other explanation. Under a step: `-> what blocks it`. With subagents, each group (this session first) opens with a
+ * divider and a bold row naming it, with its own state and %.
  */
 export function statusBody(ui: Ui, data: StatusData | null) {
   const { h } = ui
   if (!busy(data)) return h(ui.Text, { dimColor: true }, 'nothing running')
-  const heads = ['Step', 'State']
-  const fields = (row: StatusRow) => [row.item, row.state]
-  const done = (row: StatusRow) => (row.percent !== '' ? `${row.percent}%` : PLACEHOLDERS.includes(row.figure) ? '' : row.figure)
+  const heads = ['Step', 'State', '%', 'Note']
+  const fields = (row: StatusRow) => [row.item, splitState(row.state).short, row.percent === '' ? '' : `${row.percent}%`, noteOf(row)]
   const blocker = (row: StatusRow) => (PLACEHOLDERS.includes(row.blocker || row.waiting) ? '' : `-> ${row.blocker || row.waiting}`)
-  const under = (row: StatusRow) => [done(row), blocker(row)].filter(Boolean).map(text => h(ui.Text, { dimColor: true }, text))
   const widths = heads.map((head, at) =>
     Math.min(STATUS_COLUMN, Math.max(head.length, ...data.rows.map(row => (fields(row)[at] ?? '').length))) + 1)
-  const cellsOf = (texts: string[], kind: 'head' | 'running' | 'plain') => h(ui.Box, { flexDirection: 'row', columnGap: 1 },
+  const cellsOf = (texts: string[], kind: 'head' | 'group' | 'running' | 'plain') => h(ui.Box, { flexDirection: 'row', columnGap: 1 },
     texts.map((text, at) => h(ui.Box, at < texts.length - 1 ? { width: widths[at], flexShrink: 0 } : { flexGrow: 1 },
       kind === 'head' ? hoverable(ui, `status-${text}`, h(ui.Text, { bold: true }, text))
-        : h(ui.Text, kind === 'running' ? { bold: true } : at === 0 ? {} : { dimColor: text === '—' || text === '-' || text === '' }, text))))
+        : h(ui.Text, kind === 'plain' ? (at === 0 ? {} : { dimColor: true }) : { bold: true }, text))))
   const said = (title: string, text: string) => (text === ''
     ? null
     : [h(ui.Box, { flexDirection: 'row', columnGap: 1 },
@@ -124,6 +154,8 @@ export function statusBody(ui: Ui, data: StatusData | null) {
     helpCard(ui, `status-${title}`, STATUS_HELP[title])])
   const groups = stepGroups(data.rows)
   const titled = groups.some(group => group.agent !== '')
+  // A divider: a box with only its top border, as wide as the table.
+  const divider = () => h(ui.Box, { borderStyle: 'single', borderTop: true, borderBottom: false, borderLeft: false, borderRight: false, borderDimColor: true })
   return h(ui.Box, { flexDirection: 'column' },
     said('Now', data.now),
     said('Next', data.next),
@@ -131,7 +163,7 @@ export function statusBody(ui: Ui, data: StatusData | null) {
       cellsOf(heads, 'head'),
       heads.map(head => helpCard(ui, `status-${head}`, STATUS_HELP[head])),
       groups.map(group => [
-        titled ? h(ui.Text, { dimColor: true }, [group.agent || 'this session', donePercent(group.rows)].filter(Boolean).join(' · ')) : null,
-        group.rows.map(row => [cellsOf(fields(row), row.state === RUNNING ? 'running' : 'plain'),
-          under(row).length === 0 ? null : h(ui.Box, { flexDirection: 'column', marginLeft: 2 }, under(row))])])))
+        titled ? [divider(), cellsOf([group.agent || 'this session', groupState(group.rows), donePercent(group.rows), ''], 'group')] : null,
+        group.rows.map(row => [cellsOf(fields(row), splitState(row.state).short === RUNNING ? 'running' : 'plain'),
+          blocker(row) === '' ? null : h(ui.Box, { marginLeft: 2 }, h(ui.Text, { dimColor: true }, blocker(row)))])])))
 }

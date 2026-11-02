@@ -22,8 +22,9 @@ message until it is done. A one-question/one-answer exchange gets no list.
   plan goes up in the first message, before any work.
 - **Analyse first, then steps in the Status box (user decision 02/11/2026).** Every task is analysed and split into steps
   (phases where it helps) before any work, and the steps go into the pane's Status box with `podium_status.py step` in
-  order: each with its state (not started · running · done · blocked · did not run), how much of it is done (%), and what
-  blocks it. A request that arrives mid-work is analysed the same way and its steps go in where they belong (`--after`).
+  order: each with a short name, its state (not started · running · done · blocked · did not run), how much of it is done
+  (%), what blocks it (`--blocker`) and any details (`--note`); the box shows the state as one short word (todo · run ·
+  done · stuck · skip), the % beside it and every detail in a last column. A request that arrives mid-work is analysed the same way and its steps go in where they belong (`--after`).
   A subagent writes its own steps under its name (`--agent`); the box shows each group with its %. The setting
   `steps.enforce` decides how hard: `block` (default) refuses a code edit or a commit until the box holds steps,
   `remind` only reminds on each message. Claude's own bookkeeping in `~/.claude` and temp files are never blocked.
