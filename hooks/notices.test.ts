@@ -16,6 +16,7 @@ test('a setting names the rules it steers, and a setting no rule reads names non
   expect(rulesFor('agents.qa.model')).toEqual(['#27', '#28'])
   expect(rulesFor('write.unit_tests')).toEqual(['#8', '#32', '#29'])
   expect(rulesFor('write.e2e')).toEqual(['#33', '#31'])
+  expect(rulesFor('gate_steps.sast.test')).toEqual(['#34', '#25', '#19'])
   expect(rulesFor('merge.test')).toEqual(['#34', '#26'])
   expect(rulesFor('push.prod')).toEqual(['#34', '#26'])
   expect(rulesFor('gates_before_push.dev')).toEqual(['#34', '#25', '#29'])

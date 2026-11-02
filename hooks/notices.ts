@@ -37,6 +37,7 @@ const RULES_OF: Array<[RegExp, string[]]> = [
   [/^merge\./, ['#34', '#26']],
   [/^push\./, ['#34', '#26']],
   [/^gates_before_push\./, ['#34', '#25', '#29']],
+  [/^gate_steps\./, ['#34', '#25', '#19']],
   [/^coverage_before_push\./, ['#34', '#29']],
   [/^ci_after_push\./, ['#34', '#19']],
   [/^ci\.runner$/, ['#19', '#25']],

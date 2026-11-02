@@ -1,4 +1,7 @@
-export type Spec = { key: string; type: 'bool' | 'enum'; label: string; group: string; options?: string[] }
+/** `step`, `heading`, `default`: a gate step's name in the pane, its heading in the gate, its default (additive, 02/11/2026). */
+export type Spec = {
+  key: string; type: 'bool' | 'enum'; label: string; group: string; options?: string[]; step?: string; heading?: string; default?: boolean
+}
 export type AgentRow = {
   role: string
   defined: string

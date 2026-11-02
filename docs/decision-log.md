@@ -660,6 +660,19 @@ after `Agent`/`Bash` tool calls) compares the effective settings with what that 
 adds a context note with the changes, "apply from the NEXT task, do not restart or split the step in progress". Nothing
 is interrupted and nothing is queued by Claude; the note is the whole mechanism. The first call of a session only records.
 
+**Amended 02/11/2026 (user request: "list every step of the gate like coverage, so I can choose what runs while the gate
+is on").** Every step of the shared gate is a setting per target, `gate_steps.<id>.<t>`, default on; the Settings pane
+lists them indented under *Gates*, under a `steps` label, for each target whose gate is on. The list is written once, in
+`GATE_STEPS` of `scripts/gate-lib.sh`; `podium_schema.py` reads it for the pane, so a step added to the gate shows there
+with no second list (rule #2). A step the user unticks **does not run, is reported WAIVED and is named in the merge
+commit's `Gate-Waived:` line, never counted as passed** (amends #19 and #25: removing a step stays forbidden to a
+project; the user's own choice per target is a waiver, recorded like the gate's). The gate reads the choice from
+`.claude/sdlc-settings.json`, like coverage; only an explicit `false` waives, a missing or unreadable file runs every
+step (fail closed). Coverage keeps its own setting (#29) and is not in the list. The last selection comes back: a press
+on the Session tab writes this session's layer and the saved defaults, so the next session starts with it; with nothing
+saved, every step is on. The `steps.enforce` row's label became *Plan* (the key is unchanged, rule #4), since *steps*
+now names the gate's.
+
 ## Model per job — run on Sonnet, diagnose on Opus (29/09/2026, user decision)
 
 **The rule:** `standards/23-delivery-flow-tuning.md` §13b. Running a suite or gate is
