@@ -37,6 +37,10 @@ EXPECTED = {
 for _role in cfg.D_ROLES:
     EXPECTED['agents.%s.enabled' % _role] = 'auto'
     EXPECTED['agents.%s.model' % _role] = 'default'
+# Every step of the gate starts on (02/11/2026). Its default is in the schema, not in defaults/podium.json, so the step
+# list is written only in gate-lib.sh (rule #2).
+GATE_STEP_KEYS = ['gate_steps.%s.%s' % (_step, _t) for _step, _, _ in cfg.GATE_STEPS for _t in cfg.TARGETS]
+EFFECTIVE = dict(EXPECTED, **{_key: True for _key in GATE_STEP_KEYS})
 
 
 class Shipped(unittest.TestCase):
@@ -47,7 +51,8 @@ class Shipped(unittest.TestCase):
 
     def test_every_setting_has_a_default_and_every_default_a_setting(self):
         values, _ = cfg.read_layer(cfg.DEFAULTS_FILE)
-        self.assertEqual(sorted(cfg.SPECS), sorted(values))
+        self.assertEqual(sorted(set(cfg.SPECS) - set(GATE_STEP_KEYS)), sorted(values))
+        self.assertTrue(GATE_STEP_KEYS and all(cfg.SPECS[key].get('default') is True for key in GATE_STEP_KEYS))
 
     def test_every_setting_is_a_checkbox_or_a_dropdown_with_a_label(self):
         for spec in cfg.SCHEMA:
@@ -96,7 +101,7 @@ class Tool(unittest.TestCase):
 class Layers(Tool):
     def test_with_no_files_the_defaults_apply(self):
         data = self.values()
-        self.assertEqual(EXPECTED, data['values'])
+        self.assertEqual(EFFECTIVE, data['values'])
         self.assertEqual({'default'}, set(data['sources'].values()))
 
     def test_user_beats_default_and_project_beats_user(self):
