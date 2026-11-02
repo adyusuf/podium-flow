@@ -1,7 +1,7 @@
 # scripts — the gate, the hook scripts, measurement and install
 
-36 scripts (`.sh`/`.py`) and their tests in `tests/`:
-`python3 -m unittest discover -s scripts/tests -p 'test_*.py'` (856 tests on 02/11/2026). The sections:
+37 scripts (`.sh`/`.py`) and their tests in `tests/`:
+`python3 -m unittest discover -s scripts/tests -p 'test_*.py'` (860 tests on 02/11/2026). The sections:
 [CLAUDE.md maintenance](#claudemd-maintenance-tools) ·
 [measurement and commit gate](#measurement-and-commit-gate-scripts) · [the shared gate](#gate-coresh--the-shared-gate-in-two-layers) ·
 [the gate in your own project](#putting-the-gate-in-a-project-of-your-own).
@@ -184,7 +184,7 @@ Not everything here is meant to be copied, and some copied files must be edited.
 | `doc-check.py` | **Copy if you want it** | Runs from `pre-commit.sh` when present. Checks that do not apply (no `standards/`, no index) are no-ops. |
 | `evidence-check.py` + `evidence-block.schema.json` | **Copy both, only if you run agents (modes C/D/E)** | The script loads the schema from beside itself. |
 | `tests/` | **Copy only the tests of the scripts you copied** | |
-| `md-hook.sh` | **Do not copy** | A plugin hook (`hooks/hooks.json`, `PostToolUse` Edit/Write and `Stop`); it finds its sibling scripts beside itself. |
+| `md-hook.sh`, `md_hook_path.py` | **Do not copy** | A plugin hook (`hooks/hooks.json`, `PostToolUse` Edit/Write and `Stop`); it finds its sibling scripts beside itself. `md_hook_path.py` reads the edited path from the payload, kept out of the hook so the plugin directory can read every command. |
 | `step-stats.py` (+ its `step_stats_*.py` parts), `measurement-cuts.tsv` | **Do not copy** | They read the transcripts of *all* projects under `~/.claude/projects`; there is one canonical copy, here. The ledger, its per-day reports and the per-session cost tool USED to sit beside them and now live in ~/.claude/measurement/ (outside this repository, and deliberately so: it records per-session token and cost metadata, which a published rule set has no business carrying, and a ledger next to the rules keeps session metadata on disk longer than the platform's own retention). |
 
 Every file marked **copy as is** is listed in `twins.txt` and drift-checked: by `md-hook.sh` inside a project against the plugin's `scripts/` (the configuration repository itself is exempt, since it is the canonical set), and by `twin-drift.sh` across every project's `origin/dev`.

@@ -2187,3 +2187,10 @@ with it, which would have blocked every running session's tools. `plugin-setup.p
 is downloaded and run before any checkout exists; that is its written exception to rule #9 (419 lines). This log keeps
 the old name in its earlier entries, which record what happened then; only their file paths point at the new names.
 Other repositories that name `adyusuf:<role>` or `.claude/adyusuf.json` are moved separately.
+
+**The Status box's look (02/11/2026, user decisions).** Step · state · % · note: the state is one short word (todo · run ·
+done · stuck · skip) and anything else written in it goes to the note; the % is a narrow column beside it; the note
+column, last, gathers every detail (the state's own, `--note`, an older row's measured figure); `-> what blocks it` stays
+under the step. With subagents, each group opens with a divider and a bold row with the group's state (run while a step
+runs, stuck while one is blocked, done when all are over, else todo) and its %. Step names stay short; details go in
+`--note`, which `step` now takes.
