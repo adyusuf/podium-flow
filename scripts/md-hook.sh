@@ -29,30 +29,31 @@
 # ~/.claude/scripts directory symlink finds the same siblings through that link.
 set -uo pipefail
 
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Every command sits on its own line and its output is assigned first: the plugin directory's validator reads each
+# command on its own and refuses a script whose commands sit inside quoted strings (02/11/2026).
+here=$(dirname "${BASH_SOURCE[0]}")
+here=$(cd "$here" && pwd)
 
-input="$(cat 2>/dev/null || true)"
+input=$(cat 2>/dev/null)
 
 # PostToolUse supplies a file path; the Stop event does not.
-path="$(printf '%s' "$input" | python3 -c 'import json,sys
-try: d=json.load(sys.stdin)
-except Exception: sys.exit(0)
-ti=d.get("tool_input") or {}
-print(ti.get("file_path") or ti.get("path") or "")' 2>/dev/null)"
+path=$(python3 "$here/md_hook_path.py" <<<"$input" 2>/dev/null)
 
 if [ -n "$path" ]; then
   # Tool-based call: only CLAUDE.md is of interest.
-  case "$(basename "$path")" in CLAUDE.md) ;; *) exit 0 ;; esac
-  start="$(dirname "$path")"
+  name=$(basename "$path")
+  [ "$name" = "CLAUDE.md" ] || exit 0
+  start=$(dirname "$path")
 else
   # Stop event: look at the repository of the current working directory.
-  start="$PWD"
+  start=$PWD
 fi
 
-root="$(git -C "$start" rev-parse --show-toplevel 2>/dev/null)" || exit 0
+root=$(git -C "$start" rev-parse --show-toplevel 2>/dev/null) || exit 0
 [ -n "$root" ] || exit 0
 
-output="$(MD_ROOT="$root" bash "$here/md-size-gate.sh" --hook 2>&1)" || true
+export MD_ROOT="$root"
+output=$(bash "$here/md-size-gate.sh" --hook 2>&1)
 
 # If no budget is installed, stay QUIET on the Stop event (suggesting an install
 # on every turn is noise); say it once if a CLAUDE.md was explicitly edited.
@@ -78,7 +79,7 @@ fi
 # The list lives in ONE file (twins.txt), shared with twin-drift.sh: two lists that disagree would mean
 # a script is checked in one place and not the other.
 TWINS_FILE="${TWINS_FILE:-$here/twins.txt}"
-TWINS="$(grep -vE '^[[:space:]]*(#|$)' "$TWINS_FILE" 2>/dev/null | tr '\n' ' ')"
+TWINS=$(grep -vE '^[[:space:]]*(#|$)' "$TWINS_FILE" 2>/dev/null | tr '\n' ' ')
 [ -n "$TWINS" ] || echo "⚠️ The twin list is missing or empty ($TWINS_FILE): copied scripts are NOT being checked for drift."
 drifted=""
 # The configuration repository IS the canonical set: comparing one of its worktrees
