@@ -16,7 +16,7 @@ Usage:
     podium_status.py --session ID next TEXT                 what runs next ('' clears it)
     podium_status.py --session ID row ITEM STATE FIGURE WAITING
                                                              add the row named ITEM, or replace it in place
-    podium_status.py --session ID step ITEM STATE PERCENT [--blocker TEXT] [--agent NAME] [--after ITEM]
+    podium_status.py --session ID step ITEM STATE PERCENT [--blocker TEXT] [--agent NAME] [--after ITEM] [--note TEXT]
                                                              a step (02/11/2026): its state (STATES), how much is done
                                                              (0-100), what blocks it, who runs it (a subagent; none =
                                                              this session); --after puts a new step after that one,
@@ -48,7 +48,7 @@ MAX_TEXT = 300
 MAX_ROWS = 50
 FIELDS = ('item', 'state', 'figure', 'waiting')
 # A step's own fields (user decision 02/11/2026); a row written by `row` leaves them empty.
-STEP_FIELDS = ('percent', 'blocker', 'agent')
+STEP_FIELDS = ('percent', 'blocker', 'agent', 'note')     # note: what the step's short name leaves out
 STATES = ('not started', 'running', 'done', 'blocked', 'did not run')
 OPEN, CLOSED = STATES[:2] + STATES[3:4], (STATES[2], STATES[4])      # a step still to finish, and one that is over
 EMPTY = {'now': '', 'next': '', 'rows': [], 'updated': ''}
@@ -230,7 +230,7 @@ def render(data):
     for row in data['rows']:
         if row.get('percent') or row.get('agent') or row.get('blocker'):
             done = row['percent'] + '%' if row['percent'] else ''
-            lines.append(' | '.join([row['agent'] or 'session', row['item'], row['state'], done, row['blocker']]))
+            lines.append(' | '.join([row['agent'] or 'session', row['item'], row['state'], done, row['blocker'], row['note']]).rstrip(' |'))
         else:
             lines.append(' | '.join(row.get(key, '') for key in FIELDS))
     return '\n'.join(lines) if lines else 'nothing running'
@@ -245,7 +245,7 @@ def change(args):
         elif args.action == 'row':
             data = put_row(data, args.item, args.state, args.figure, args.waiting)
         elif args.action == 'step':
-            step = {'percent': percent(args.percent), 'blocker': clip(args.blocker), 'agent': clip(args.agent)}
+            step = {'percent': percent(args.percent), 'blocker': clip(args.blocker), 'agent': clip(args.agent), 'note': clip(args.note)}
             # The older fields carry the % and the blocker too, so an older writer's rewrite keeps them (rule #4).
             figure = step['percent'] + '%' if step['percent'] else ''
             data = put_row(data, args.item, args.state, figure, step['blocker'], step, args.after)
@@ -275,7 +275,7 @@ def main(argv=None):
     step = sub.add_parser('step')
     for name in ('item', 'state', 'percent'):
         step.add_argument(name)
-    for name in ('--blocker', '--agent', '--after'):
+    for name in ('--blocker', '--agent', '--after', '--note'):
         step.add_argument(name, default='' if name != '--after' else None)
     drop = sub.add_parser('drop')
     drop.add_argument('item')

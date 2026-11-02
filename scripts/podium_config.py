@@ -99,8 +99,8 @@ def context(effective, problems, session=None):
         lines.append('  this session is %s: what the rail boxes change applies to it only (podium_config.py set --session %s '
                      '<key> <value>); a new session starts from the saved defaults.' % (session, session))
         lines.append('  status box and steps (steps.enforce: %s): analyse every task first and write its steps, in order, '
-                     'before acting: python3 "%s" --session %s step "<n. step>" "<state>" <percent> [--blocker "<what>"] '
-                     '[--after "<step>"]; a new request mid-work goes in as steps with --after. Keep state (not started, '
+                     'before acting: python3 "%s" --session %s step "<n. short name>" "<state>" <percent> [--blocker "<what>"] '
+                     '[--after "<step>"] [--note "<details>"]; a new request mid-work goes in as steps with --after. Keep state (not started, '
                      'running, done, blocked, did not run) and %% current; now|next <text> say what runs. The hooks set now '
                      'on each message and "waiting for you" at each turn\'s end (standards/00 §1a, §10d).'
                      % (value('steps.enforce'), os.path.join(ROOT, 'scripts', 'podium_status.py'), session))

@@ -62,6 +62,7 @@ class PluginRoot(Base):
         os.makedirs(self.scripts)
         self.hook = os.path.join(self.scripts, 'md-hook.sh')
         shutil.copy(HOOK, self.hook)
+        shutil.copy(os.path.join(SCRIPTS, 'md_hook_path.py'), self.scripts)    # the hook's payload reader
         shutil.copy(TWINS, os.path.join(self.scripts, 'twins.txt'))
         write(self.canonical('md-size-gate.sh'), QUIET)      # the drift tests are not about the budget
 
