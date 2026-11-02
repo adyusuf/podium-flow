@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import { headWidth, ROW_LABELS, settingsBody } from './boxes'
 import { gatedTargets, gateSteps, pressStep, STEP_INDENT, STEPS_INDENT, stepOn, stepsWidth } from './gatesteps'
-import { ROW_HELP, STEP_HELP, STEPS_HELP } from './help'
+import { LOCKED_STEP_HELP, ROW_HELP, STEP_HELP, STEPS_HELP } from './help'
 
 // The gate's steps under Gates (user decision 02/11/2026), read through a recording factory as in boxes.test.ts.
 type Node = { type: unknown; props: Record<string, any>; children: unknown[] }
@@ -49,8 +49,8 @@ const data = (over: Record<string, boolean | string> = {}, saved: Record<string,
 
 test('the steps come from the schema, in order, with their targets, name and heading; other keys are not steps', () => {
   expect(gateSteps(SCHEMA)).toEqual([
-    { id: 'lint', name: 'lint', heading: 'formatter / linter', targets: TARGETS },
-    { id: 'sast', name: 'SAST', heading: 'SAST', targets: TARGETS }])
+    { id: 'lint', name: 'lint', heading: 'formatter / linter', targets: TARGETS, locked: false },
+    { id: 'sast', name: 'SAST', heading: 'SAST', targets: TARGETS, locked: false }])
   expect(gateSteps([{ key: 'gate_steps.x.dev.extra' }, { key: 'gate_steps.' }, { key: 'push.dev' }])).toEqual([])
   expect(gateSteps([{ key: 'gate_steps.x.dev' }])[0]!.name).toBe('x')
 })
@@ -110,4 +110,16 @@ test('the new rows have hover cards: `steps` its own, a step its heading from th
 
 test('the steps.enforce row is labelled Plan now; Steps is no row of its own', () => {
   expect([ROW_LABELS.includes('Plan'), ROW_LABELS.includes('Steps'), (ROW_HELP.Plan ?? '').length > 10]).toEqual([true, false, true])
+})
+
+test('a locked step (the secret scan, SAST) is drawn ticked whatever the value, a press changes nothing, its card says why', () => {
+  const locked = [...SCHEMA, ...step('secrets', 'secrets', 'secret scan').map(spec => ({ ...spec, locked: true }))]
+  const pressed: string[] = []
+  const body = settingsBody(ui, { ...data({ 'gate_steps.secrets.test': false }), schema: locked }, '', [], (key: string) => pressed.push(key))
+  expect(lines(body).map(([, text]) => text).filter(text => text.startsWith('secrets'))).toEqual(['secrets[test][prod]'])
+  for (const one of all(body, 'Button').filter(button => String(button.props.key).includes('gate_steps.secrets'))) one.props.onPress()
+  expect(pressed).toEqual([])
+  const cards = all(body, 'Box').filter(node => node.props.display === 'none').map(words)
+  expect(cards.includes(`secret scan: ${LOCKED_STEP_HELP}`) && LOCKED_STEP_HELP.includes('#19')).toBe(true)
+  expect(gateSteps(locked).map(one => one.locked)).toEqual([false, false, true])
 })

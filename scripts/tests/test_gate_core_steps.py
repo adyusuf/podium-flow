@@ -31,9 +31,10 @@ class GateSteps(GateProject):
         super().setUp()
         self.sast = os.path.join(self.project, 'sast-ran')
         self.secrets = os.path.join(self.project, 'secrets-ran')
+        self.compat = os.path.join(self.project, 'compat-ran')
         # Every command passes, so only what the ticks change decides the verdict.
         self.conf = (self.measured() + f'SAST_CMD="touch {self.sast}"\nSECRET_CMD="touch {self.secrets}"\n'
-                     'BACKCOMPAT_CMD="true"\n')
+                     f'BACKCOMPAT_CMD="touch {self.compat}"\n')
 
     def steps(self, **ticks):
         os.makedirs(os.path.join(self.project, '.claude'), exist_ok=True)
@@ -41,37 +42,48 @@ class GateSteps(GateProject):
             json.dump({'version': 1, 'settings': {'gate_steps': ticks}}, handle)
 
     def test_an_unticked_step_does_not_run_and_is_waived_never_passed(self):
-        self.steps(sast={'dev': False, 'test': True})
+        self.steps(compat={'dev': False, 'test': True})
         out, _ = self.gate(self.conf)
-        self.assertFalse(os.path.exists(self.sast), out)
-        self.assertIn('WAIVED: sast (gate_steps.sast.dev = no', out)
-        self.assertIn('- WAIVED sast (configuration; the merge commit must carry Gate-Waived: sast)', out)
-        self.assertNotIn('✓ SAST', out)
+        self.assertFalse(os.path.exists(self.compat), out)
+        self.assertIn('WAIVED: compat (gate_steps.compat.dev = no', out)
+        self.assertIn('- WAIVED compat (configuration; the merge commit must carry Gate-Waived: compat)', out)
+        self.assertNotIn('✓ backward compatibility', out)
         self.assertTrue(os.path.exists(self.secrets), 'a ticked step still runs')
 
+    def test_a_pull_request_that_turns_off_the_secret_scan_and_sast_changes_nothing(self):
+        # The file is the project's own, so a pull request can commit it; the two locked steps run whatever it says.
+        self.steps(secrets={'dev': False}, sast={'dev': False}, compat={'dev': False})
+        out, _ = self.gate(self.conf)
+        self.assertTrue(os.path.exists(self.secrets) and os.path.exists(self.sast), out)
+        for step in ('secrets', 'sast'):
+            self.assertIn('gate_steps.%s.dev = no in .claude/sdlc-settings.json was IGNORED: %s is locked' % (step, step), out)
+            self.assertNotIn('WAIVED: %s' % step, out)
+        self.assertFalse(os.path.exists(self.compat), 'a step that is not locked is still waived')
+        self.assertIn('WAIVED: compat', out)
+
     def test_the_tick_of_another_target_does_not_waive_this_one(self):
-        self.steps(sast={'dev': False})
+        self.steps(compat={'dev': False})
         out, _ = self.gate(self.conf, target='test')
-        self.assertTrue(os.path.exists(self.sast), out)
-        self.assertNotIn('WAIVED: sast', out)
+        self.assertTrue(os.path.exists(self.compat), out)
+        self.assertNotIn('WAIVED: compat', out)
 
     def test_only_false_waives_and_a_missing_file_runs_every_step(self):
-        for ticks in ({'sast': {'dev': True}}, {'sast': {'dev': 'no'}}, {'sast': {'dev': None}}, {}):
+        for ticks in ({'compat': {'dev': True}}, {'compat': {'dev': 'no'}}, {'compat': {'dev': None}}, {}):
             with self.subTest(ticks=ticks):
                 self.steps(**ticks)
                 out, _ = self.gate(self.conf)
-                self.assertTrue(os.path.exists(self.sast), out)
-                os.remove(self.sast)
+                self.assertTrue(os.path.exists(self.compat), out)
+                os.remove(self.compat)
         os.remove(os.path.join(self.project, '.claude', 'sdlc-settings.json'))
         out, _ = self.gate(self.conf)
-        self.assertTrue(os.path.exists(self.sast), out)
+        self.assertTrue(os.path.exists(self.compat), out)
 
     def test_a_file_that_does_not_parse_runs_every_step_and_says_so(self):
         os.makedirs(os.path.join(self.project, '.claude'), exist_ok=True)
         with open(os.path.join(self.project, '.claude', 'sdlc-settings.json'), 'w', encoding='utf-8') as handle:
             handle.write('{ broken')
         out, _ = self.gate(self.conf)
-        self.assertTrue(os.path.exists(self.sast), out)
+        self.assertTrue(os.path.exists(self.compat), out)
         self.assertIn('every gate step runs (fail closed)', out)
 
     def test_waiving_the_steps_that_would_be_skipped_ends_green_and_names_them(self):
@@ -84,10 +96,10 @@ class GateSteps(GateProject):
         self.assertIn('GATE GREEN (with 0 accepted gap(s), 2 step(s) waived by configuration: md e2e_specs)', out)
 
     def test_a_listing_shows_the_waived_step_and_does_not_list_its_command(self):
-        self.steps(sast={'dev': False})
+        self.steps(compat={'dev': False})
         out, _ = self.gate(self.conf, '--list')
-        self.assertIn('WAIVED: sast', out)
-        self.assertNotIn(f'touch {self.sast}', out)
+        self.assertIn('WAIVED: compat', out)
+        self.assertNotIn(f'touch {self.compat}', out)
 
     def test_every_step_prints_its_own_heading_from_the_list(self):
         out, _ = self.gate(self.conf)
@@ -163,6 +175,10 @@ class EveryStep(GateProject):
         for step in self.EVIDENCE:
             with self.subTest(step=step):
                 log, out = self.run_gate(step)
+                if step in podium_schema.LOCKED_STEPS:
+                    self.assertTrue(self.ran(step, log, out), 'locked %s did not run\n%s' % (step, out))
+                    self.assertIn('was IGNORED: %s is locked' % step, out)
+                    continue
                 self.assertFalse(self.ran(step, log, out), '%s ran while unticked\n%s' % (step, out))
                 if step in self.ALSO:
                     self.assertNotIn(self.ALSO[step], log)
@@ -204,9 +220,14 @@ class TheOneList(unittest.TestCase):
     def test_an_unreadable_or_malformed_block_gives_no_steps(self):
         self.assertEqual([], podium_schema.gate_steps('/nonexistent/gate-lib.sh'))
         with tempfile.NamedTemporaryFile('w', suffix='.sh', delete=False, encoding='utf-8') as handle:
-            handle.write("GATE_STEPS='lint|lint|formatter\nBad Id|x|y\nonly|two\nsast|SAST|SAST'\n")
+            handle.write("GATE_STEPS='lint|lint|formatter\nBad Id|x|y\nonly|two\nsast|SAST|SAST|locked\nodd|o|O|maybe'\n")
         self.addCleanup(os.remove, handle.name)
         self.assertEqual([('lint', 'lint', 'formatter'), ('sast', 'SAST', 'SAST')], podium_schema.gate_steps(handle.name))
+        self.assertEqual(['sast'], podium_schema.locked_steps(handle.name))
+        self.assertEqual([], podium_schema.locked_steps('/nonexistent/gate-lib.sh'))
+
+    def test_the_secret_scan_and_sast_are_the_locked_steps(self):
+        self.assertEqual(('secrets', 'sast'), podium_schema.LOCKED_STEPS)
 
 
 if __name__ == '__main__':

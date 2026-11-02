@@ -50,3 +50,6 @@ export const STEPS_HELP = 'The steps of the shared gate, shown for each branch w
 
 /** Every gate step row's card, after the step's own heading from the gate (gate-lib.sh), so no step is named here. */
 export const STEP_HELP = 'a step of the shared gate. Unticked, it does not run on that branch; the gate reports it as waived and the merge names it in Gate-Waived, never as passed.'
+
+/** A locked step's card (the secret scan and SAST), after its heading: why its tick cannot be changed. */
+export const LOCKED_STEP_HELP = 'always on. Rule #19: security scans are never switched off, so this tick cannot be removed and the gate runs it even if a settings file says no.'

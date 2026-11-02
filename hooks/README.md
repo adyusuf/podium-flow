@@ -85,7 +85,7 @@ reopening them.
   - *steps*, one step in under *Gates*, then one row per step of the shared gate two steps in (`gate_steps.<id>.<t>`,
     default on), each with a checkbox for every target whose gate is on; with no gate on, the block is hidden. The rows
     come from `GATE_STEPS` in `scripts/gate-lib.sh`, so the pane names no step itself. An unticked step does not run and
-    is recorded as `Gate-Waived`. A press on the Session tab also saves the choice as the default, so the next session
+    is recorded as `Gate-Waived`. The secret scan and SAST are locked (#19): their ticks stay checked and a press changes nothing. A press on the Session tab also saves the choice as the default, so the next session
     starts with the last selection (user decision 02/11/2026).
   - *Runner* (`cloud` = GitHub's runners, `local` = this machine's), *Deploy* (which environments a pushed update is
     deployed to) and *E2E* (run e2e before that deploy; rule #33).

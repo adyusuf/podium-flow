@@ -26,15 +26,15 @@ class Ticks(Tool):
         self.assertTrue(all(values[key] is True for key in keys))
 
     def test_the_saved_choice_comes_back_in_a_new_session_and_the_session_beats_it(self):
-        self.run_tool('set', 'gate_steps.sast.test', 'no')
+        self.run_tool('set', 'gate_steps.compat.test', 'no')
         _, _, code = self.run_tool('set', '--session', 'one', 'gate_steps.lint.test', 'no')
         self.assertEqual(0, code)
-        fresh, _, _ = self.run_tool('get', '--session', 'two', 'gate_steps.sast.test')
+        fresh, _, _ = self.run_tool('get', '--session', 'two', 'gate_steps.compat.test')
         self.assertEqual('no', fresh.strip())
         other, _, _ = self.run_tool('get', '--session', 'two', 'gate_steps.lint.test')
         self.assertEqual('yes', other.strip(), 'a session-only tick must not reach another session')
-        self.run_tool('set', '--session', 'one', 'gate_steps.sast.test', 'yes')
-        now, _, _ = self.run_tool('get', '--session', 'one', 'gate_steps.sast.test')
+        self.run_tool('set', '--session', 'one', 'gate_steps.compat.test', 'yes')
+        now, _, _ = self.run_tool('get', '--session', 'one', 'gate_steps.compat.test')
         self.assertEqual('yes', now.strip())
 
     def test_an_unknown_step_is_refused(self):
@@ -43,11 +43,11 @@ class Ticks(Tool):
         self.assertIn('unknown setting', err)
 
     def test_the_context_names_the_unticked_steps_where_the_gate_runs(self):
-        self.run_tool('set', 'gate_steps.sast.test', 'no')
-        self.run_tool('set', 'gate_steps.compat.dev', 'no')       # the dev gate is off by default: nothing to name
+        self.run_tool('set', 'gate_steps.compat.test', 'no')
+        self.run_tool('set', 'gate_steps.lint.dev', 'no')         # the dev gate is off by default: nothing to name
         out, _, _ = self.run_tool('context')
         line = next(text for text in out.splitlines() if text.strip().startswith('test: merge'))
-        self.assertIn('gate steps off (waived, named in Gate-Waived): sast', line)   # the id the gate prints
+        self.assertIn('gate steps off (waived, named in Gate-Waived): compat', line)   # the id the gate prints
         dev = next(text for text in out.splitlines() if text.strip().startswith('dev: merge'))
         self.assertNotIn('gate steps off', dev)
 
@@ -60,18 +60,52 @@ class Ticks(Tool):
                          (first['key'], first['step'], first['heading'], first['default'], first['type']))
 
 
+class Locked(Tool):
+    """The secret scan and SAST can never be unticked (user decision 02/11/2026, rule #19), at any layer."""
+
+    def test_set_and_apply_refuse_to_turn_them_off_at_every_layer(self):
+        for step in cfg.LOCKED_STEPS:
+            for scope in ([], ['--project'], ['--session', 'one']):
+                with self.subTest(step=step, scope=scope):
+                    _, err, code = self.run_tool('set', *scope, 'gate_steps.%s.test' % step, 'no')
+                    self.assertEqual(2, code)
+                    self.assertIn('locked on', err)
+            _, err, code = self.run_tool('apply', '-', stdin=json.dumps({'gate_steps.%s.dev' % step: False}))
+            self.assertEqual(2, code, err)
+        self.assertFalse(os.path.exists(self.user) or os.path.exists(self.project), 'a refused change wrote a file')
+        _, _, code = self.run_tool('set', 'gate_steps.sast.test', 'yes')
+        self.assertEqual(0, code, 'turning a locked step on is allowed')
+
+    def test_a_file_that_holds_them_off_keeps_them_on_and_the_rest_of_the_layer(self):
+        with open(self.user, 'w', encoding='utf-8') as handle:
+            json.dump({'push': {'prod': False}, 'gate_steps': {'sast': {'test': False}, 'secrets': {'dev': 'no'},
+                                                               'compat': {'test': False}}}, handle)
+        data = self.values()
+        self.assertEqual([], data.get('problems', []))
+        values = data['values']
+        self.assertEqual((True, True, False, False),
+                         (values['gate_steps.sast.test'], values['gate_steps.secrets.dev'], values['gate_steps.compat.test'],
+                          values['push.prod']))
+
+    def test_the_schema_marks_them_locked_for_the_pane(self):
+        out, _, _ = self.run_tool('schema')
+        locked = sorted({spec['key'].split('.')[1] for spec in json.loads(out) if spec.get('locked')})
+        self.assertEqual(sorted(cfg.LOCKED_STEPS), locked)
+        self.assertEqual(['sast', 'secrets'], locked)
+
+
 class InTheProject(Tool):
     def test_the_ticks_are_written_where_the_gate_reads_them(self):
         with open(self.user, 'w', encoding='utf-8') as handle:
-            json.dump({'gate_steps': {'sast': {'test': False}}}, handle)
+            json.dump({'gate_steps': {'compat': {'test': False}}}, handle)
         env = dict(os.environ, PODIUM_CONFIG_USER=self.user, PODIUM_SESSION_DIR=os.path.join(self.home, 'sessions'))
         done = subprocess.run([sys.executable, os.path.join(SCRIPTS, 'sdlc_settings.py'), 'write', '--project', self.repo],
                               capture_output=True, text=True, env=env)
         self.assertEqual(0, done.returncode, done.stderr)
         with open(os.path.join(self.repo, '.claude', 'sdlc-settings.json'), encoding='utf-8') as handle:
             steps = json.load(handle)['settings']['gate_steps']
-        self.assertIs(False, steps['sast']['test'])
-        self.assertIs(True, steps['sast']['dev'])
+        self.assertIs(False, steps['compat']['test'])
+        self.assertIs(True, steps['compat']['dev'])
         self.assertEqual(sorted(step for step, _, _ in cfg.GATE_STEPS), sorted(steps))
 
 

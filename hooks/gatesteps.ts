@@ -3,19 +3,20 @@
 // one per target. The steps come from the schema, which reads them from GATE_STEPS in gate-lib.sh: no step is named
 // here (rule #2). Engine-free like boxes.ts, which it was split out of so no file passes 300 lines (rule #9).
 import { INDENT, option } from './controls'
-import { STEP_HELP, STEPS_HELP } from './help'
+import { LOCKED_STEP_HELP, STEP_HELP, STEPS_HELP } from './help'
 import type { Ui } from './controls'
 
 type Scope = 'session' | 'saved'
 type Press = (key: string, value: string, scope?: Scope) => void
 type Values = Record<string, boolean | string>
-type Spec = { key: string; step?: string; heading?: string }
+type Spec = { key: string; step?: string; heading?: string; locked?: boolean }
 
 /** The label above the step rows, and the prefix of their keys (`gate_steps.<id>.<target>`). */
 export const STEPS_LABEL = 'steps'
 export const GATE_STEP_PREFIX = 'gate_steps.'
 
-export type GateStep = { id: string; name: string; heading: string; targets: string[] }
+/** `locked`: a step nobody can untick (the secret scan and SAST, rule #19; user decision 02/11/2026). */
+export type GateStep = { id: string; name: string; heading: string; targets: string[]; locked: boolean }
 
 /** The gate's steps in schema order, each with the targets it has a setting for. */
 export function gateSteps(schema: Spec[]): GateStep[] {
@@ -26,10 +27,11 @@ export function gateSteps(schema: Spec[]): GateStep[] {
     if (!id || !target || rest.length > 0) continue
     let step = steps.find(one => one.id === id)
     if (!step) {
-      step = { id, name: spec.step ?? id, heading: spec.heading ?? id, targets: [] }
+      step = { id, name: spec.step ?? id, heading: spec.heading ?? id, targets: [], locked: false }
       steps.push(step)
     }
     step.targets.push(target)
+    if (spec.locked) step.locked = true
   }
   return steps
 }
@@ -73,10 +75,13 @@ export function stepLines(ui: Ui, schema: Spec[], press: Press): StepLine[] {
   const anyGate = (values: Values) => gatedTargets(values, all).length > 0
   const head: StepLine = { id: 'steps', label: STEPS_LABEL, indent: STEPS_INDENT, help: STEPS_HELP, names: [], shown: anyGate, draw: () => [] }
   return [head, ...steps.map((step): StepLine => ({
-    id: `step-${step.id}`, label: step.name, indent: STEP_INDENT, help: `${step.heading}: ${STEP_HELP}`, names: step.targets,
+    id: `step-${step.id}`, label: step.name, indent: STEP_INDENT, help: `${step.heading}: ${step.locked ? LOCKED_STEP_HELP : STEP_HELP}`,
+    names: step.targets,
     shown: anyGate,
     draw: (scope, values) => gatedTargets(values, step.targets).map(target => {
       const key = `${GATE_STEP_PREFIX}${step.id}.${target}`
+      // A locked step is drawn ticked and a press changes nothing: the settings would refuse it anyway.
+      if (step.locked) return option(ui, `${scope}/${key}`, target, 'check', true, () => undefined)
       const on = stepOn(values, key)
       return option(ui, `${scope}/${key}`, target, 'check', on, () => pressStep(press, key, on ? 'no' : 'yes', scope))
     }),

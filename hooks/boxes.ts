@@ -19,7 +19,7 @@ export type { Factory, Ui } from './controls'
 export type Scope = 'session' | 'saved'
 export type Press = (key: string, value: string, scope?: Scope) => void
 
-type Spec = { key: string; type: 'bool' | 'enum'; label: string; group: string; options?: string[]; step?: string; heading?: string }
+type Spec = { key: string; type: 'bool' | 'enum'; label: string; group: string; options?: string[]; step?: string; heading?: string; locked?: boolean }
 type AgentRow = {
   role: string; defined: string; runs_on: string; default_model?: string; active: boolean; in_mode: boolean; enabled: string; model: string
   description?: string
