@@ -136,16 +136,18 @@ gate_coverage() {
 }
 
 # ── The steps the user can untick (user decision 02/11/2026) ─────────────────
-# THE ONE LIST of the gate's steps (rule #2): id|the name the podium Settings pane shows|the heading the gate prints.
-# podium_schema.py reads this block for the pane's rows (gate_steps.<id>.<target>); keep it one step per line, between
-# the quotes. Coverage is not here: it has its own setting (coverage_before_push.<t>, rule #29).
+# THE ONE LIST of the gate's steps (rule #2): id|the name the podium Settings pane shows|the heading the gate prints,
+# and a fourth column `locked` for a step nobody can untick. podium_schema.py reads this block for the pane's rows
+# (gate_steps.<id>.<target>); keep it one step per line, between the quotes. Coverage is not here: it has its own
+# setting (coverage_before_push.<t>, rule #29). The secret scan and SAST are locked (user decision 02/11/2026, rule #19:
+# they are never switched off): the settings refuse to turn them off, and an off value in the file is ignored here.
 GATE_STEPS='lint|lint|formatter / linter
 typecheck|types|typecheck
 build|build|build
 unit|unit|unit tests
-secrets|secrets|secret scan
+secrets|secrets|secret scan|locked
 cve|CVE|dependency CVE
-sast|SAST|SAST
+sast|SAST|SAST|locked
 compat|compat|backward compatibility
 md|md size|CLAUDE.md gates
 documents|docs|project documents (rule #16 — fail closed)
@@ -158,16 +160,26 @@ gate_steps_off() {
   GATE_STEPS_READ=1
   [ -f "$SDLC_SETTINGS_FILE" ] || return 0
   have python3 || { warn "python3 is missing: $SDLC_SETTINGS_FILE not read - every gate step runs (fail closed)"; return 0; }
-  GATE_STEPS_OFF="$(python3 -c 'import json, sys
+  # Only well-formed ids come back (qa 02/11/2026): a key such as `*` would otherwise glob over the files in the project.
+  GATE_STEPS_OFF="$(python3 -c 'import json, re, sys
 try:
     steps = json.load(open(sys.argv[1], encoding="utf-8"))["settings"].get("gate_steps", {})
 except (KeyError, TypeError, AttributeError):
     sys.exit(0)
 except Exception:
     sys.exit(3)
-print(" ".join(sorted(i for i, t in steps.items() if isinstance(t, dict) and t.get(sys.argv[2]) is False)))' \
+print(" ".join(sorted(i for i, t in steps.items()
+                     if re.fullmatch("[a-z0-9_]+", i) and isinstance(t, dict) and t.get(sys.argv[2]) is False)))' \
     "$SDLC_SETTINGS_FILE" "$TARGET" 2>/dev/null)" || {
     GATE_STEPS_OFF=""; warn "$SDLC_SETTINGS_FILE could not be read - every gate step runs (fail closed)"; }
+  # A locked step runs whatever the file says: a pull request that commits it off changes nothing, and the gate says so.
+  local id kept=""
+  for id in $GATE_STEPS_OFF; do
+    if printf '%s\n' "$GATE_STEPS" | awk -F'|' -v id="$id" '$1 == id && $4 == "locked" { found = 1 } END { exit !found }'; then
+      warn "gate_steps.$id.$TARGET = no in $SDLC_SETTINGS_FILE was IGNORED: $id is locked and always runs (rule #19)"
+    else kept="$kept $id"; fi
+  done
+  GATE_STEPS_OFF="${kept# }"
 }
 step_on() { gate_steps_off; case " $GATE_STEPS_OFF " in *" $1 "*) return 1 ;; esac; return 0; }
 # gate_step <id>: print the step's heading; 0 when it runs, 1 when the user unticked it. An unticked step is WAIVED:

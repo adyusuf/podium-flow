@@ -48,17 +48,34 @@ GATE_LIB = os.path.join(ROOT, 'scripts', 'gate-lib.sh')
 
 def gate_steps(path=GATE_LIB):
     """[(id, name, heading)] of the gate's steps, read from GATE_STEPS in gate-lib.sh: the one list of them (rule #2;
-    user decision 02/11/2026). An unreadable file gives none, so the pane shows no step rows rather than a guessed list."""
+    user decision 02/11/2026). An unreadable file gives none, so the pane shows no step rows rather than a guessed list.
+    A fourth column `locked` marks a step nobody can untick; locked_steps() reads it."""
     try:
         with open(path, encoding='utf-8') as handle:
             found = re.search(r"^GATE_STEPS='(.*?)'", handle.read(), re.S | re.M)
     except OSError:
         return []
-    rows = [line.split('|') for line in found.group(1).splitlines()] if found else []
-    return [tuple(part.strip() for part in row) for row in rows if len(row) == 3 and re.fullmatch(r'[a-z0-9_]+', row[0].strip())]
+    return [row[:3] for row in _rows(found.group(1)) if len(row) in (3, 4)] if found else []
+
+
+def _rows(block):
+    rows = [tuple(part.strip() for part in line.split('|')) for line in block.splitlines()]
+    return [row for row in rows if re.fullmatch(r'[a-z0-9_]+', row[0]) and (len(row) == 3 or row[3:] == ('locked',))]
+
+
+def locked_steps(path=GATE_LIB):
+    """The ids of the steps marked `locked` in GATE_STEPS: the secret scan and SAST (user decision 02/11/2026; rule #19
+    says they are never switched off). Their ticks cannot be turned off and the gate runs them whatever the file says."""
+    try:
+        with open(path, encoding='utf-8') as handle:
+            found = re.search(r"^GATE_STEPS='(.*?)'", handle.read(), re.S | re.M)
+    except OSError:
+        return []
+    return [row[0] for row in _rows(found.group(1)) if len(row) == 4] if found else []
 
 
 GATE_STEPS = tuple(gate_steps())
+LOCKED_STEPS = tuple(locked_steps())
 
 
 # The one definition of what can be set: order is the display order. `group` titles the sections of `show`.
@@ -79,7 +96,8 @@ SCHEMA = (
     # One tick per step of the gate and target; each defaults to on here, not in defaults/podium.json, so the step list
     # is written only in gate-lib.sh. `step` and `heading` are what the pane shows and its hover card says.
     + [dict(_bool('gate_steps.%s.%s' % (step, t), 'Gate step %s on %s' % (name, t)), group='Gate steps', step=name,
-            heading=heading, default=True) for step, name, heading in GATE_STEPS for t in TARGETS]
+            heading=heading, default=True, **({'locked': True} if step in LOCKED_STEPS else {}))
+       for step, name, heading in GATE_STEPS for t in TARGETS]
     + [dict(_bool('ci_after_push.' + t, 'Run CI after pushing %s' % t), group='CI after push') for t in TARGETS]
     + [dict(_bool('deploy_after_push.' + env, 'After pushing update, deploy to ' + env), group='Deploy after push') for env in DEPLOY_ENVS]
     + [dict(_enum('ci.runner', 'CI runner', CI_RUNNERS), group='CI after push')]

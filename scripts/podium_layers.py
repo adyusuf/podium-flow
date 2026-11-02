@@ -29,6 +29,10 @@ class ConfigError(Exception):
         self.code = code
 
 
+class LockedError(ConfigError):
+    """A locked setting asked to turn off (the secret scan, SAST): refused on a write, left out on a read."""
+
+
 # The plugin was called `adyusuf` until 02/11/2026: its files and variables keep working (rule #4).
 LEGACY = 'adyusuf'
 
@@ -92,12 +96,12 @@ def check(key, value):
     if spec is None:
         raise ConfigError("unknown setting '%s' (see: podium_config.py schema)" % key)
     if spec['type'] == 'bool':
-        if isinstance(value, bool):
-            return value
         text = str(value).strip().lower()
-        if text in ('true', 'yes', 'y', '1', 'on'):
+        if value is True or (not isinstance(value, bool) and text in ('true', 'yes', 'y', '1', 'on')):
             return True
-        if text in ('false', 'no', 'n', '0', 'off'):
+        if value is False or (not isinstance(value, bool) and text in ('false', 'no', 'n', '0', 'off')):
+            if spec.get('locked'):
+                raise LockedError("'%s' is locked on and cannot be turned off: a security scan is never switched off (rule #19)" % key)
             return False
         raise ConfigError("'%s' is a yes/no setting, got %r" % (key, value))
     text = str(value).strip()
@@ -129,6 +133,13 @@ def read_layer(path, keep_unknown=False):
             if key not in SPECS:
                 if keep_unknown:
                     values[key] = value
+                continue
+            if SPECS[key].get('locked'):
+                # A locked step written off by hand (or by an older copy) is left out, so it stays on and the rest of
+                # the layer still counts; refusing the whole file would throw away the user's other settings. Any other
+                # bad value still makes the layer a problem, as for every key.
+                with contextlib.suppress(LockedError):
+                    values[key] = check(key, value)
                 continue
             values[key] = check(key, value)
         return values, None

@@ -1,7 +1,7 @@
 # scripts — the gate, the hook scripts, measurement and install
 
 37 scripts (`.sh`/`.py`) and their tests in `tests/`:
-`python3 -m unittest discover -s scripts/tests -p 'test_*.py'` (879 tests on 02/11/2026). The sections:
+`python3 -m unittest discover -s scripts/tests -p 'test_*.py'` (886 tests on 02/11/2026). The sections:
 [CLAUDE.md maintenance](#claudemd-maintenance-tools) ·
 [measurement and commit gate](#measurement-and-commit-gate-scripts) · [the shared gate](#gate-coresh--the-shared-gate-in-two-layers) ·
 [the gate in your own project](#putting-the-gate-in-a-project-of-your-own).
@@ -124,7 +124,8 @@ Whether the coverage step runs at all is the panel's `coverage_before_push.<targ
 The other steps are listed once, in `GATE_STEPS` of `gate-lib.sh` (id, the name the podium Settings pane shows, the
 heading the gate prints); `podium_schema.py` reads that block for the pane's `gate_steps.<id>.<target>` ticks. A step
 whose tick is `false` in `.claude/sdlc-settings.json` does not run: it prints `WAIVED <id>` and the merge commit's
-`Gate-Waived:` line names it. A missing key runs the step; an unreadable file runs every step with a warning.
+`Gate-Waived:` line names it. A missing key runs the step; an unreadable file runs every step with a warning. A row
+with a fourth column `locked` (the secret scan and SAST, #19) always runs: an off value in the file is ignored with a warning.
 
 | Target | What runs |
 |---|---|
