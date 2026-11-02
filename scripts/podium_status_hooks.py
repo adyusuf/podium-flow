@@ -78,8 +78,9 @@ def reminder(session):
     """What every user message carries: analyse first, steps in the box, % and blockers kept current."""
     return ('podium steps (setting steps.enforce: %s): before acting on this message, analyse it. If it adds work, '
             'write its steps into the Status box first, in order, as phases where it helps: python3 "%s" --session %s '
-            'step "<n. step>" "not started" 0 [--after "<step>"] (a request that arrives mid-work goes in with --after). '
-            'Keep each step current: state running/done/blocked/did not run, its %% done, --blocker "<what>" when stuck. '
+            'step "<n. short name>" "not started" 0 [--after "<step>"] [--note "<details>"] (a request that arrives '
+            'mid-work goes in with --after; keep the name short, details go in --note). Keep each step current: state '
+            'running/done/blocked/did not run, its %% done, --blocker "<what>" when stuck. '
             'Status box: standards/00 §1a, §10d.' % (enforce(session), SCRIPT, session))
 
 

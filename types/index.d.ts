@@ -27,7 +27,7 @@ export type Stage = { branch: string; origin: string; unpushed: number; waived: 
 export type Promotion = { stages: Stage[]; error?: string; outside?: boolean }
 /** One row of the session's status table: what it is, where it stands, the measured figure with its signal, what it waits on. */
 /** `percent`, `blocker`, `agent`: a step's fields (additive, 02/11/2026); '' on a row written the older way. */
-export type StatusRow = { item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string }
+export type StatusRow = { item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string; note: string }
 /** The session's status table (scripts/podium_status.py writes it): what runs now, what runs next, the rows. */
 export type StatusData = { now: string; next: string; rows: StatusRow[]; updated: string }
 

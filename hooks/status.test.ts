@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { donePercent, parseStatus, statusBody, stepGroups, statusDir, statusScript, statusStep } from './status'
+import { donePercent, groupState, noteOf, parseStatus, splitState, statusBody, stepGroups, statusDir, statusScript, statusStep } from './status'
 
 // A recording factory: an element is { type, props, children }, so the tests read what the box would draw.
 type Node = { type: unknown; props: Record<string, any>; children: unknown[] }
@@ -36,33 +36,33 @@ test('the status file is read as text: only strings are kept, anything else is n
   expect(parseStatus('[1, 2]')).toBe(null)
   expect(parseStatus('null')).toBe(null)
   const odd = parseStatus(JSON.stringify({ now: 5, rows: [{ item: 'a', state: 1 }, 'x', null] }))
-  expect(odd).toEqual({ now: '', next: '', updated: '', rows: [{ item: 'a', state: '', figure: '', waiting: '', percent: '', blocker: '', agent: '' }] })
+  expect(odd).toEqual({ now: '', next: '', updated: '', rows: [{ item: 'a', state: '', figure: '', waiting: '', percent: '', blocker: '', agent: '', note: '' }] })
   // A percentage is digits only; anything else reads as not given.
   expect(parseStatus(JSON.stringify({ rows: [{ item: 'a', percent: '45' }, { item: 'b', percent: '45%' }, { item: 'c', percent: 7 }] }))!.rows.map(row => row.percent)).toEqual(['45', '', ''])
 })
 
-test('the body shows now and next, then the steps under step and state, with done and -> blocker under each step', () => {
+test('the body shows now and next, then step · state · % · note, a short state, -> blocker under the step', () => {
+  const lines = (body: unknown) => all(body, 'Box').filter(node => node.props.flexDirection === 'row' && !node.props.marginLeft)
+    .map(node => all(node, 'Text').map(words).join(' | '))
   const body = statusBody(ui, parseStatus(FILE))
-  const lines = all(body, 'Box').filter(node => node.props.flexDirection === 'row').map(node => all(node, 'Text').map(words).join(' | '))
-  expect(lines).toEqual(['Now | prod gate', 'Next | plugin update', 'Step | State', 'dev | pushed', 'prod | gate running'])
-  // Under a step, no heading: the done line (an older row's figure) and the arrow to what it waits on; a placeholder is left out.
-  const under = all(body, 'Box').filter(node => node.props.marginLeft === 2).map(node => all(node, 'Text').map(words))
-  expect(under).toEqual([['4a45bda (promote.log)'], ['coverage step (gate-prod.log)', '-> promote.sh']])
-  expect(all(body, 'Text').filter(node => node.props.bold).map(words)).toEqual(['Now', 'Next', 'Step', 'State'])
-  // A step is a step: its % under it, -> its blocker, the running one bold.
+  // An older row: its state has no short word, so the whole state goes to the note with the measured figure.
+  expect(lines(body)).toEqual(['Now | prod gate', 'Next | plugin update', 'Step | State | % | Note',
+    'dev |  |  | pushed · 4a45bda (promote.log)', 'prod |  |  | gate running · coverage step (gate-prod.log)'])
+  expect(all(body, 'Box').filter(node => node.props.marginLeft === 2).map(words)).toEqual(['-> promote.sh'])
   const steps = statusBody(ui, parseStatus(JSON.stringify({ rows: [
-    { item: '1. data', state: 'done', percent: '100' }, { item: '2. pane', state: 'running', percent: '40', blocker: 'qa review' }] })))
-  expect(all(steps, 'Box').filter(node => node.props.marginLeft === 2).map(node => all(node, 'Text').map(words))).toEqual([['100%'], ['40%', '-> qa review']])
-  expect(all(steps, 'Text').filter(node => node.props.bold).map(words)).toEqual(['Step', 'State', '2. pane', 'running'])
-  expect(all(steps, 'Box').filter(node => node.props.marginLeft === 2).every(node => all(node, 'Text').every(text => text.props.dimColor))).toBe(true)
+    { item: '1. data', state: 'done', percent: '100' },
+    { item: '2. pane', state: 'running: 3 of 8 files', percent: '40', blocker: 'qa review', note: 'tabs first' }] })))
+  expect(lines(steps).slice(1)).toEqual(['1. data | done | 100% | ', '2. pane | run | 40% | 3 of 8 files · tabs first'])
+  expect(all(steps, 'Text').filter(node => node.props.bold).map(words)).toEqual(['Step', 'State', '%', 'Note', '2. pane', 'run', '40%', '3 of 8 files · tabs first'])
+  expect(all(steps, 'Box').filter(node => node.props.marginLeft === 2).map(words)).toEqual(['-> qa review'])
 })
 
-test('the columns have one width on every row, capped so a long text wraps inside its column', () => {
+test('the columns have one width on every row, capped so a long text wraps inside its column; the note column takes the rest', () => {
   const long = 'x'.repeat(80)
-  const body = statusBody(ui, parseStatus(JSON.stringify({ rows: [{ item: 'a', state: long, figure: 'f', waiting: 'w' }] })))
+  const body = statusBody(ui, parseStatus(JSON.stringify({ rows: [{ item: long, state: 'done', percent: '100', note: 'n' }] })))
   const rows = all(body, 'Box').filter(node => node.props.flexDirection === 'row')
   const widths = rows.map(row => flat(row.children).map(cell => (cell as Node).props.width))
-  expect(widths).toEqual([[5, undefined], [5, undefined]])
+  expect(widths).toEqual([[37, 6, 5, undefined], [37, 6, 5, undefined]])
 })
 
 test('an empty table, or none, says nothing running', () => {
@@ -112,7 +112,7 @@ test('the status script sits beside the configuration script the pane found; non
   expect(statusScript('/elsewhere/other.py')).toBe('')
 })
 
-test('steps group by who runs them, this session first, each subagent group named with how much of it is done', () => {
+test('steps group by who runs them, this session first; each group opens with a divider and a bold row with its state and %', () => {
   const data = parseStatus(JSON.stringify({ rows: [
     { item: '1. plan', state: 'done', percent: '100' }, { item: 'review', state: 'running', percent: '50', agent: 'qa a9f3c2' },
     { item: '2. build', state: 'running', percent: '20' }, { item: 'scan', state: 'not started', percent: '0', agent: 'qa a9f3c2' }] }))!
@@ -123,12 +123,30 @@ test('steps group by who runs them, this session first, each subagent group name
   const half = parseStatus(JSON.stringify({ rows: [{ item: 'a', agent: 'qa x', percent: '50' }, { item: 'b', agent: 'qa x', percent: '75' }, { item: 'c', percent: '0' }] }))!
   expect(donePercent(half.rows.slice(0, 2))).toBe('63%')
   expect(stepGroups(half.rows).map(group => group.agent)).toEqual(['', 'qa x'])
-  // An older row's placeholder figure is left out under the step, as a placeholder blocker is.
-  const older = statusBody(ui, parseStatus(JSON.stringify({ rows: [{ item: 'x', state: 'done', figure: '—', waiting: '-' }] })))
-  expect(all(older, 'Box').filter(node => node.props.marginLeft === 2).length).toBe(0)
-  const titles = all(statusBody(ui, data), 'Text').filter(node => node.props.dimColor && /·/.test(words(node))).map(words)
-  expect(titles).toEqual(['this session · 60%', 'qa a9f3c2 · 25%'])
-  // With this session's steps alone, no group line.
+  const body = statusBody(ui, data)
+  const groupRows = all(body, 'Box').filter(node => node.props.flexDirection === 'row')
+    .map(node => all(node, 'Text')).filter(texts => texts.length === 4 && texts.every(text => text.props.bold) && words(texts[0]) !== 'Step')
+    .map(texts => texts.map(words).join(' | '))
+  expect(groupRows.filter(row => row.startsWith('this session') || row.startsWith('qa a9f3c2 |'))).toEqual(['this session | run | 60% | ', 'qa a9f3c2 | run | 25% | '])
+  expect(all(body, 'Box').filter(node => node.props.borderTop === true && node.props.borderBottom === false).length).toBe(2)
+  // With this session's steps alone, no group row and no divider.
   const alone = statusBody(ui, parseStatus(JSON.stringify({ rows: [{ item: '1. plan', state: 'done', percent: '100' }] })))
-  expect(all(alone, 'Text').some(node => words(node).startsWith('this session'))).toBe(false)
+  expect(all(alone, 'Text').some(node => words(node) === 'this session')).toBe(false)
+  expect(all(alone, 'Box').some(node => node.props.borderTop === true)).toBe(false)
+})
+
+test('a state is a short word and its detail; a group runs while a step runs, is stuck while one is blocked, else done or todo', () => {
+  expect(['not started', 'running', 'done', 'blocked', 'did not run', 'in progress', 'pending'].map(state => splitState(state).short))
+    .toEqual(['todo', 'run', 'done', 'stuck', 'skip', 'run', 'todo'])
+  expect(splitState('running: 3 of 8')).toEqual({ short: 'run', detail: '3 of 8' })
+  expect(splitState('blocked (approval)')).toEqual({ short: 'stuck', detail: '(approval)' })
+  expect(splitState('gate running')).toEqual({ short: '', detail: 'gate running' })
+  expect(splitState('doneish')).toEqual({ short: '', detail: 'doneish' })
+  const row = (state: string) => ({ item: 'x', state, figure: '', waiting: '', percent: '', blocker: '', agent: '', note: '' })
+  expect(groupState([row('done'), row('running')])).toBe('run')
+  expect(groupState([row('done'), row('blocked')])).toBe('stuck')
+  expect(groupState([row('done'), row('did not run')])).toBe('done')
+  expect(groupState([row('done'), row('not started')])).toBe('todo')
+  expect(noteOf({ ...row('running: half'), note: 'n', figure: '3/8' })).toBe('half · n · 3/8')
+  expect(noteOf({ ...row('done'), percent: '100', figure: '100%' })).toBe('')
 })
