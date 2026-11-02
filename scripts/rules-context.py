@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Puts the global working rules (CLAUDE.md) into Claude's context from a plugin hook.
 
-A plugin cannot ship a CLAUDE.md that Claude Code loads, so the adyusuf plugin's
+A plugin cannot ship a CLAUDE.md that Claude Code loads, so the podium plugin's
 hooks/hooks.json calls this script on SessionStart and SubagentStart instead
 (docs/decision-log.md, "Plugin install"). Claude Code caps each hook's output at
 10,000 characters, so CLAUDE.md is split into parts at its own boundaries (a `## `
@@ -81,7 +81,7 @@ def render(all_parts, part, registered):
     total = len(all_parts)
     if part > total:
         return ''
-    text = (f'[Global working rules, part {part}/{total} (adyusuf plugin, CLAUDE.md); '
+    text = (f'[Global working rules, part {part}/{total} (podium plugin, CLAUDE.md); '
             f'relative paths start at {ROOT}]\n') + all_parts[part - 1]
     if part == registered and total > registered:
         text += (f'\n[WARNING: the global rules need {total} parts but only {registered} hooks are '

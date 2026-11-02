@@ -1,4 +1,4 @@
-"""scripts/adyusuf_config.py: the defaults that replace the questions (global rule #34), and how they are changed.
+"""scripts/podium_config.py: the defaults that replace the questions (global rule #34), and how they are changed.
 
 What is pinned: the shipped defaults are exactly the maintainer's list; a project value beats a user value beats a
 default; an invalid value or an unknown key writes NOTHING; an unreadable file is reported and never fails a session
@@ -15,7 +15,7 @@ import unittest
 
 SCRIPTS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 ROOT = os.path.dirname(SCRIPTS)
-_spec = importlib.util.spec_from_file_location('adyusuf_config', os.path.join(SCRIPTS, 'adyusuf_config.py'))
+_spec = importlib.util.spec_from_file_location('podium_config', os.path.join(SCRIPTS, 'podium_config.py'))
 cfg = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(cfg)
 
@@ -63,7 +63,7 @@ class NoPanel(unittest.TestCase):
     def test_the_template_and_the_commands_are_gone(self):
         self.assertFalse(os.path.exists(os.path.join(ROOT, 'skills', 'config', 'panel.template.html')))
         for command in ('panel', 'panel-data'):
-            result = subprocess.run(['python3', os.path.join(SCRIPTS, 'adyusuf_config.py'), command],
+            result = subprocess.run(['python3', os.path.join(SCRIPTS, 'podium_config.py'), command],
                                     capture_output=True, text=True)
             self.assertEqual(2, result.returncode, command)
             self.assertEqual('', result.stdout)
@@ -76,14 +76,14 @@ class Tool(unittest.TestCase):
         os.makedirs(self.repo)
         subprocess.run(['git', 'init', '-q', self.repo], check=True)
         self.user = os.path.join(self.home, 'user.json')
-        self.project = os.path.join(self.repo, '.claude', 'adyusuf.json')
+        self.project = os.path.join(self.repo, '.claude', 'podium.json')
 
     def tearDown(self):
         shutil.rmtree(self.home, ignore_errors=True)
 
     def run_tool(self, *args, stdin=None):
-        env = dict(os.environ, ADYUSUF_CONFIG_USER=self.user, ADYUSUF_SESSION_DIR=os.path.join(self.home, 'sessions'))
-        result = subprocess.run(['python3', os.path.join(SCRIPTS, 'adyusuf_config.py'), *args], cwd=self.repo,
+        env = dict(os.environ, PODIUM_CONFIG_USER=self.user, PODIUM_SESSION_DIR=os.path.join(self.home, 'sessions'))
+        result = subprocess.run(['python3', os.path.join(SCRIPTS, 'podium_config.py'), *args], cwd=self.repo,
                                 capture_output=True, text=True, env=env, input=stdin)
         return result.stdout, result.stderr, result.returncode
 
@@ -192,8 +192,8 @@ class ConcurrentWrites(Tool):
 
     def test_many_simultaneous_sets_all_land_and_leave_no_temp_file(self):
         keys = ['push.dev', 'push.test', 'push.prod', 'merge.dev', 'merge.test', 'merge.prod', 'write.e2e', 'write.unit_tests']
-        env = dict(os.environ, ADYUSUF_CONFIG_USER=self.user)
-        tool = os.path.join(SCRIPTS, 'adyusuf_config.py')
+        env = dict(os.environ, PODIUM_CONFIG_USER=self.user)
+        tool = os.path.join(SCRIPTS, 'podium_config.py')
         for round_ in range(5):
             if os.path.exists(self.user):
                 os.remove(self.user)
@@ -298,7 +298,7 @@ class RetiredKeys(Tool):
 
     def test_the_context_tells_a_session_how_to_keep_its_status_box(self):
         out, _, _ = self.run_tool('context', '--stdin', stdin=json.dumps({'session_id': 'abc-1'}))
-        script = os.path.join(cfg.ROOT, 'scripts', 'adyusuf_status.py')
+        script = os.path.join(cfg.ROOT, 'scripts', 'podium_status.py')
         self.assertIn('status box and steps (steps.enforce: block): analyse every task first and write its steps', out)
         self.assertIn('python3 "%s" --session abc-1 step "<n. step>" "<state>" <percent>' % script, out)
         self.assertIn('a new request mid-work goes in as steps with --after', out)
@@ -465,9 +465,9 @@ class Notify(Tool):
         self.seen = os.path.join(self.home, 'seen')
 
     def hook(self, session='sess-1', event='UserPromptSubmit'):
-        env = dict(os.environ, ADYUSUF_CONFIG_USER=self.user, ADYUSUF_SEEN_DIR=self.seen,
-                   ADYUSUF_SESSION_DIR=os.path.join(self.home, 'sessions'))
-        result = subprocess.run(['python3', os.path.join(SCRIPTS, 'adyusuf_config.py'), 'notify', event], cwd=self.repo,
+        env = dict(os.environ, PODIUM_CONFIG_USER=self.user, PODIUM_SEEN_DIR=self.seen,
+                   PODIUM_SESSION_DIR=os.path.join(self.home, 'sessions'))
+        result = subprocess.run(['python3', os.path.join(SCRIPTS, 'podium_config.py'), 'notify', event], cwd=self.repo,
                                 capture_output=True, text=True, env=env, input=json.dumps({'session_id': session}))
         self.assertEqual(0, result.returncode, result.stderr)
         return json.loads(result.stdout)['hookSpecificOutput'] if result.stdout.strip() else None
@@ -520,14 +520,14 @@ class Notify(Tool):
         self.assertIn('mode: C -> B', self.hook()['additionalContext'])
 
     def test_a_broken_payload_or_file_never_fails_the_hook(self):
-        env = dict(os.environ, ADYUSUF_CONFIG_USER=self.user, ADYUSUF_SEEN_DIR=self.seen)
+        env = dict(os.environ, PODIUM_CONFIG_USER=self.user, PODIUM_SEEN_DIR=self.seen)
         for payload in ('', 'not json', '{"session_id": "../../etc"}'):
-            result = subprocess.run(['python3', os.path.join(SCRIPTS, 'adyusuf_config.py'), 'notify', 'UserPromptSubmit'],
+            result = subprocess.run(['python3', os.path.join(SCRIPTS, 'podium_config.py'), 'notify', 'UserPromptSubmit'],
                                     cwd=self.repo, capture_output=True, text=True, env=env, input=payload)
             self.assertEqual((0, ''), (result.returncode, result.stdout), payload)
         with open(self.user, 'w', encoding='utf-8') as handle:
             handle.write('{ broken')
-        self.assertEqual(0, subprocess.run(['python3', os.path.join(SCRIPTS, 'adyusuf_config.py'), 'notify', 'PostToolUse'],
+        self.assertEqual(0, subprocess.run(['python3', os.path.join(SCRIPTS, 'podium_config.py'), 'notify', 'PostToolUse'],
                                            cwd=self.repo, capture_output=True, text=True, env=env,
                                            input=json.dumps({'session_id': 's'})).returncode)
 

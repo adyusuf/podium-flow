@@ -19,9 +19,10 @@ def role_label(role):
     so it would block the whole write (measured: one `agent-skills`
     run made `--write` impossible). Only the agent part is printed, marked
     `ext:` so it is never confused with a mode role — except our own plugin's
-    agents (`adyusuf:<role>`), which ARE the mode roles and print as `<role>`.
+    agents (`podium:<role>`, and `adyusuf:<role>` from before the rename on 02/11/2026), which ARE the mode roles and
+    print as `<role>`.
     """
-    if role.startswith('adyusuf:'):
+    if role.startswith(('podium:', 'adyusuf:')):
         role = role.split(':', 1)[1]
     elif ':' in role:
         return 'ext:' + role.split(':', 1)[1]

@@ -7,25 +7,25 @@ it at each step, and a background run (a gate, a promotion) may write its own st
 tool call and when its modification time changes. Every figure is MEASURED: the script stores what it is given and
 invents nothing.
 
-The file is `<session id>.json` in ADYUSUF_STATUS_DIR (an absolute path; default `~/.claude/adyusuf-status`). Writers take
+The file is `<session id>.json` in PODIUM_STATUS_DIR (an absolute path; default `~/.claude/podium-status`). Writers take
 a lock around read-modify-write, so Claude and a background run never lose each other's rows. Status files nobody has
 written to for KEEP_DAYS are removed whenever one is written; a file that is not a status table is never touched.
 
 Usage:
-    adyusuf_status.py --session ID now TEXT                  what runs now ('' clears it)
-    adyusuf_status.py --session ID next TEXT                 what runs next ('' clears it)
-    adyusuf_status.py --session ID row ITEM STATE FIGURE WAITING
+    podium_status.py --session ID now TEXT                  what runs now ('' clears it)
+    podium_status.py --session ID next TEXT                 what runs next ('' clears it)
+    podium_status.py --session ID row ITEM STATE FIGURE WAITING
                                                              add the row named ITEM, or replace it in place
-    adyusuf_status.py --session ID step ITEM STATE PERCENT [--blocker TEXT] [--agent NAME] [--after ITEM]
+    podium_status.py --session ID step ITEM STATE PERCENT [--blocker TEXT] [--agent NAME] [--after ITEM]
                                                              a step (02/11/2026): its state (STATES), how much is done
                                                              (0-100), what blocks it, who runs it (a subagent; none =
                                                              this session); --after puts a new step after that one,
                                                              else it goes last. Replaced in place.
-    adyusuf_status.py --session ID drop ITEM [--agent NAME]  remove the row named ITEM
-    adyusuf_status.py --session ID clear                     empty the table (also replaces a corrupt file)
-    adyusuf_status.py --session ID show [--json]             print it
-    adyusuf_status.py hook EVENT                             the plugin's hooks (stdin: the hook payload), in
-                                                             adyusuf_status_hooks.py
+    podium_status.py --session ID drop ITEM [--agent NAME]  remove the row named ITEM
+    podium_status.py --session ID clear                     empty the table (also replaces a corrupt file)
+    podium_status.py --session ID show [--json]             print it
+    podium_status.py hook EVENT                             the plugin's hooks (stdin: the hook payload), in
+                                                             podium_status_hooks.py
 Exit codes: 0 done, 2 refused (an unusable session id or folder, an unreadable file, a failed write).
 """
 import argparse
@@ -62,10 +62,10 @@ class StatusError(Exception):
 
 
 def status_dir():
-    chosen = os.environ.get('ADYUSUF_STATUS_DIR')
+    chosen = os.environ.get('PODIUM_STATUS_DIR') or os.environ.get('ADYUSUF_STATUS_DIR')     # the older name still read
     if chosen and not os.path.isabs(chosen):
-        raise StatusError('ADYUSUF_STATUS_DIR must be an absolute path (the pane reads it from another directory): %r' % chosen)
-    return chosen or os.path.join(os.path.expanduser('~'), '.claude', 'adyusuf-status')
+        raise StatusError('PODIUM_STATUS_DIR must be an absolute path (the pane reads it from another directory): %r' % chosen)
+    return chosen or os.path.join(os.path.expanduser('~'), '.claude', 'podium-status')
 
 
 def valid(session):
@@ -148,7 +148,7 @@ def prune(now=None, keep_days=KEEP_DAYS):
     """Remove status files (and their locks) nobody has written to for `keep_days`. Never raises.
 
     Only a file named like a session's and holding a status table goes: the folder may be one the user chose
-    (ADYUSUF_STATUS_DIR), where other JSON files must survive.
+    (PODIUM_STATUS_DIR), where other JSON files must survive.
     """
     limit = (time.time() if now is None else now) - keep_days * 86400
     try:
@@ -262,7 +262,7 @@ def main(argv=None):
         except (OSError, ValueError, AttributeError):
             raw = b''
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        import adyusuf_status_hooks as hooks      # beside this file; loaded only for a hook
+        import podium_status_hooks as hooks      # beside this file; loaded only for a hook
         return hooks.hook(argv[1] if len(argv) > 1 else '', raw.decode('utf-8', errors='replace'))
     parser = argparse.ArgumentParser(description='This session\'s status table for the pane\'s Status box.')
     parser.add_argument('--session', required=True)
@@ -290,7 +290,7 @@ def main(argv=None):
         else:
             change(args)
     except (StatusError, OSError) as error:
-        print('adyusuf_status: %s' % error, file=sys.stderr)
+        print('podium_status: %s' % error, file=sys.stderr)
         return 2
     return 0
 

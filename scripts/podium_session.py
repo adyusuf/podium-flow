@@ -1,9 +1,9 @@
-"""The session layer of the adyusuf configuration: settings changed for ONE session only.
+"""The session layer of the podium configuration: settings changed for ONE session only.
 
-The rail boxes write here (`adyusuf_config.py set --session <id> ...`), so a click never changes what the next session
+The rail boxes write here (`podium_config.py set --session <id> ...`), so a click never changes what the next session
 starts with: a new session has a new id, finds no file, and loads the saved defaults (the user's file, then the
-project's). The file is one more layer on top of those, stored as `<session id>.json` in `ADYUSUF_SESSION_DIR`
-(default `~/.claude/adyusuf-session`). A resumed session keeps its id and so its file; `/clear` starts a new id.
+project's). The file is one more layer on top of those, stored as `<session id>.json` in `PODIUM_SESSION_DIR`
+(default `~/.claude/podium-session`). A resumed session keeps its id and so its file; `/clear` starts a new id.
 Files older than KEEP_DAYS are removed whenever a session file is written.
 """
 import os
@@ -14,7 +14,7 @@ MAX_ID = 100
 
 
 def session_dir():
-    return os.environ.get('ADYUSUF_SESSION_DIR') or os.path.join(os.path.expanduser('~'), '.claude', 'adyusuf-session')
+    return os.environ.get('PODIUM_SESSION_DIR') or os.environ.get('ADYUSUF_SESSION_DIR') or os.path.join(os.path.expanduser('~'), '.claude', 'podium-session')
 
 
 def valid(session):

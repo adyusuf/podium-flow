@@ -58,7 +58,7 @@ test('every Settings row label has a card text, and every card text a row', () =
 test('a card is a hidden row of its label hover group, readable in either theme, not placed over other rows', () => {
   const box = section(ui, 'settings', 'Settings', false, () => undefined, 'BODY') as Node
   const card = flat(box.children).find(isCard) as Node
-  expect(card.props.hover).toEqual({ scope: 'adyusuf-help-section-settings', display: 'flex' })
+  expect(card.props.hover).toEqual({ scope: 'podium-help-section-settings', display: 'flex' })
   expect([card.props.position, card.props.top, card.props.width]).toEqual([undefined, undefined, undefined])
   expect([card.props.backgroundColor, all(card, 'Text')[0]!.props.color]).toEqual(['text', 'inverseText'])
   expect(words(card)).toBe(SECTION_HELP.settings)
@@ -85,7 +85,7 @@ test('each Settings card follows its own label line; the System card only when S
   // The column cards follow the heading line.
   expect(pairs.filter(([owner]) => owner.includes('Session') || owner.includes('System')).map(([, before]) => before.startsWith('[Session]System'))).toEqual([true, true])
   const bare = settingsBody(ui, data({ schema: SCHEMA, values: {}, saved: undefined }), '', [], () => undefined)
-  expect(all(bare, 'Box').filter(isCard).some(card => scope(card) === 'adyusuf-help-column-System')).toBe(false)
+  expect(all(bare, 'Box').filter(isCard).some(card => scope(card) === 'podium-help-column-System')).toBe(false)
 })
 
 test('an Agents role card is its file description, right after the role line; no description, no card', () => {

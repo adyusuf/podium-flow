@@ -9,7 +9,7 @@
 CI runs on a server that cannot read this machine's panel, so every merge writes the panel's SDLC settings into the
 project (user decision 29/10/2026): the shared workflow (.github/workflows/sdlc.yml) and the local gate read this one
 file, nothing else. Only the layers the PANEL owns count - the shipped defaults, the user's file and, with --session,
-that session's layer; a project's own `.claude/adyusuf.json` is left out on purpose, the projects take the panel's
+that session's layer; a project's own `.claude/podium.json` is left out on purpose, the projects take the panel's
 settings and keep none of their own. A setting the panel has not seen yet takes the shipped default.
 
 The file is the same for the same settings (sorted keys, no timestamp), so writing it on every merge changes nothing
@@ -21,7 +21,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import adyusuf_config as cfg  # noqa: E402
+import podium_config as cfg  # noqa: E402
 
 FILE = os.path.join('.claude', 'sdlc-settings.json')
 # What the pipeline reads. The session's own choices (mode, agents) and the pod are not part of the SDLC.
@@ -94,7 +94,7 @@ def main(argv):
     command, rest = argv[0], argv[1:]
     session, project = option(rest, '--session'), option(rest, '--project')
     try:
-        text = render(settings(session=session, user_path=os.environ.get('ADYUSUF_CONFIG_USER') or None))
+        text = render(settings(session=session, user_path=os.environ.get('PODIUM_CONFIG_USER') or None))
     except cfg.ConfigError as problem:
         print('sdlc_settings: %s' % problem, file=sys.stderr)
         return 1

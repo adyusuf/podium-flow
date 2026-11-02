@@ -14,7 +14,7 @@ each one, and whether a returned agent's work was actually accepted. This skill 
 that plan in one small file per session, so it survives a long session and a context
 compaction, and you can open it at any time.
 
-Contributions are welcome: https://github.com/adyusuf/claude-code-standards
+Contributions are welcome: https://github.com/adyusuf/podium-flow
 
 Standard: `${CLAUDE_PLUGIN_ROOT}/standards/22-live-board.md`.
 
@@ -47,7 +47,7 @@ started — propose the mode change in one line (#27). Work you do yourself has 
 ## 3. Tag every agent call
 
 Put the task id in the Agent `description`: `"[T-3] SMS pause sentence"`, and call the
-role by its plugin name (`subagent_type: "adyusuf:<role>"`). The tag links the agent's
+role by its plugin name (`subagent_type: "podium:<role>"`). The tag links the agent's
 work to its row in the plan file.
 
 ## 4. Keep the status current — in the same turn as the work

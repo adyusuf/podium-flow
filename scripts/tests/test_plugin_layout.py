@@ -1,5 +1,5 @@
-"""The `adyusuf` plugin: the repository root IS the plugin (.claude-plugin/ + hooks/hooks.json) and
-our skills and commands are invoked as /adyusuf:<name>. The layout invariants live here: no plugin/
+"""The `podium` plugin: the repository root IS the plugin (.claude-plugin/ + hooks/hooks.json) and
+our skills and commands are invoked as /podium:<name>. The layout invariants live here: no plugin/
 directory, no symlink, the exact hook set, and every ${CLAUDE_PLUGIN_ROOT} path in a skill, command,
 agent or hook resolves to a tracked file (a path that does not resolve is a broken install)."""
 import json
@@ -9,13 +9,13 @@ import subprocess
 import unittest
 
 REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
-NAMESPACE = 'adyusuf'
+NAMESPACE = 'podium'
 DOC_SUFFIXES = ('.md', '.py', '.sh', '.js', '.json')
 SELF = 'scripts/tests/test_plugin_layout.py'  # its fixtures are unprefixed on purpose
 COMPONENT_DIRS = ('skills', 'commands', 'agents', 'hooks')
 PLUGIN_PATH = re.compile(r'\$\{CLAUDE_PLUGIN_ROOT\}"?((?:/[A-Za-z0-9_.<>*-]+)*)')
 OLD_HOME_PATH = re.compile(r'(?:~|\$HOME|\$\{HOME\})/\.claude/'
-                           r'(?:CLAUDE\.md|standards|modes|agents|docs|scripts|skills/adyusuf)')
+                           r'(?:CLAUDE\.md|standards|modes|agents|docs|scripts|skills/podium)')
 FRONTMATTER_NAME = re.compile(r'^name:\s*(\S+)\s*$', re.MULTILINE)
 ROOT = '${CLAUDE_PLUGIN_ROOT}'
 RULES_CTX = f'python3 "{ROOT}/scripts/rules-context.py"'
@@ -86,7 +86,7 @@ class ReferenceTest(unittest.TestCase):
         names = ['working-mode']
         self.assertEqual(unprefixed('run `/working-mode B`', names), ['working-mode'])
         self.assertEqual(unprefixed('/working-mode', names), ['working-mode'])
-        self.assertEqual(unprefixed('run `/adyusuf:working-mode B`', names), [])
+        self.assertEqual(unprefixed('run `/podium:working-mode B`', names), [])
         self.assertEqual(unprefixed('see skills/working-mode/SKILL.md', names), [])
         self.assertEqual(unprefixed('/working-modes', names), [])
 
@@ -102,7 +102,7 @@ class ReferenceTest(unittest.TestCase):
                 found = unprefixed(handle.read(), names)
             if found:
                 stale[rel] = found
-        self.assertEqual(stale, {}, 'write /adyusuf:<name>')
+        self.assertEqual(stale, {}, 'write /podium:<name>')
 
 
 class TreeShapeTest(unittest.TestCase):
@@ -127,7 +127,7 @@ class RootPluginTest(unittest.TestCase):
     def test_marketplace_lists_exactly_the_one_plugin_at_the_repository_root(self):
         # The right-hand rail boxes are NOT a second plugin (user decision 22/10/2026): they are the mod inside this one.
         marketplace = json.loads(read('.claude-plugin', 'marketplace.json'))
-        self.assertEqual(marketplace['name'], 'adyusuf-marketplace')
+        self.assertEqual(marketplace['name'], 'podium-marketplace')
         self.assertEqual([(p['name'], p['source']) for p in marketplace['plugins']], [(NAMESPACE, './')])
 
     def test_the_mod_is_listed_in_hooks_json_beside_the_command_hooks_and_its_files_exist(self):
@@ -139,12 +139,12 @@ class RootPluginTest(unittest.TestCase):
         manifest = json.loads(read('.claude-plugin', 'plugin.json'))
         self.assertEqual(manifest['types'], './types/index.d.ts')
         self.assertTrue(os.path.isfile(os.path.join(REPO, 'types', 'index.d.ts')))
-        self.assertIn("name: 'adyusuf:panels'", read('hooks', 'register.tsx'))
+        self.assertIn("name: 'podium:panels'", read('hooks', 'register.tsx'))
 
     def test_panels_command_exists_as_a_file_so_it_is_there_where_mods_do_not_load(self):
-        # The mod registers /adyusuf:panels only where it runs; the file is the fallback everywhere else.
+        # The mod registers /podium:panels only where it runs; the file is the fallback everywhere else.
         self.assertIn('panels', own_names())
-        self.assertIn('adyusuf_config.py', read('commands', 'panels.md'))
+        self.assertIn('podium_config.py', read('commands', 'panels.md'))
 
     def test_hook_events_are_exactly_the_seven(self):
         self.assertEqual(sorted(normalised_hooks()),
@@ -152,27 +152,27 @@ class RootPluginTest(unittest.TestCase):
 
     def test_rules_parts_one_to_four_and_the_configuration_on_session_start_and_nothing_else(self):
         rules = [f'{RULES_CTX} session {n} 4' for n in range(1, 5)]
-        rules.append(f'python3 "{ROOT}/scripts/adyusuf_config.py" context --stdin')    # the effective defaults (rule #34)
-        rules.append(f'python3 "{ROOT}/scripts/adyusuf_status.py" hook session')       # the Status box starts waiting
+        rules.append(f'python3 "{ROOT}/scripts/podium_config.py" context --stdin')    # the effective defaults (rule #34)
+        rules.append(f'python3 "{ROOT}/scripts/podium_status.py" hook session')       # the Status box starts waiting
         self.assertEqual(commands_of('SessionStart'), [(None, rules)])
 
     def test_rules_parts_one_to_four_on_subagent_start(self):
-        subagent_steps = f'python3 "{ROOT}/scripts/adyusuf_status.py" hook subagent'   # a subagent writes its own steps
+        subagent_steps = f'python3 "{ROOT}/scripts/podium_status.py" hook subagent'   # a subagent writes its own steps
         self.assertEqual(commands_of('SubagentStart'), [(None, [f'{RULES_CTX} subagent {n} 4' for n in range(1, 5)] + [subagent_steps])])
 
     def test_the_guard_runs_before_a_bash_call_and_nothing_else_does(self):
         # The never-do guard on Bash, then the steps-first guard on edits and commits (02/11/2026).
-        steps_guard = f'python3 "{ROOT}/scripts/adyusuf_status.py" hook guard'
+        steps_guard = f'python3 "{ROOT}/scripts/podium_status.py" hook guard'
         self.assertEqual(commands_of('PreToolUse'), [('Bash', [f'bash "{ROOT}/scripts/guard-destructive.sh"']),
                                                      ('Edit|Write|NotebookEdit|Bash', [steps_guard])])
 
     def test_the_size_hook_runs_after_an_edit_or_write_and_at_stop(self):
         size_hook = [f'bash "{ROOT}/scripts/md-hook.sh"']
-        notify = lambda event: [f'python3 "{ROOT}/scripts/adyusuf_config.py" notify {event}']  # noqa: E731
+        notify = lambda event: [f'python3 "{ROOT}/scripts/podium_config.py" notify {event}']  # noqa: E731
         # After a task boundary (an agent call, a shell command) and before each prompt, a changed setting is announced.
         self.assertEqual(commands_of('PostToolUse'), [('Edit|Write', size_hook), ('Agent|Bash', notify('PostToolUse'))])
         # Every session's Status box: a message sets what runs now, the end of a turn says it waits (02/11/2026).
-        status = lambda event: f'python3 "{ROOT}/scripts/adyusuf_status.py" hook {event}'  # noqa: E731
+        status = lambda event: f'python3 "{ROOT}/scripts/podium_status.py" hook {event}'  # noqa: E731
         self.assertEqual(commands_of('UserPromptSubmit'), [(None, notify('UserPromptSubmit') + [status('prompt')])])
         self.assertEqual(commands_of('Stop'), [(None, size_hook + [status('stop')])])
         self.assertEqual(commands_of('StopFailure'), [(None, [status('stop')])])     # an API error ends the turn too
@@ -185,8 +185,8 @@ class RootPluginTest(unittest.TestCase):
         files = set(tracked())
         scripts = {path for groups in normalised_hooks().values() for _, hooks in groups
                    for _, command in hooks for path in plugin_paths(command)}
-        self.assertEqual(sorted(scripts), ['scripts/adyusuf_config.py', 'scripts/adyusuf_status.py', 'scripts/guard-destructive.sh',
-                                           'scripts/md-hook.sh', 'scripts/rules-context.py'])
+        self.assertEqual(sorted(scripts), ['scripts/guard-destructive.sh', 'scripts/md-hook.sh', 'scripts/podium_config.py',
+                                           'scripts/podium_status.py', 'scripts/rules-context.py'])
         for script in scripts:
             self.assertIn(script, files)
             self.assertTrue(os.path.isfile(os.path.join(REPO, script)), script)
@@ -231,7 +231,7 @@ class PluginPathTest(unittest.TestCase):
 
     def test_old_home_paths_are_gone_from_skill_command_and_agent_bodies(self):
         self.assertTrue(OLD_HOME_PATH.search('open ~/.claude/standards/x.md'))
-        self.assertTrue(OLD_HOME_PATH.search('$HOME/.claude/skills/adyusuf/x'))
+        self.assertTrue(OLD_HOME_PATH.search('$HOME/.claude/skills/podium/x'))
         self.assertIsNone(OLD_HOME_PATH.search('edit ~/.claude/settings.json'))
         stale = {}
         for rel in tracked():

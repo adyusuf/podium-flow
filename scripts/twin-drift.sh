@@ -23,7 +23,7 @@
 # actually carries, because that is what its gate will run.
 #
 # ⚠️ It compares against THIS working tree's scripts/, which is the branch under
-# test — not against the installed copy of the adyusuf plugin's `scripts/`
+# test — not against the installed copy of the podium plugin's `scripts/`
 # (canonical, taken from `prod`), which is SUPPOSED to lag.
 # Comparing with the installed copy is what makes a not-yet-promoted change look like
 # drift; md-hook.sh does that deliberately for a different purpose (warning a

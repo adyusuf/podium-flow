@@ -18,7 +18,7 @@ Bring this project in line with the `${CLAUDE_PLUGIN_ROOT}/standards/` layout. *
 - If present: do not delete it. Add only the missing sections and put this note at the top (if it is not there already):
 
   ```
-  > Global rules and standards: the `adyusuf` Claude Code plugin (https://github.com/adyusuf/claude-code-standards) — its rules load in every session, its standards through `/adyusuf:software-standards`.
+  > Global rules and standards: the `podium` Claude Code plugin (https://github.com/adyusuf/podium-flow) — its rules load in every session, its standards through `/podium:software-standards`.
   > This file holds only the rules **specific to this project**; a rule here overrides the global standard.
   ```
 
@@ -76,8 +76,8 @@ only by **moving** content (never by summarising it); the result is verified wit
 ## 6. Working mode (optional)
 
 If the project carries no `.claude/mode` file, mode **B** applies.
-To request a different agent set: `/adyusuf:working-mode <A|C|D|E>`; to run the Opus
-agents on another model, add it: `/adyusuf:working-mode C sonnet` (written to
+To request a different agent set: `/podium:working-mode <A|C|D|E>`; to run the Opus
+agents on another model, add it: `/podium:working-mode C sonnet` (written to
 `.claude/mode-model`; the letter alone removes it).
 Definitions are in `${CLAUDE_PLUGIN_ROOT}/modes/README.md`, the rule in `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` #27.
 ⚠️ `.claude/*` is gitignored in most projects; the mode file **must be committed**
@@ -86,7 +86,7 @@ project setting, not personal session state.
 
 ## 6a. Plan file (`${CLAUDE_PLUGIN_ROOT}/standards/22-live-board.md`)
 
-`/adyusuf:board-plan` keeps each session's plan in `.claude/board/plan-<session>.md`.
+`/podium:board-plan` keeps each session's plan in `.claude/board/plan-<session>.md`.
 
 1. `.gitignore`: `.claude/board/` must be ignored (runtime data). Verify:
    `git check-ignore -v .claude/board/x` matches.
@@ -113,4 +113,4 @@ inventory), and an `.env.example`. This command brings a new or existing project
 that baseline — it fills in what is missing and never deletes what is there — so every
 later session, agent or person starts from the same written facts instead of rediscovering them.
 
-Contributions are welcome: https://github.com/adyusuf/claude-code-standards
+Contributions are welcome: https://github.com/adyusuf/podium-flow

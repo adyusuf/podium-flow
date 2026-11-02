@@ -21,7 +21,7 @@ message until it is done. A one-question/one-answer exchange gets no list.
 - **Phases are visible:** each item carries its phase (`P0 · …`, `P1 · …`); the whole
   plan goes up in the first message, before any work.
 - **Analyse first, then steps in the Status box (user decision 02/11/2026).** Every task is analysed and split into steps
-  (phases where it helps) before any work, and the steps go into the pane's Status box with `adyusuf_status.py step` in
+  (phases where it helps) before any work, and the steps go into the pane's Status box with `podium_status.py step` in
   order: each with its state (not started · running · done · blocked · did not run), how much of it is done (%), and what
   blocks it. A request that arrives mid-work is analysed the same way and its steps go in where they belong (`--after`).
   A subagent writes its own steps under its name (`--agent`); the box shows each group with its %. The setting
@@ -42,7 +42,7 @@ message until it is done. A one-question/one-answer exchange gets no list.
   deploy (a backend), never for an offline app; e2e never appears while no gate runs it
   (#33); the review is the one the active mode has (the `qa` agent in C/D/E, my own pass
   in A/B).
-- **Merge, gate and push items come from the configuration (#34, `/adyusuf:config`):**
+- **Merge, gate and push items come from the configuration (#34, `/podium:config`):**
   per target, in order dev → test → prod (first `sdlc_settings.py write --session <id>` into the project, committed
   with the merge: the gate reads the coverage setting from that file, standards/13 §8a) — the target only if
   `merge.<t>` is yes (a no drops it and every later target); its gates only if
@@ -133,7 +133,7 @@ in a row — and every time something real was.
 
 ### 5a. Reply length is a setting: short, normal, long (user decision 01/11/2026)
 
-How much Claude writes follows `reply.length` (`/adyusuf:config`, the *Replies* row in the pane; default **short**). The
+How much Claude writes follows `reply.length` (`/podium:config`, the *Replies* row in the pane; default **short**). The
 session-start context names the effective value. Before every reply Claude writes at the effective length: the value
 in the session-start block, or in the latest change notice. A change applies from the next reply, not the next task
 (user decision 02/11/2026): it splits no work, so unlike the other settings it does not wait for the task to end.
@@ -227,16 +227,16 @@ The same repository may be open in more than one Claude session:
   if you get an error, use an isolated clone.
 - Before long-running work: `git fetch`, and a `--ff-only` pull if you are behind.
 
-### 7a. The live configuration is the installed `adyusuf` plugin
+### 7a. The live configuration is the installed `podium` plugin
 
-The rule set is ONE Claude Code plugin, `adyusuf`: the repository root carries
+The rule set is ONE Claude Code plugin, `podium`: the repository root carries
 `.claude-plugin/plugin.json` and `marketplace.json`, and every machine installs it with
-`/plugin marketplace add adyusuf/claude-code-standards#prod` +
-`/plugin install adyusuf@adyusuf-marketplace` (`SETUP.md` §6). Claude Code **copies** the
+`/plugin marketplace add adyusuf/podium-flow#prod` +
+`/plugin install podium@podium-marketplace` (`SETUP.md` §6). Claude Code **copies** the
 `prod` branch into its plugin cache; nothing in `~/.claude` links into a checkout (decision
 13/10/2026, `docs/decision-log.md`). The plugin brings the global rules (its hooks print
 `CLAUDE.md` into every session and subagent), the standards, the modes, the role agents as
-`adyusuf:<role>`, every skill and command as `/adyusuf:<name>`, and the safety hooks.
+`podium:<role>`, every skill and command as `/podium:<name>`, and the safety hooks.
 
 So:
 
@@ -245,12 +245,12 @@ So:
   for that session only.
 - **A change reaches the live configuration only by promotion** `dev → test → prod`, which
   Claude merges through the gate and, once the user has picked what to push (#34), pushes. A machine takes it with
-  `/plugin marketplace update adyusuf-marketplace` + `/plugin update adyusuf` (or the
+  `/plugin marketplace update podium-marketplace` + `/plugin update podium` (or the
   marketplace's auto-update); the plugin has no `version`, so every `prod` commit is a new one.
 - **Never edit the installed copy** under `~/.claude/plugins/cache/`: the next update replaces
   it and the change is lost. Edit the repository.
 - Ours are never confused with third-party skills, commands or agents: every one of them is
-  namespaced `adyusuf:`. Check the install with `claude plugin details adyusuf`.
+  namespaced `podium:`. Check the install with `claude plugin details podium`.
 
 ## 8. Work that requires approval (no exceptions)
 
@@ -358,14 +358,14 @@ finished into one row and give the remaining work its own rows.
 
 ### 10d. The pane's Status box shows the same table (user decision 01/11/2026)
 
-Where the `adyusuf` pane runs, the table is ALSO kept in the session's status file, and the pane's **Status** box (the
+Where the `podium` pane runs, the table is ALSO kept in the session's status file, and the pane's **Status** box (the
 first box) shows it. It does not replace the table in the reply, at any reply length (§5a); the reply table stays the
 deliverable.
 
 - **Every task, not only a long run (user decision 01/11/2026):** from the first step of any task with more than one step
   to its end, the box shows what runs now, what runs next and one row per piece; it is never left empty or stale while
   work goes on, and it is cleared only when the work is done.
-- **Claude writes it at every state change**, with `scripts/adyusuf_status.py --session <id>` (the installed plugin's
+- **Claude writes it at every state change**, with `scripts/podium_status.py --session <id>` (the installed plugin's
   copy): `now` (what runs now), `next` (what runs next), `step ITEM STATE PERCENT [--blocker] [--agent] [--after]` (one
   step of the work, §1a, replaced by its item and runner), `drop`, `clear` when the work is done (`clear` also replaces a
   corrupt file); `row ITEM STATE FIGURE WAITING` still writes an older row. The session id is the one the plugin's
@@ -376,7 +376,7 @@ deliverable.
   exists it is an estimate and the step's name or blocker says so. A blocked step keeps its % and names its reason
   (`--blocker`), which the box shows as `-> reason`. The reply table (§10) is unchanged: measured figures with their
   signal, and a blocked row there states the reason, not a percentage.
-- **Every session, automatically (user decision 02/11/2026):** the plugin's hooks (`adyusuf_status.py hook`) write
+- **Every session, automatically (user decision 02/11/2026):** the plugin's hooks (`podium_status.py hook`) write
   *Now*: `waiting for you` when a session starts, the first line of each message the user sends (a system-started turn
   leaves it), and at each turn's end `waiting for you`, or `waiting for background work` while a background task or a
   session cron runs; an API error (`StopFailure`) and an interrupt (the pane, on `turn.complete`) end a turn too. The
@@ -384,7 +384,7 @@ deliverable.
   Windows, which has no file lock, a hook and a background writer can lose one write if they collide.
 - **How the box stays current:** a trigger (it re-reads the file when any tool call returns) and a poll every 2 s that
   stats the file and re-reads it only when its modification time changed. The file is
-  `~/.claude/adyusuf-status/<session id>.json` (`ADYUSUF_STATUS_DIR`, an absolute path, overrides the folder); status
+  `~/.claude/podium-status/<session id>.json` (`PODIUM_STATUS_DIR`, an absolute path, overrides the folder); status
   files untouched for 14 days are removed on the next write, and no other file in the folder is ever touched. A file the
   box cannot read leaves its last table in place, with one warning in the chat. It is local: nothing is published, so this is not the removed dashboard.
 

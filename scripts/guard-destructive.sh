@@ -40,7 +40,7 @@ esac
 # tracer counts a heredoc as ONE statement, so this file reported 3 of 19 lines
 # covered while every rule in it was being exercised (#29 wants an honest
 # denominator). Moved, patterns byte-identical.
-# ⚠️ THE SYMLINK MUST BE RESOLVED FIRST. The adyusuf plugin runs the copy in its
+# ⚠️ THE SYMLINK MUST BE RESOLVED FIRST. The podium plugin runs the copy in its
 # own `scripts/` (canonical) directly, but the legacy install put this hook at
 # ~/.claude/hooks/guard-destructive.sh as a SYMLINK into the repository's scripts/,
 # and a machine not yet moved off it still calls it that way. $BASH_SOURCE is the

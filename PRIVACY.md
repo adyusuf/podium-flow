@@ -1,8 +1,8 @@
-# Privacy policy — the `adyusuf` plugin
+# Privacy policy — the `podium` plugin
 
 Last updated: 22/10/2026 · Maintainer: Adnan Yusuf (<https://github.com/adyusuf>)
 
-The `adyusuf` plugin is a set of working rules, skills, commands, role agents, hooks and scripts for Claude
+The `podium` plugin is a set of working rules, skills, commands, role agents, hooks and scripts for Claude
 Code. It has **no service of its own**: nothing it contains runs on a server the maintainer operates, and the
 maintainer receives no data from it. The full inventory is in
 [`hooks/README.md`](hooks/README.md).
@@ -13,8 +13,8 @@ All reading happens on your own machine. Nothing read is sent anywhere by the pl
 
 - **The hooks** read this plugin's `CLAUDE.md`, the command Claude is about to run (to refuse destructive ones) and
   a `CLAUDE.md` you edit (to check its size).
-- **The settings and the rail boxes** (`scripts/adyusuf_config.py`, `hooks/register.tsx`) read your own and a project's
-  `adyusuf.json`, `~/.claude/plugins/installed_plugins.json` (to find the installed copy of this plugin) and, for the
+- **The settings and the rail boxes** (`scripts/podium_config.py`, `hooks/register.tsx`) read your own and a project's
+  `podium.json`, `~/.claude/plugins/installed_plugins.json` (to find the installed copy of this plugin) and, for the
   Promotion box, the branch names, commit messages and `Gate-Waived:` lines of the repository you are in, through
   read-only `git` commands.
 - **`scripts/step-stats.py`** reads Claude Code's local session transcripts (`~/.claude/projects`), and only
@@ -24,10 +24,10 @@ All reading happens on your own machine. Nothing read is sent anywhere by the pl
 
 - `step-stats.py` writes only aggregate counts (steps, tokens) to `docs/measurement-log.md`. A sanitiser
   removes project names and paths, and the script refuses to write when one survives.
-- `plugin-setup.py` writes its log, and a copy of your `adyusuf.json` before it replaces the plugin, under
+- `plugin-setup.py` writes its log, and a copy of your `podium.json` before it replaces the plugin, under
   `~/.claude-standards/` on your machine.
-- Changing a setting with `/adyusuf:config` writes `~/.claude/adyusuf.json`, or a project's `.claude/adyusuf.json` when you
-  ask for the project layer. A change made in the rail boxes writes `~/.claude/adyusuf-session/<session id>.json`, which
+- Changing a setting with `/podium:config` writes `~/.claude/podium.json`, or a project's `.claude/podium.json` when you
+  ask for the project layer. A change made in the rail boxes writes `~/.claude/podium-session/<session id>.json`, which
   applies to that session only; files nobody has written to for 14 days are removed. A short lock file goes to your temp folder while it writes.
 - Nothing is retained anywhere else.
 
@@ -49,4 +49,4 @@ Disable or uninstall the plugin with `/plugin`.
 
 ## Contact
 
-Questions about this policy: open an issue at <https://github.com/adyusuf/claude-code-standards/issues>.
+Questions about this policy: open an issue at <https://github.com/adyusuf/podium-flow/issues>.

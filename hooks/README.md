@@ -1,4 +1,4 @@
-# hooks — what the plugin runs by itself, and the `adyusuf` pane
+# hooks — what the plugin runs by itself, and the `podium` pane
 
 Installing someone else's plugin means running their code in your sessions, so this page lists everything the
 plugin runs, reads, writes and sends.
@@ -10,35 +10,35 @@ All of them run locally; none opens a network connection.
 | When | Script | What it does |
 |---|---|---|
 | `SessionStart`, `SubagentStart` | `scripts/rules-context.py` (4 parts) | prints the plugin's `CLAUDE.md` into the session and every subagent, in parts of under 10,000 characters; reads only that file |
-| `SessionStart` | `scripts/adyusuf_config.py context` | prints the effective settings (mode, models, merge/push/gate per target) and this session's id |
-| `UserPromptSubmit`, `PostToolUse` (Agent, Bash) | `scripts/adyusuf_config.py notify` | when a setting changed since the session last looked, says so; keeps what it saw in `~/.claude/adyusuf-seen/<session id>` |
-| `SessionStart`, `UserPromptSubmit`, `Stop`, `StopFailure` | `scripts/adyusuf_status.py hook` | keeps every session's Status box alive: a session starts `waiting for you`, your message's first line becomes *Now* (`working on: …`; a system-started turn leaves it), the end of a turn sets `waiting for you` or `waiting for background work`; Claude's rows stay. The mod does the same after an interrupted turn. Writes only `~/.claude/adyusuf-status/<session id>.json`, pruned after 14 days |
-| `UserPromptSubmit` (same hook) | `scripts/adyusuf_status.py hook prompt` | also reminds Claude to analyse the message and write or insert its steps first |
-| `SubagentStart` | `scripts/adyusuf_status.py hook subagent` | tells each subagent how to write its own steps into this session's Status box under its name |
-| `PreToolUse` (Edit, Write, NotebookEdit, Bash) | `scripts/adyusuf_status.py hook guard` | with *Steps* on `block`, refuses a code edit or a `git commit` until the Status box holds steps; `~/.claude` and temp files are never refused |
+| `SessionStart` | `scripts/podium_config.py context` | prints the effective settings (mode, models, merge/push/gate per target) and this session's id |
+| `UserPromptSubmit`, `PostToolUse` (Agent, Bash) | `scripts/podium_config.py notify` | when a setting changed since the session last looked, says so; keeps what it saw in `~/.claude/podium-seen/<session id>` |
+| `SessionStart`, `UserPromptSubmit`, `Stop`, `StopFailure` | `scripts/podium_status.py hook` | keeps every session's Status box alive: a session starts `waiting for you`, your message's first line becomes *Now* (`working on: …`; a system-started turn leaves it), the end of a turn sets `waiting for you` or `waiting for background work`; Claude's rows stay. The mod does the same after an interrupted turn. Writes only `~/.claude/podium-status/<session id>.json`, pruned after 14 days |
+| `UserPromptSubmit` (same hook) | `scripts/podium_status.py hook prompt` | also reminds Claude to analyse the message and write or insert its steps first |
+| `SubagentStart` | `scripts/podium_status.py hook subagent` | tells each subagent how to write its own steps into this session's Status box under its name |
+| `PreToolUse` (Edit, Write, NotebookEdit, Bash) | `scripts/podium_status.py hook guard` | with *Steps* on `block`, refuses a code edit or a `git commit` until the Status box holds steps; `~/.claude` and temp files are never refused |
 | `PreToolUse` (Bash) | `scripts/guard-destructive.sh` | refuses the never-do commands (forced push, push to `main`, `--no-verify`, `DROP`/`TRUNCATE`, `rm -rf` on `/` `~` `.` `*`); a push to `prod` is not judged here, it follows `push.prod` in the configuration |
 | `PostToolUse` (Edit, Write), `Stop` | `scripts/md-hook.sh` | checks a touched `CLAUDE.md` against its size budget and for dropped rules, and the copied scripts for drift; warns only |
 
 ## The mod (`register.tsx`)
 
-`hooks.json` also lists `register.tsx` under `modules`: a Claude Code mod that opens one pane, titled `adyusuf`, in the
-right-hand rail of the desktop app when a session starts, and answers `/adyusuf:panels`. In a client that does not load
+`hooks.json` also lists `register.tsx` under `modules`: a Claude Code mod that opens one pane, titled `podium`, in the
+right-hand rail of the desktop app when a session starts, and answers `/podium:panels`. In a client that does not load
 mods, the command prints the same settings as a table instead ([`commands/panels.md`](../commands/panels.md)).
 
 What the mod runs and reads:
 
-- `python3` to find the installed `adyusuf` plugin in `~/.claude/plugins/installed_plugins.json`, then
-  `python3 scripts/adyusuf_config.py show/agents/schema/set` from that copy. A press in the pane runs `set --session <id>`:
+- `python3` to find the installed `podium` plugin in `~/.claude/plugins/installed_plugins.json`, then
+  `python3 scripts/podium_config.py show/agents/schema/set` from that copy. A press in the pane runs `set --session <id>`:
   it changes this session only, never the saved defaults, unless the press is in the *System* column.
 - read-only `git` (`for-each-ref`, `rev-parse`, `rev-list`, `log`) in the session's repository, for Promotion.
-- `~/.claude/adyusuf-status/<session id>.json` (or `ADYUSUF_STATUS_DIR`) for Status: after every tool call, and every
+- `~/.claude/podium-status/<session id>.json` (or `PODIUM_STATUS_DIR`) for Status: after every tool call, and every
   2 s when its modification time changed.
-- Before a Bash or PowerShell command runs, it writes one `⚠ adyusuf operation: …` line into the chat when the command
+- Before a Bash or PowerShell command runs, it writes one `⚠ podium operation: …` line into the chat when the command
   is one the rules govern (a push, a merge, a gate run), naming the rules in play.
-- When a setting changes — in a box, through `/adyusuf:config` or by hand in a settings file — it writes
-  `⚠ adyusuf setting changed (<layer>): <label> (<key>) old → new` into the chat, with the rules the setting steers.
-- A press writes `~/.claude/adyusuf-session/<session id>.json` (this session's layer) or, in the *System* column,
-  `~/.claude/adyusuf.json`.
+- When a setting changes — in a box, through `/podium:config` or by hand in a settings file — it writes
+  `⚠ podium setting changed (<layer>): <label> (<key>) old → new` into the chat, with the rules the setting steers.
+- A press writes `~/.claude/podium-session/<session id>.json` (this session's layer) or, in the *System* column,
+  `~/.claude/podium.json`.
 
 It opens no network connection. The code is split so the drawing can be tested without the engine: `boxes.ts` (Settings,
 Agents, Promotion), `controls.ts` (the shared icons, options, aligned lines and hover cards), `help.ts` (what the hover
@@ -47,7 +47,7 @@ engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/imp
 
 ## The four boxes
 
-![The adyusuf pane in the right-hand rail: Status, Settings, Agents and Promotion boxes, with an operation notice in the chat on the left](../docs/images/adyusuf-panels.webp)
+![The podium pane in the right-hand rail: Status, Settings, Agents and Promotion boxes, with an operation notice in the chat on the left](../docs/images/podium-panels.webp)
 
 The screenshot is of 01/11/2026. The left two-thirds are the app's session list and the conversation, blurred on purpose.
 Each box folds by the arrow before its bold title (`▾` open, `▸` folded); Agents and Promotion start folded. The header
@@ -56,15 +56,15 @@ Resting the pointer on a box title, a Settings tab (*Session*, *System*), a Sett
 label or heading opens a card under it that explains it; a role's card is its agent file's description. In a session
 whose folder is in no git repository, no code work happens: the pane shows only Status and Settings, and Settings only
 *Replies* ([`standards/13-pr-and-review.md`](../standards/13-pr-and-review.md) §8a). The
-boxes refresh after every turn, so a merge, a push or a `/adyusuf:config` change shows without
+boxes refresh after every turn, so a merge, a push or a `/podium:config` change shows without
 reopening them.
 
 - **Status.** What runs now and next, then the work's steps: step · state · % · blocked on, a running step in bold.
   With subagents, each group of steps has a line naming who runs it and how much of it is done. Claude writes the steps
-  first, before any work, with `scripts/adyusuf_status.py step`; a background gate or promotion writes its own
+  first, before any work, with `scripts/podium_status.py step`; a background gate or promotion writes its own
   ([`standards/00-working-method.md`](../standards/00-working-method.md) §1a, §10d).
 - **Settings.** Two tabs: **Session** (what this session runs on; a press changes this session only) and **System** (the
-  saved defaults in `~/.claude/adyusuf.json`, which every new session starts from). One tab shows at a time, Session at
+  saved defaults in `~/.claude/podium.json`, which every new session starts from). One tab shows at a time, Session at
   start; the chosen tab is at full strength (in brackets in the terminal), and the pane remembers it. Under the tabs, one
   row per setting: the label, then that tab's options. (The screenshot is older: it shows the two as columns.)
   - *Mode* A–E (rule #27) and *Model\**, the model that replaces Opus in the roles marked `*` in Agents.
@@ -96,7 +96,7 @@ reopening them.
 
 ## What runs only when you call it
 
-- **`/adyusuf:*` skills and commands** tell Claude what to do; they run nothing on their own. `/adyusuf:board-plan`
+- **`/podium:*` skills and commands** tell Claude what to do; they run nothing on their own. `/podium:board-plan`
   writes only the local plan file.
 - **The gate** (`scripts/gate-core.sh`, run in your own project) runs your project's tools on your machine. Four of its
   steps reach the network: installing dependencies from the lockfile when `node_modules` is missing, the dependency

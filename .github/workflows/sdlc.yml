@@ -13,7 +13,7 @@ on:
   workflow_call:
     inputs:
       standards-ref:
-        description: The commit SHA or tag of claude-code-standards to take gate-core.sh from. Pin it; a branch name moves every project at once.
+        description: The commit SHA or tag of podium-flow to take gate-core.sh from. Pin it; a branch name moves every project at once.
         type: string
         required: true
       runner-labels:
@@ -124,7 +124,7 @@ jobs:
             # scanned the standards repository too (first pilot run, 29/10/2026).
             std="$RUNNER_TEMP/sdlc-standards"
             rm -rf "$std" && git init -q "$std"
-            git -C "$std" fetch -q --depth 1 https://github.com/adyusuf/claude-code-standards.git "$STANDARDS_REF"
+            git -C "$std" fetch -q --depth 1 https://github.com/adyusuf/podium-flow.git "$STANDARDS_REF"
             git -C "$std" checkout -q FETCH_HEAD
             bash "$std/scripts/gate-core.sh" "$TARGET"
           fi

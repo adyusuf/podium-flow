@@ -4,7 +4,7 @@ User decision 29/10/2026: CI cannot read this machine's panel, so each merge wri
 project. What matters here:
 
   · the file holds the PANEL's layers only (defaults < the user's file < a session) - a project's own
-    `.claude/adyusuf.json` is ignored, the projects keep no settings of their own;
+    `.claude/podium.json` is ignored, the projects keep no settings of their own;
   · a setting the user never touched takes the shipped default (a new panel setting needs nothing from anyone);
   · nothing outside the SDLC (mode, agents, pod) leaks into the file;
   · writing is repeatable: the same settings give the same bytes, so a merge without a change adds no diff;
@@ -20,7 +20,7 @@ import unittest
 
 SCRIPTS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 TOOL = os.path.join(SCRIPTS, 'sdlc_settings.py')
-CONFIG = os.path.join(SCRIPTS, 'adyusuf_config.py')
+CONFIG = os.path.join(SCRIPTS, 'podium_config.py')
 
 
 class SdlcSettings(unittest.TestCase):
@@ -29,8 +29,8 @@ class SdlcSettings(unittest.TestCase):
         self.project = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.home, ignore_errors=True)
         self.addCleanup(shutil.rmtree, self.project, ignore_errors=True)
-        self.user = os.path.join(self.home, 'adyusuf.json')
-        self.env = dict(os.environ, ADYUSUF_CONFIG_USER=self.user, ADYUSUF_SESSION_DIR=os.path.join(self.home, 'sessions'))
+        self.user = os.path.join(self.home, 'podium.json')
+        self.env = dict(os.environ, PODIUM_CONFIG_USER=self.user, PODIUM_SESSION_DIR=os.path.join(self.home, 'sessions'))
         self.file = os.path.join(self.project, '.claude', 'sdlc-settings.json')
 
     def run_tool(self, *args, tool=TOOL):
@@ -64,9 +64,9 @@ class SdlcSettings(unittest.TestCase):
         self.run_tool('write', '--project', self.project, '--session', 'abc-1')
         self.assertEqual({'test': True, 'prod': False}, self.written()['settings']['deploy_after_push'])
 
-    def test_a_projects_own_adyusuf_json_is_ignored(self):
+    def test_a_projects_own_podium_json_is_ignored(self):
         os.makedirs(os.path.join(self.project, '.claude'))
-        with open(os.path.join(self.project, '.claude', 'adyusuf.json'), 'w') as handle:
+        with open(os.path.join(self.project, '.claude', 'podium.json'), 'w') as handle:
             json.dump({'ci': {'runner': 'self-hosted'}, 'push': {'prod': False}}, handle)
         self.run_tool('write', '--project', self.project)
         settings = self.written()['settings']

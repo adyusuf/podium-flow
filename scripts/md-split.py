@@ -4,7 +4,7 @@
 Usage:
   python3 scripts/md-split.py <claude.md> <section-heading> <detail-file> <relative-link>
 
-⚠️ The master copy lives in the adyusuf plugin's `scripts/` (canonical); every
+⚠️ The master copy lives in the podium plugin's `scripts/` (canonical); every
    project takes a COPY and commits it. The three tools are twins — changing one means changing all.
 
 Method:

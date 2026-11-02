@@ -11,7 +11,7 @@ mobile client**, so there is no `.env` file to fill in and no port to open. What
 | You want to... | Do this |
 |---|---|
 | Read it, or take a few rules into your own `~/.claude` | Nothing to install. Follow steps 1-3 in [`README.md`](README.md#how-to-use-it) |
-| Use it in every session (the `adyusuf` plugin) | §6 below |
+| Use it in every session (the `podium` plugin) | §6 below |
 | Change it (rules, scripts, agents) and pass its own gate | §1-§5 |
 | Put the gate into another project | [`scripts/README.md`](scripts/README.md#putting-the-gate-in-a-project-of-your-own) |
 
@@ -70,8 +70,8 @@ just git and Python and add the rest as the gate asks for it.
 ## 2. Clone and install
 
 ```bash
-git clone https://github.com/adyusuf/claude-code-standards
-cd claude-code-standards
+git clone https://github.com/adyusuf/podium-flow
+cd podium-flow
 ```
 
 1. Install the commit hooks (the `CLAUDE.md` size gate, `gitleaks` over staged
@@ -90,7 +90,7 @@ cd claude-code-standards
 
    ```bash
    git fetch origin
-   git worktree add ../claude-code-standards-wt-<topic> -b <type>/<topic> origin/dev
+   git worktree add ../podium-flow-wt-<topic> -b <type>/<topic> origin/dev
    ```
 
 3. Create the Python environment the coverage step expects. It is kept **outside**
@@ -134,6 +134,7 @@ Set them in your shell or on the command line. None has to be set; the same list
 | `REAL_NAMES_STRICT` | `0` | `1` makes a missing map a failure instead of a warning |
 | `GATE_PARALLEL_NODE` | `0` | `1` runs the Node track in parallel (only meaningful for a project with a Node codebase) |
 | `GATE_CHECK_TEST_DEPLOY` | `0` | `1` makes the prod gate verify the deployed SHA on test (`TEST_VERSION_URL` / `TEST_DEPLOY_SHA_CMD`); by default it does not look at test and warns |
+| `PODIUM_STATUS_DIR`, `PODIUM_SESSION_DIR`, `PODIUM_SEEN_DIR`, `PODIUM_CONFIG_USER` | `~/.claude/podium-status`, `podium-session`, `podium-seen`, `~/.claude/podium.json` | Where the plugin keeps the Status tables, the session layers, what a session last saw, and the user's settings (an absolute path for the status folder). The older `ADYUSUF_*` names, from before the plugin was renamed, are still read |
 | `TEST_VERSION_URL`, `TEST_DEPLOY_SHA_CMD`, `E2E_WEB_CMD`, `E2E_MOBILE_CMD` | unset | Test-environment hooks of the gate (read only with `GATE_CHECK_TEST_DEPLOY=1` / `GATE_RUN_E2E=1`). Here the "test tier" is the pushed `test` branch (`scripts/merge-gate.conf`) |
 
 **The real-name map.** `docs/project-nicknames.tsv` is git-ignored and local. One
@@ -175,49 +176,55 @@ containing a fake-looking key and confirm that `git commit` is **refused**.
 
 A step that reports NOT RUN is a missing tool from §1, not a pass.
 
-## 6. Installing the rule set: the `adyusuf` plugin
+## 6. Installing the rule set: the `podium` plugin
+
+> **Renamed on 02/11/2026.** The plugin was `adyusuf@adyusuf-marketplace` from `adyusuf/claude-code-standards`; it is now
+> `podium@podium-marketplace` from `adyusuf/podium-flow`. `scripts/plugin-setup.py` moves an old install (README, *Moving
+> from adyusuf*); by hand: `/plugin marketplace add adyusuf/podium-flow#prod`, `/plugin install podium@podium-marketplace`,
+> `/plugin uninstall adyusuf@adyusuf-marketplace`, and a `CLAUDE_CODE_PLUGIN_DIRS` naming `adyusuf-marketplace` must name
+> `podium-marketplace`. Open new sessions afterwards.
 
 The rule set installs like every other Claude Code plugin — copied into Claude Code's plugin cache, no links, no
 install script. In a Claude Code session (or the same words after `claude plugin` in a shell):
 
 ```
-/plugin marketplace add adyusuf/claude-code-standards#prod
-/plugin install adyusuf@adyusuf-marketplace
+/plugin marketplace add adyusuf/podium-flow#prod
+/plugin install podium@podium-marketplace
 ```
 
 Start a new session. **Verify:** the session's context carries `[Global working rules, part 1/…` (ask Claude to
-quote it), `/adyusuf:software-standards` opens, and `python3 <checkout>/scripts/plugin-setup.py --check` ends
+quote it), `/podium:software-standards` opens, and `python3 <checkout>/scripts/plugin-setup.py --check` ends
 with `✓ the installed plugin is the newest`. **Where it works:** fully in Claude Code (terminal, desktop app, IDEs) and in
 Cowork, which loads hooks and agents. In claude.ai chat only the skills and commands work: chat skips hooks and
 agents, so the global rules, the guard and the 14 roles are not there. The plugin brings the global rules (its `SessionStart` and
-`SubagentStart` hooks print `CLAUDE.md` through `scripts/rules-context.py`), every `/adyusuf:*` skill and command,
-the 14 role agents as `adyusuf:<role>`, the destructive-command guard and the `CLAUDE.md` size hook. Nothing is
+`SubagentStart` hooks print `CLAUDE.md` through `scripts/rules-context.py`), every `/podium:*` skill and command,
+the 14 role agents as `podium:<role>`, the destructive-command guard and the `CLAUDE.md` size hook. Nothing is
 written into `~/.claude` by hand; read the warning in
 [`README.md` › How to use it](README.md#how-to-use-it) first.
 
 - **The right-hand boxes (part of the plugin):** one pane with the Status, Settings, Agents and Promotion boxes (each folds by its header) opens at session start
-  and with `/adyusuf:panels`. They run `git` and `python3` locally (no shell: on Windows both must be on the desktop app's `PATH`) and contact no server. They show the settings of the
-  installed copy, so `/plugin update adyusuf` brings new settings into them. A click changes **this session only**; a new
-  session starts from your saved defaults (`~/.claude/adyusuf.json`, changed with `/adyusuf:config`). The Status box reads
-  this session's status table from `~/.claude/adyusuf-status/<session id>.json` (written by `scripts/adyusuf_status.py`;
-  `ADYUSUF_STATUS_DIR`, an absolute path, moves the folder), after every tool call and every 2 s when the file changed.
+  and with `/podium:panels`. They run `git` and `python3` locally (no shell: on Windows both must be on the desktop app's `PATH`) and contact no server. They show the settings of the
+  installed copy, so `/plugin update podium` brings new settings into them. A click changes **this session only**; a new
+  session starts from your saved defaults (`~/.claude/podium.json`, changed with `/podium:config`). The Status box reads
+  this session's status table from `~/.claude/podium-status/<session id>.json` (written by `scripts/podium_status.py`;
+  `PODIUM_STATUS_DIR`, an absolute path, moves the folder), after every tool call and every 2 s when the file changed.
   **The Claude desktop app** does not load an installed plugin's mod by itself. Name the plugin's folder in the `env` block
-  of `~/.claude/settings.json` and start a new session: `"env": {"CLAUDE_CODE_PLUGIN_DIRS": "<home>/.claude/plugins/marketplaces/adyusuf-marketplace"}`
+  of `~/.claude/settings.json` and start a new session: `"env": {"CLAUDE_CODE_PLUGIN_DIRS": "<home>/.claude/plugins/marketplaces/podium-marketplace"}`
   (a session the app starts loads each folder like `--plugin-dir`, and that copy then takes precedence over the installed
   one for the session; `plugin-setup.py` keeps that folder current). Verified in the desktop app on 24/10/2026; if a later
   app version shows nothing, remove the line again. The boxes run the installed plugin's script, so keep that copy current
   (`plugin-setup.py`): an old copy shows retired options and fails on a click. Where mods are not switched on, the session
   asks once ("Turn on the mods…"); the config skill falls back to clickable questions in the chat.
-- **Update:** `/plugin marketplace update adyusuf-marketplace`, then `/plugin update adyusuf` and `/reload-plugins`
+- **Update:** `/plugin marketplace update podium-marketplace`, then `/plugin update podium` and `/reload-plugins`
   (or turn auto-update on for the marketplace under `/plugin` › Marketplaces). The plugin has no `version`, so every
   commit on `prod` is a new version. Never edit the cache: the next update replaces it.
-- **Another branch:** `/plugin marketplace add adyusuf/claude-code-standards#test`. To try a working copy without
+- **Another branch:** `/plugin marketplace add adyusuf/podium-flow#test`. To try a working copy without
   installing it: `claude --plugin-dir <worktree>` (it takes precedence over the installed plugin for that session).
 **One script for install and update:** `scripts/plugin-setup.py` (standalone, standard library only; download and run it with the
 macOS/Linux or Windows commands at [the top of `README.md`](README.md#install)). It asks GitHub for the newest
 commit of `prod`, then: not installed → links the marketplace and installs; already newest → nothing; older →
 asks "Remove the old one and install the new one?" and on yes removes it (`--keep-data`), installs the new one and
-checks that `~/.claude/adyusuf.json`, the enabled state and the marketplace link are unchanged. `--check` reports only
+checks that `~/.claude/podium.json`, the enabled state and the marketplace link are unchanged. `--check` reports only
 (exit 1 when work is due), `--yes` skips the question, `--ref <branch>` picks the branch for a first link. It needs
 `git` on `PATH` and the `claude` program: on `PATH`, in the installers' usual folders, in the copy the Claude desktop
 app keeps for its Code tab (standard, Microsoft Store and 3P installs, Windows and macOS), or given with `--claude <path>`;
@@ -235,7 +242,7 @@ your settings file: `~/.claude-standards/backups/plugin-setup-<stamp>/`.
 | Commit refused by the real-name check | A folder key or alias from your map is in the staged change or message | Use the nickname. The exception is `--no-verify`, and yours alone |
 | Real-name check prints a warning and passes | No `docs/project-nicknames.tsv` | Create it (§4), or set `REAL_NAMES_STRICT=1` to make this a failure |
 | `CLAUDE.md` size gate refuses a commit | The file grew past its ceiling in `scripts/md-budget.tsv` | Move the rule into `standards/<topic>.md` first; raise the ceiling only with a written reason |
-| A session has no `[Global working rules` in its context | `python3` not on `PATH` (Windows, §1), or the plugin is disabled | Add `python3`; `/plugin` › Installed › enable `adyusuf` |
+| A session has no `[Global working rules` in its context | `python3` not on `PATH` (Windows, §1), or the plugin is disabled | Add `python3`; `/plugin` › Installed › enable `podium` |
 | Every Bash call mentioning push/rm/drop is BLOCKED with "no Python 3 interpreter" | Neither `python3` nor a Python 3 `python` on the hook's `PATH` | Install Python 3; on Windows add `python3.exe` (§1) |
 | Gate runs on stale branches | The local `dev`/`test` are behind `origin` | `git fetch`, and branch off `origin/dev` |
 

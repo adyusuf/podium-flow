@@ -1,6 +1,6 @@
-// What the Status box of the adyusuf pane shows: this session's status table (user decision 01/11/2026), the same table
+// What the Status box of the podium pane shows: this session's status table (user decision 01/11/2026), the same table
 // `standards/00-working-method.md` §10 asks for in a reply during a long run. Engine-free like boxes.ts, so a test hands in
-// a recording factory. The file is written by scripts/adyusuf_status.py; register.tsx reads it and hands its text here.
+// a recording factory. The file is written by scripts/podium_status.py; register.tsx reads it and hands its text here.
 import type { Ui } from './boxes'
 import { helpCard, hoverable } from './controls'
 import { STATUS_HELP } from './help'
@@ -9,7 +9,7 @@ import { STATUS_HELP } from './help'
 type StatusRow = { item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string }
 export type StatusData = { now: string; next: string; rows: StatusRow[]; updated: string }
 
-/** The same caps as scripts/adyusuf_status.py: the file is read as untrusted text, so a foreign file cannot flood the box. */
+/** The same caps as scripts/podium_status.py: the file is read as untrusted text, so a foreign file cannot flood the box. */
 const MAX_ROWS = 50
 const MAX_TEXT = 300
 // eslint-disable-next-line no-control-regex
@@ -23,19 +23,19 @@ function clean(value: unknown): string {
 }
 
 /**
- * The status folder (user decision 01/11/2026): an absolute ADYUSUF_STATUS_DIR, else `.claude/adyusuf-status` in the home
+ * The status folder (user decision 01/11/2026): an absolute PODIUM_STATUS_DIR, else `.claude/podium-status` in the home
  * folder, USERPROFILE first as Python's expanduser takes it on Windows, then HOME. '' when none is usable: a relative
  * folder would resolve against another directory here than in the script that writes it.
  */
 export function statusDir(chosen?: string, profile?: string, home?: string): string {
   if (chosen) return /^([A-Za-z]:)?[\\/]/.test(chosen) ? chosen.replace(/[\\/]+$/, '') : ''
   const base = profile || home
-  return base ? `${base.replace(/[\\/]+$/, '')}/.claude/adyusuf-status` : ''
+  return base ? `${base.replace(/[\\/]+$/, '')}/.claude/podium-status` : ''
 }
 
 /** The status script beside the configuration script the pane found ('' when none was found). */
 export const statusScript = (configScript: string) =>
-  (configScript.endsWith('/adyusuf_config.py') ? `${configScript.slice(0, -'adyusuf_config.py'.length)}adyusuf_status.py` : '')
+  (configScript.endsWith('/podium_config.py') ? `${configScript.slice(0, -'podium_config.py'.length)}podium_status.py` : '')
 
 /** What a refresh found: no file, a file and its modification time, or an error (unreadable, denied). */
 export type StatusProbe = { kind: 'missing' } | { kind: 'error' } | { kind: 'file'; mtimeMs: number }

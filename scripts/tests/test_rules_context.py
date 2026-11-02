@@ -204,25 +204,25 @@ class ModeParts(unittest.TestCase):
 class HeaderRoot(unittest.TestCase):
     """The part header names the plugin root: the rules say `standards/...`, `modes/...`, and a model
     in any project can only open those if it is told what they are relative to (8707197)."""
-    LONG_ROOT = os.path.join(os.sep + 'r' * 1000, 'cache', 'adyusuf')
+    LONG_ROOT = os.path.join(os.sep + 'r' * 1000, 'cache', 'podium')
 
     def test_the_root_is_the_directory_above_scripts_and_the_rules_are_its_claude_md(self):
         self.assertEqual(rc.ROOT, REPO)
         self.assertEqual(rc.RULES, os.path.join(REPO, 'CLAUDE.md'))
 
     def test_the_first_line_ends_with_the_root_in_both_modes(self):
-        with mock.patch.object(rc, 'ROOT', '/cache/adyusuf'):
+        with mock.patch.object(rc, 'ROOT', '/cache/podium'):
             session = rc.output('session', ['a\n'], 1, 4)
             subagent = json.loads(rc.output('subagent', ['a\n'], 1, 4))['hookSpecificOutput']['additionalContext']
         for text in (session, subagent):
             self.assertEqual(text.splitlines()[0],
-                             '[Global working rules, part 1/1 (adyusuf plugin, CLAUDE.md); '
-                             'relative paths start at /cache/adyusuf]')
+                             '[Global working rules, part 1/1 (podium plugin, CLAUDE.md); '
+                             'relative paths start at /cache/podium]')
             self.assertEqual(text.splitlines()[1], 'a')
 
     def test_the_overflow_warning_names_the_rules_file_not_only_the_root(self):
-        with mock.patch.object(rc, 'ROOT', '/cache/adyusuf'), mock.patch.object(rc, 'RULES', '/cache/adyusuf/CLAUDE.md'):
-            self.assertIn('read the rest in /cache/adyusuf/CLAUDE.md]', rc.render(['a\n', 'b\n'], 1, 1))
+        with mock.patch.object(rc, 'ROOT', '/cache/podium'), mock.patch.object(rc, 'RULES', '/cache/podium/CLAUDE.md'):
+            self.assertIn('read the rest in /cache/podium/CLAUDE.md]', rc.render(['a\n', 'b\n'], 1, 1))
 
     def test_every_printed_real_part_stays_under_the_cap_in_both_modes_for_the_registered_four(self):
         for mode in ('session', 'subagent'):

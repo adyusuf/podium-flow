@@ -11,33 +11,33 @@ import { operationWarnings, warnings } from './notices'
 import { parseStatus, statusBody, statusDir, statusScript, statusStep, type StatusProbe } from './status'
 
 /** One pane, four bordered boxes in it (Status, Settings, Agents, Promotion), each folded by its header. */
-const BOXES = 'adyusuf-boxes'
-const TITLE = 'adyusuf'
+const BOXES = 'podium-boxes'
+const TITLE = 'podium'
 
 // The pane's values live in `$.state`, declared in ../types; a value never written reads as undefined, so each read names its initial one.
-const settings = { plugin: 'adyusuf', key: 'settings' } as const
-const settingsError = { plugin: 'adyusuf', key: 'settingsError' } as const
-const settingsProblems = { plugin: 'adyusuf', key: 'settingsProblems' } as const
-const promotion = { plugin: 'adyusuf', key: 'promotion' } as const
-const folded = { plugin: 'adyusuf', key: 'folded' } as const
-const status = { plugin: 'adyusuf', key: 'status' } as const
+const settings = { plugin: 'podium', key: 'settings' } as const
+const settingsError = { plugin: 'podium', key: 'settingsError' } as const
+const settingsProblems = { plugin: 'podium', key: 'settingsProblems' } as const
+const promotion = { plugin: 'podium', key: 'promotion' } as const
+const folded = { plugin: 'podium', key: 'folded' } as const
+const status = { plugin: 'podium', key: 'status' } as const
 
 /** How often the Status box looks at its file while nothing else wakes it (a background run writing its steps). */
 const STATUS_POLL_MS = 2000
 
-const PLUGIN = 'adyusuf'
-const MARKETPLACE = 'adyusuf-marketplace'
+const PLUGIN = 'podium'
+const MARKETPLACE = 'podium-marketplace'
 const PLUGIN_ID = `${PLUGIN}@${MARKETPLACE}`
 
 type Run = (argv: readonly string[]) => Promise<{ exitCode: number; stdout: string; stderr: string }>
 
-/** The configuration script of the INSTALLED adyusuf plugin ('' when it has none yet); the choice is choose.ts's scriptDir. */
+/** The configuration script of the INSTALLED podium plugin ('' when it has none yet); the choice is choose.ts's scriptDir. */
 async function scriptPath(run: Run): Promise<string> {
   const found = await run(['python3', '-c', DISCOVER_PY, MARKETPLACE, PLUGIN])
   const { record, listing } = parseDiscovery(found.stdout)
   const dir = scriptDir(record, PLUGIN_ID, listing)
   if (!dir) return ''
-  const script = `${dir}/scripts/adyusuf_config.py`
+  const script = `${dir}/scripts/podium_config.py`
   const has = await run(['python3', '-c', IS_FILE_PY, script])
   return has.exitCode === 0 ? script : ''
 }
@@ -55,7 +55,7 @@ async function refreshSettings($: EngineInterface) {
   const run: Run = argv => $.process.run(argv)
   const script = await scriptPath(run)
   if (!script) {
-    await $.state.set(settingsError, 'The adyusuf plugin with /adyusuf:config is not installed yet: /plugin update adyusuf')
+    await $.state.set(settingsError, 'The podium plugin with /podium:config is not installed yet: /plugin update podium')
     return
   }
   const id = await sessionId($)
@@ -66,7 +66,7 @@ async function refreshSettings($: EngineInterface) {
   // The "Claude settings" block: the shipped defaults and the user's own file, with no project or session layer (user decision 28/10/2026).
   const savedRead = await run(['python3', script, 'show', '--json', '--user'])
   if (shown.exitCode !== 0 || agents.exitCode !== 0 || schema.exitCode !== 0 || savedRead.exitCode !== 0) {
-    await $.state.set(settingsError, (shown.stderr || agents.stderr || schema.stderr || savedRead.stderr || 'adyusuf_config.py failed').slice(0, 300))
+    await $.state.set(settingsError, (shown.stderr || agents.stderr || schema.stderr || savedRead.stderr || 'podium_config.py failed').slice(0, 300))
     return
   }
   try {
@@ -79,14 +79,14 @@ async function refreshSettings($: EngineInterface) {
       saved: { values: saved.values, sources: saved.sources },
       agents: JSON.parse(agents.stdout) as AgentRow[],
     }
-    // Every change since the last read (a press in the boxes, /adyusuf:config, a hand edit) is a warning in the chat, with its rules.
+    // Every change since the last read (a press in the boxes, /podium:config, a hand edit) is a warning in the chat, with its rules.
     const { value: before = null } = await $.state.get(settings)
     await $.state.set(settings, next)
     for (const line of warnings(before, next)) $.ui.log(line)
     await $.state.set(settingsError, '')
     await $.state.set(settingsProblems, data.problems ?? [])
   } catch (error) {
-    await $.state.set(settingsError, `Unreadable answer from adyusuf_config.py: ${String(error).slice(0, 200)}`)
+    await $.state.set(settingsError, `Unreadable answer from podium_config.py: ${String(error).slice(0, 200)}`)
   }
 }
 
@@ -123,7 +123,7 @@ async function setSetting($: EngineInterface, key: string, value: string, scope:
   const run: Run = argv => $.process.run(argv)
   const script = await scriptPath(run)
   if (!script) {
-    await $.ui.toast('The adyusuf plugin is not installed yet: /plugin install adyusuf@adyusuf-marketplace')
+    await $.ui.toast('The podium plugin is not installed yet: /plugin install podium@podium-marketplace')
     return
   }
   const id = scope === 'session' ? await sessionId($) : ''
@@ -145,7 +145,7 @@ async function setSetting($: EngineInterface, key: string, value: string, scope:
 /** This session's status file ('' when the engine will not say which session this is, or no folder is usable). */
 async function statusPath($: EngineInterface): Promise<string> {
   const id = await sessionId($)
-  const dir = statusDir(await $.env.get('ADYUSUF_STATUS_DIR'), await $.env.get('USERPROFILE'), await $.env.get('HOME'))
+  const dir = statusDir((await $.env.get('PODIUM_STATUS_DIR')) || (await $.env.get('ADYUSUF_STATUS_DIR')), await $.env.get('USERPROFILE'), await $.env.get('HOME'))
   return id && dir ? `${dir}/${id}.json` : ''
 }
 
@@ -175,7 +175,7 @@ async function readStatus($: EngineInterface) {
   statusStamp = step.stamp
   if (step.stamp === -1 && !statusWarned) {
     statusWarned = true
-    $.ui.log(`adyusuf: the Status box cannot read ${path}; it keeps its last table and tries again`)
+    $.ui.log(`podium: the Status box cannot read ${path}; it keeps its last table and tries again`)
   }
 }
 
@@ -210,7 +210,7 @@ function click($: EngineInterface, key: string, value: string, scope: Scope) {
 }
 
 const onStart: Hook<'session.start'> = async ($, e, next) => {
-  await $.command.register({ name: 'adyusuf:panels', description: 'Open the adyusuf status, settings, agents and promotion boxes' })
+  await $.command.register({ name: 'podium:panels', description: 'Open the podium status, settings, agents and promotion boxes' })
   void $.ui.open({ id: BOXES, title: TITLE })
   await safely($, refreshSettings($))
   await safely($, refreshPromotion($))
@@ -227,10 +227,10 @@ const onPanels: Hook<'command.run'> = async $ => {
   await safely($, refreshPromotion($))
   statusStamp = -1
   await refreshStatus($)
-  return { text: 'adyusuf boxes opened.' }
+  return { text: 'podium boxes opened.' }
 }
 
-// The boxes follow the work: a turn may have merged, pushed or changed a setting through /adyusuf:config.
+// The boxes follow the work: a turn may have merged, pushed or changed a setting through /podium:config.
 // An interrupted turn fires no Stop hook, so the pane marks the Status box as waiting itself (qa, 02/11/2026).
 async function waitAfterInterrupt($: EngineInterface) {
   const script = statusScript(await scriptPath(argv => $.process.run(argv)))
@@ -290,7 +290,7 @@ const onRender: Hook<'ui.render'> = async ($, e) => {
 
 export const register: Register = on => {
   on('session.start', onStart)
-  on('command.run', { command: 'adyusuf:panels' }, onPanels)
+  on('command.run', { command: 'podium:panels' }, onPanels)
   on('turn.complete', onTurnComplete)
   on('tool.call', { tool: 'Bash' }, onShell)
   on('tool.call', { tool: 'PowerShell' }, onShell)

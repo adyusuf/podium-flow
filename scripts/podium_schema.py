@@ -1,11 +1,11 @@
-"""The adyusuf configuration's schema: what can be set, the role sets of the modes, and the agents each mode runs.
+"""The podium configuration's schema: what can be set, the role sets of the modes, and the agents each mode runs.
 
-Split out of adyusuf_config.py so no file passes 300 lines (rule #9); adyusuf_config.py re-exports every name here.
+Split out of podium_config.py so no file passes 300 lines (rule #9); podium_config.py re-exports every name here.
 """
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULTS_FILE = os.path.join(ROOT, 'defaults', 'adyusuf.json')
+DEFAULTS_FILE = os.path.join(ROOT, 'defaults', 'podium.json')
 TARGETS = ('dev', 'test', 'prod')
 E2E_STAGES = (('dev', 'test'), ('test', 'prod'))      # (the environment e2e runs on, the target about to be deployed)
 MODES = ('A', 'B', 'C', 'D', 'E')

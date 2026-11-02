@@ -28,12 +28,12 @@ export type Promotion = { stages: Stage[]; error?: string; outside?: boolean }
 /** One row of the session's status table: what it is, where it stands, the measured figure with its signal, what it waits on. */
 /** `percent`, `blocker`, `agent`: a step's fields (additive, 02/11/2026); '' on a row written the older way. */
 export type StatusRow = { item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string }
-/** The session's status table (scripts/adyusuf_status.py writes it): what runs now, what runs next, the rows. */
+/** The session's status table (scripts/podium_status.py writes it): what runs now, what runs next, the rows. */
 export type StatusData = { now: string; next: string; rows: StatusRow[]; updated: string }
 
 declare module 'claude-code' {
   interface PluginState {
-    'adyusuf': {
+    'podium': {
       /** The effective configuration, read through the plugin's own script; null until the first read. */
       settings: Settings | null
       /** Why the settings could not be read (script missing, bad JSON); empty when they could. */
@@ -41,7 +41,7 @@ declare module 'claude-code' {
       /** Problems the script reports about the configuration files (an unreadable or invalid layer); empty when none. */
       settingsProblems: string[]
       promotion: Promotion | null
-      /** The session's status table from ~/.claude/adyusuf-status/<session>.json; null when there is none. */
+      /** The session's status table from ~/.claude/podium-status/<session>.json; null when there is none. */
       status: StatusData | null
       /** Which of the pane's boxes are folded, by id (settings, agents, promotion); the pane starts with agents and promotion folded. */
       folded: Record<string, boolean>

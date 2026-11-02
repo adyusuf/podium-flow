@@ -12,7 +12,7 @@ Why the rule set exists, how it is carried out, and what was measured. The rules
 | `case-04-the-audit-gap.md` | Case: nine roles, only one audited — the fix was mandatory evidence, not another agent |
 | `benchmark-method.md` | How the measurements are produced and compared: what is and is not measured, the comparison rules, when a comparison is invalid, the reproduce commands |
 | `coverage-gap.md` | Line coverage of this repository's own scripts against the 80% rule (#29): the measured numbers per script, the plan to close the gap, and why shell is not measured |
-| `images/adyusuf-panels.webp` | The screenshot of the `adyusuf` pane, explained in [`hooks/README.md`](../hooks/README.md) |
+| `images/podium-panels.webp` | The screenshot of the `podium` pane, explained in [`hooks/README.md`](../hooks/README.md) |
 | `measurement-log.md` | **Generated.** Aggregate statistics: prefix, per-role cost, how often each step ran (`scripts/step-stats.py`) |
 | `project-nicknames.tsv` | **Local and git-ignored — holds real project folder keys, never commit it.** `<folder key><TAB><nickname>[<TAB><aliases>[<TAB>public]]`; the ledger and the reports show only the nickname, and `real-name-check.sh` searches the key and the aliases in every commit and message. A nickname may not contain a real project name |
 | `measurement-daily-by-project.md` | **Generated, local, git-ignored.** Cost by day × project (nicknames), rewritten whenever the ledger is |

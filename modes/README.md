@@ -2,12 +2,12 @@
 
 **Five** modes determine how a task is carried out: **A-E, subagent-based.**
 (The Agent Teams modes X-Z are archived → [`archive/README.md`](archive/README.md).)
-Reading order: **a session-scoped selection** (`/adyusuf:working-mode <letter> --once`, not
+Reading order: **a session-scoped selection** (`/podium:working-mode <letter> --once`, not
 written to the project file) → the project's `.claude/mode` → the configuration's `mode`
-(`/adyusuf:config`, default **C**).
+(`/podium:config`, default **C**).
 A second word downgrades only the Opus agents (`C sonnet`) → the **Model override** section at the end of this file.
 
-⚠️ **A role is the `adyusuf` plugin's agent:** role `qa` is called with `subagent_type: "adyusuf:qa"`
+⚠️ **A role is the `podium` plugin's agent:** role `qa` is called with `subagent_type: "podium:qa"`
 (the same in a `Workflow` `agent()`). Plugin agents are reachable only by their namespaced name; a bare
 `qa` or another plugin's `<plugin>:qa` is **not** the role.
 
@@ -81,7 +81,7 @@ If either check cannot be run, the output is "not verified" (#28), never fine.
 **No agent is called in A; in B/C/D/E choosing the mode is the approval for that
 agent set.** No separate question before a call; at the end of the turn, how many
 agents ran and the estimated cost are **reported**. If an agent is needed but the
-mode is A: I do not start it, I **propose changing the mode** (`/adyusuf:working-mode B`) —
+mode is A: I do not start it, I **propose changing the mode** (`/podium:working-mode B`) —
 the decision is the user's.
 
 ⚠️ **Automatic delegation is a call too.** Claude Code may suggest an agent on its
@@ -133,13 +133,13 @@ is the producer's own confidence, **never** a substitute for the combined run.
 
 A session does **not** ask the mode or the Opus replacement. The read order decides, silently:
 
-1. the session's own choice (`$S/mode`, `$S/mode-model`, written by `/adyusuf:working-mode <letter> [<model>] --once`);
+1. the session's own choice (`$S/mode`, `$S/mode-model`, written by `/podium:working-mode <letter> [<model>] --once`);
 2. the project's `.claude/mode` and `.claude/mode-model`;
-3. the configuration (`/adyusuf:config`): `mode` (default **C**) and `mode_model` (default `sonnet`).
+3. the configuration (`/podium:config`): `mode` (default **C**) and `mode_model` (default `sonnet`).
 
 The SessionStart hook prints the effective values and the agents they enable, so the session starts knowing them.
-Whoever wants another mode says so in the first message (`C sonnet`, `/adyusuf:working-mode …`) or changes the default
-with `/adyusuf:config`. Subagents, `Workflow` agents and non-interactive runs use the same order.
+Whoever wants another mode says so in the first message (`C sonnet`, `/podium:working-mode …`) or changes the default
+with `/podium:config`. Subagents, `Workflow` agents and non-interactive runs use the same order.
 (Until 17/10/2026 every interactive session opened with an `AskUserQuestion`; the old section is in
 `docs/decision-log.md`, "§27 round 5".)
 
@@ -225,7 +225,7 @@ the main conversation, and the gain does not cover the cost.
 
 Each role is a subagent in `agents/<role>.md`, with its own context window, tool allow-list and model. The model below is
 the one its file defines; with the default configuration (`mode_model: sonnet`) the Opus roles run on Sonnet, and each
-role can be set on its own in the Agents box or with `/adyusuf:config` (`agents.<role>.model`, `agents.<role>.enabled`).
+role can be set on its own in the Agents box or with `/podium:config` (`agents.<role>.model`, `agents.<role>.enabled`).
 
 | Role | Model | Why that tier | Tools it may use |
 |---|---|---|---|
@@ -268,20 +268,20 @@ budget ceiling, stall brake, stopping on any irreversible action.
 
 ## Selecting a mode
 
-    /adyusuf:working-mode               # show the current mode
-    /adyusuf:working-mode B             # switch this project to B (persistent)
-    /adyusuf:working-mode B --once      # this session only, do not write the file
-    /adyusuf:working-mode C sonnet      # C, and every Opus agent runs on Sonnet
-    /adyusuf:working-mode D sonnet --once
+    /podium:working-mode               # show the current mode
+    /podium:working-mode B             # switch this project to B (persistent)
+    /podium:working-mode B --once      # this session only, do not write the file
+    /podium:working-mode C sonnet      # C, and every Opus agent runs on Sonnet
+    /podium:working-mode D sonnet --once
 
 ## Model override — `<letter> <model>` (PERMANENT, all projects; user decision 05/10/2026)
 
 Each agent keeps the model its definition gives it (`model:` in `agents/<role>.md`, or a
 plugin agent's own frontmatter). A second word after the letter downgrades **only the
-Opus agents**. Since 17/10/2026 each agent can also be set on its own (`/adyusuf:config`, the Agents box):
+Opus agents**. Since 17/10/2026 each agent can also be set on its own (`/podium:config`, the Agents box):
 `agents.<role>.model` (`default` follows this table) beats the override, and `agents.<role>.enabled`
 (`auto` = the mode's set, `on`, `off`) adds a role to the mode or takes one out of it; mode A runs none whatever
-these say. The effective list is `scripts/adyusuf_config.py agents`:
+these say. The effective list is `scripts/podium_config.py agents`:
 
 | The user types | Opus agents run on | Every other agent |
 |---|---|---|

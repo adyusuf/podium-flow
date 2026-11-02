@@ -44,11 +44,11 @@ test('changes are the keys whose value differs, and there are none without an ea
 
 test('a warning says the scope, the setting, old and new value, and the rules in play', () => {
   expect(warning({ key: 'push.prod', from: false, to: true }, 'this session', SCHEMA)).toBe(
-    '⚠ adyusuf setting changed (this session): Push prod (push.prod) no → yes. Rules in play: #34 merges, pushes and gates follow the configuration, not questions; #26 work off dev, one commit per task, merged through a gate.')
+    '⚠ podium setting changed (this session): Push prod (push.prod) no → yes. Rules in play: #34 merges, pushes and gates follow the configuration, not questions; #26 work off dev, one commit per task, merged through a gate.')
   expect(warning({ key: 'pod.connect', from: true, to: false }, 'saved defaults', SCHEMA)).toBe(
-    '⚠ adyusuf setting changed (saved defaults): Connect to pod (pod.connect) yes → no. No rule reads this setting.')
+    '⚠ podium setting changed (saved defaults): Connect to pod (pod.connect) yes → no. No rule reads this setting.')
   expect(warning({ key: 'unknown.key', from: undefined, to: 'x' }, 'this session', SCHEMA)).toBe(
-    '⚠ adyusuf setting changed (this session): unknown.key (unknown.key) unset → x. No rule reads this setting.')
+    '⚠ podium setting changed (this session): unknown.key (unknown.key) unset → x. No rule reads this setting.')
 })
 
 test('nothing is said on the first read or when nothing changed', () => {
@@ -59,10 +59,10 @@ test('nothing is said on the first read or when nothing changed', () => {
 test('a session change is said as a session change, a saved change as a saved change', () => {
   const lines = warnings(view({ mode: 'C', 'push.prod': true }, { mode: 'C' }), view({ mode: 'B', 'push.prod': true }, { mode: 'C' }))
   expect(lines.length).toBe(1)
-  expect(lines[0].startsWith('⚠ adyusuf setting changed (this session): Working mode (mode) C → B.')).toBe(true)
+  expect(lines[0].startsWith('⚠ podium setting changed (this session): Working mode (mode) C → B.')).toBe(true)
   const saved = warnings(view({ mode: 'B' }, { mode: 'C' }), view({ mode: 'B' }, { mode: 'A' }))
   expect(saved.length).toBe(1)
-  expect(saved[0].startsWith('⚠ adyusuf setting changed (saved defaults): Working mode (mode) C → A.')).toBe(true)
+  expect(saved[0].startsWith('⚠ podium setting changed (saved defaults): Working mode (mode) C → A.')).toBe(true)
 })
 
 test('a saved default that moved the session value too is said once, as the saved change', () => {
@@ -80,14 +80,14 @@ test('before the saved defaults are read only the session is compared', () => {
 test('a git push names its stage, a forced one says so, and the rules in play follow', () => {
   const lines = operationWarnings('git -C /repo push --force origin dev:prod')
   expect(lines.length).toBe(1)
-  expect(lines[0]).toBe('⚠ adyusuf operation: git push (FORCED, prod). Rules in play: #34 merges, pushes and gates follow the configuration, not questions; #26 work off dev, one commit per task, merged through a gate. A force push is on the never-do list.')
+  expect(lines[0]).toBe('⚠ podium operation: git push (FORCED, prod). Rules in play: #34 merges, pushes and gates follow the configuration, not questions; #26 work off dev, one commit per task, merged through a gate. A force push is on the never-do list.')
   expect(operationWarnings('git push origin test')[0].includes('(test)')).toBe(true)
 })
 
 test('a git merge is a merge, and merge-base or status are not operations', () => {
   const lines = operationWarnings('git fetch && git merge --no-ff origin/dev')
   expect(lines.length).toBe(1)
-  expect(lines[0].startsWith('⚠ adyusuf operation: git merge (dev). Rules in play: #26')).toBe(true)
+  expect(lines[0].startsWith('⚠ podium operation: git merge (dev). Rules in play: #26')).toBe(true)
   expect(operationWarnings('git merge-base HEAD dev')).toEqual([])
   expect(operationWarnings('git status; git log --oneline')).toEqual([])
   expect(operationWarnings('git -c core.x=1 -C repo status')).toEqual([])
@@ -97,7 +97,7 @@ test('a git merge is a merge, and merge-base or status are not operations', () =
 test('a gate or scan script run names the gate rules, once however often it appears', () => {
   const lines = operationWarnings('bash scripts/gate-core.sh dev && bash scripts/coverage.sh; gitleaks detect')
   expect(lines.length).toBe(1)
-  expect(lines[0].startsWith('⚠ adyusuf operation: gate / scan run. Rules in play: #25')).toBe(true)
+  expect(lines[0].startsWith('⚠ podium operation: gate / scan run. Rules in play: #25')).toBe(true)
   expect(lines[0].includes('#29')).toBe(true)
   expect(operationWarnings('cat scripts/coverage.sh')).toEqual([])
   expect(operationWarnings('grep -n x scripts/gate-core.sh; ls scripts/merge-gate.sh')).toEqual([])
@@ -111,6 +111,6 @@ test('a gate or scan script run names the gate rules, once however often it appe
 test('a merge and a push in one command are two warnings, in the order they appear', () => {
   const lines = operationWarnings('git merge dev | cat; git push -f origin prod')
   expect(lines.length).toBe(2)
-  expect(lines[0].startsWith('⚠ adyusuf operation: git merge (dev). Rules in play: #26')).toBe(true)
-  expect(lines[1].startsWith('⚠ adyusuf operation: git push (FORCED, prod). Rules in play: #34')).toBe(true)
+  expect(lines[0].startsWith('⚠ podium operation: git merge (dev). Rules in play: #26')).toBe(true)
+  expect(lines[1].startsWith('⚠ podium operation: git push (FORCED, prod). Rules in play: #34')).toBe(true)
 })

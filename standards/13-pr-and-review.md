@@ -172,9 +172,9 @@ When writing a comment: **what** is wrong + **why** it matters + **a suggestion*
 ## 8a. Merges, pushes and the gates before them follow the configuration (global rule #34)
 
 Since 17/10/2026 Claude **does not ask** whether to merge, run a gate or push: the answers are settings
-(`/adyusuf:config`, `scripts/adyusuf_config.py`; defaults in `defaults/adyusuf.json`, the user's own in
-`~/.claude/adyusuf.json`, a project's in `.claude/adyusuf.json`, and the running session's own layer
-`~/.claude/adyusuf-session/<session id>.json`, which the rail boxes write and which ends with the session). Asking every
+(`/podium:config`, `scripts/podium_config.py`; defaults in `defaults/podium.json`, the user's own in
+`~/.claude/podium.json`, a project's in `.claude/podium.json`, and the running session's own layer
+`~/.claude/podium-session/<session id>.json`, which the rail boxes write and which ends with the session). Asking every
 time was too much work for the user, so the defaults say what normally happens and whoever wants something else changes
 the setting once, or for one session.
 
@@ -194,10 +194,10 @@ Status file, the settings and session layers, `.claude/mode`, the scratchpad.
   steps have nothing to act on.
 - The pane cannot see the task, only the folder: outside every git repository it shows only Status and *Replies*
   (user decision 01/11/2026), so the mode and tests settings that still hold for code written there are changed with
-  `/adyusuf:config`. Inside a repository it shows everything, and the class above is Claude's to follow.
+  `/podium:config`. Inside a repository it shows everything, and the class above is Claude's to follow.
 
 **Read the panel, then act at once (user decision 01/11/2026).** When a piece of work is done, Claude reads the settings
-afresh (`adyusuf_config.py show --session <id>`, this session's layer included; the panel may have changed since the
+afresh (`podium_config.py show --session <id>`, this session's layer included; the panel may have changed since the
 session started) and carries out the merges, gates and pushes below **straight away**: no question, no waiting for a
 "go". Re-read them before each target, since a press in the panel during a long gate counts. The chain stops only when
 the user stops it (interrupts or says stop), on a red gate, or on a step that needs approval in every mode (below).

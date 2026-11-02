@@ -176,7 +176,7 @@ xcrun xccov view --report --json <path>.xcresult
 ## 11. Screen-by-screen test audit — the `test-inventory` skill
 
 When the question is "which use cases of this screen are tested, and what is missing",
-the audit follows the `test-inventory` skill (`/adyusuf:test-inventory <phase> <target>`), not
+the audit follows the `test-inventory` skill (`/podium:test-inventory <phase> <target>`), not
 an ad-hoc read. It covers every test layer of one screen at once (web unit · e2e ·
 backend unit/integration · mobile) in four gated phases:
 

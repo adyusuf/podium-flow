@@ -1,6 +1,6 @@
-# claude-code-standards
+# podium-flow
 
-My live Claude Code configuration, packaged as one plugin, `adyusuf`: 34 rules loaded into every session, the standards
+My live Claude Code configuration, packaged as one plugin, `podium`: 34 rules loaded into every session, the standards
 behind them, 14 role agents in 5 modes, a shared gate with an exit code, and the measurements that produced each rule.
 It is not a sample: every session I open installs it from this repository's `prod` branch, so when a rule here is
 wrong, it is wrong in my own working day first. Why it exists and what it changed: [`docs/README.md`](docs/README.md).
@@ -14,27 +14,33 @@ the marketplace link carry on unchanged. It needs `python3`, `git` and `claude` 
 **macOS / Linux:**
 
 ```bash
-d=$(mktemp -d) && curl -fsSL https://raw.githubusercontent.com/adyusuf/claude-code-standards/prod/scripts/plugin-setup.py -o "$d/plugin-setup.py" && python3 "$d/plugin-setup.py"
+d=$(mktemp -d) && curl -fsSL https://raw.githubusercontent.com/adyusuf/podium-flow/prod/scripts/plugin-setup.py -o "$d/plugin-setup.py" && python3 "$d/plugin-setup.py"
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
 $d = New-Item -ItemType Directory -Path (Join-Path $env:TEMP ([guid]::NewGuid()))
-Invoke-WebRequest https://raw.githubusercontent.com/adyusuf/claude-code-standards/prod/scripts/plugin-setup.py -OutFile "$d\plugin-setup.py"
+Invoke-WebRequest https://raw.githubusercontent.com/adyusuf/podium-flow/prod/scripts/plugin-setup.py -OutFile "$d\plugin-setup.py"
 python "$d\plugin-setup.py"
 ```
 
 Or, inside a Claude Code session (the desktop app's **Code** tab too):
 
 ```
-/plugin marketplace add adyusuf/claude-code-standards#prod
-/plugin install adyusuf@adyusuf-marketplace
+/plugin marketplace add adyusuf/podium-flow#prod
+/plugin install podium@podium-marketplace
 ```
 
 Then open a new session (or `/reload-plugins`). The script's flags (`--check`, `--yes`, `--ref`, `--claude`) and how it
 finds `claude` when it is not on `PATH`: [`scripts/README.md`](scripts/README.md) (`plugin-setup.py`). Prerequisites,
 Windows included: [`SETUP.md`](SETUP.md) §1 and §6.
+
+**Moving from `adyusuf`.** Until 02/11/2026 this plugin was `adyusuf`, installed from `adyusuf/claude-code-standards`. The
+installer above moves such an install: it installs `podium` in the same scope and branch, then removes the old plugin
+(its data kept), keeps a disabled one disabled and points a `CLAUDE_CODE_PLUGIN_DIRS` at the new folder. The old
+marketplace link stays for sessions still running; remove it later with `/plugin marketplace remove adyusuf-marketplace`.
+Your settings move by themselves: `~/.claude/adyusuf.json` and the `ADYUSUF_*` variables are still read.
 
 ## What is in here
 
@@ -43,14 +49,14 @@ Windows included: [`SETUP.md`](SETUP.md) §1 and §6.
 | Working rules, loaded into every session | [`CLAUDE.md`](CLAUDE.md) | 34 rules | why each exists: [`docs/decision-log.md`](docs/decision-log.md) |
 | Engineering standards | `standards/` | 24 documents + 8 templates | [`standards/README.md`](standards/README.md) |
 | Operating modes and the role agents | `modes/`, `agents/` | 5 modes, 14 roles | [`modes/README.md`](modes/README.md) |
-| Gate, hook scripts, measurement, install | `scripts/` | 36 scripts, 842 tests | [`scripts/README.md`](scripts/README.md) |
-| Hooks and the `adyusuf` pane (`/adyusuf:panels`) | `hooks/` | 78 tests | [`hooks/README.md`](hooks/README.md) |
+| Gate, hook scripts, measurement, install | `scripts/` | 36 scripts, 856 tests | [`scripts/README.md`](scripts/README.md) |
+| Hooks and the `podium` pane (`/podium:panels`) | `hooks/` | 78 tests | [`hooks/README.md`](hooks/README.md) |
 | Slash commands | `commands/` | `apply-project-standards`, `panels`, `prod-readiness`, `standards-check` | each file |
 | Skills | `skills/` | `board-plan`, `config`, `software-standards`, `test-inventory`, `working-mode` | each `SKILL.md` |
 | The record: motivation, measurements, case studies | `docs/` | 4 case studies | [`docs/README.md`](docs/README.md) |
 | Working on this repository | [`SETUP.md`](SETUP.md) | | |
 
-Everything is invoked as `/adyusuf:<name>`. Counts are of 01/11/2026; `scripts/doc-check.py` fails when the rule, standards,
+Everything is invoked as `/podium:<name>`. Counts are of 01/11/2026; `scripts/doc-check.py` fails when the rule, standards,
 template, mode, role or script count stops matching the disk.
 
 ## If you take only five things
@@ -86,7 +92,7 @@ Take the smallest amount that is useful; each step works on its own.
 2. **Take the five rules** above.
 3. **Take the standards for your stack:** the files in `standards/` read independently. Keep the rule numbers if you
    edit; everything cross-references by number.
-4. **Install the plugin** (above). `/adyusuf:config` and the `adyusuf` pane set the mode, the models, how much Claude
+4. **Install the plugin** (above). `/podium:config` and the `podium` pane set the mode, the models, how much Claude
    writes and what it merges and pushes without asking; resting the pointer on a label explains it. Outside a git
    repository the pane shows only Status and Replies ([`hooks/README.md`](hooks/README.md)).
 5. **Put the gate in a project:** [`scripts/README.md`](scripts/README.md#putting-the-gate-in-a-project-of-your-own).

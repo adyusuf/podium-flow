@@ -14,7 +14,7 @@ SHELL_OP = re.compile(r"\s(\||\|\||&&|;|>>?|2>&1)")
 HEXISH = re.compile(r"^[0-9a-f]{7,40}$", re.I)
 SAFE_WORDS = {'src', 'test', 'tests', 'docs', 'doc', 'scripts', 'script', 'build',
               'dist', 'node_modules', 'main', 'dev', 'test', 'prod', 'claude',
-              'claude-code-standards', 'claude-code-standards-dev', 'code', 'home',
+              'claude-code-standards', 'claude-code-standards-dev', 'podium-flow', 'podium-flow-dev', 'code', 'home',
               'users', 'tmp', 'private', 'backend', 'frontend', 'mobile', 'web', 'api',
               'config', 'plugin', 'plugins', 'role', 'roles', 'scan', 'agent', 'agents',
               'session', 'sessions', 'step', 'steps', 'cut', 'cuts', 'measurement',

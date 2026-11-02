@@ -69,4 +69,4 @@ command walks the release checklist (security, hardening, backup, observability,
 and **verifies** each item; what cannot be verified is reported as such and never counts
 as passed. The release decision then rests on evidence, not on confidence.
 
-Contributions are welcome: https://github.com/adyusuf/claude-code-standards
+Contributions are welcome: https://github.com/adyusuf/podium-flow

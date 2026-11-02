@@ -19,7 +19,7 @@ Reads the hook payload (JSON, or raw text) on stdin.
 Exit 0 = allowed. Exit 2 = blocked, with the reason on stderr.
 
 A push to the prod branch is NOT judged here (17/10/2026, the user's decision: Claude makes that push when the
-configuration says so - scripts/adyusuf_config.py, `push.prod`). A push to main, any forced push and --no-verify are.
+configuration says so - scripts/podium_config.py, `push.prod`). A push to main, any forced push and --no-verify are.
 
 WARNING - FAIL CLOSED. A payload that will not parse is judged as RAW TEXT rather
 than waved through, and the wrapper turns any unexpected exit code into a block.

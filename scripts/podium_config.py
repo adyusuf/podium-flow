@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""The adyusuf configuration: defaults instead of questions.
+"""The podium configuration: defaults instead of questions.
 
-    adyusuf_config.py show [--json] [--user]     every setting, its value and where the value comes from (--user: only the
+    podium_config.py show [--json] [--user]     every setting, its value and where the value comes from (--user: only the
                                                  shipped defaults and the user's own file, no project or session layer)
-    adyusuf_config.py get <key>                  one effective value
-    adyusuf_config.py set <key> <value> [--project|--session ID]   change one setting (default scope: the user's)
-    adyusuf_config.py unset <key> [--project|--session ID]         fall back to the next layer
-    adyusuf_config.py apply <file|-> [--project|--session ID]      set many at once from a JSON object {"push.prod": false, ...}
+    podium_config.py get <key>                  one effective value
+    podium_config.py set <key> <value> [--project|--session ID]   change one setting (default scope: the user's)
+    podium_config.py unset <key> [--project|--session ID]         fall back to the next layer
+    podium_config.py apply <file|-> [--project|--session ID]      set many at once from a JSON object {"push.prod": false, ...}
     (--session ID: show, get, agents and context also read that session's layer)
-    adyusuf_config.py schema                     the keys with type, options and label
-    adyusuf_config.py agents [--json] [--all]    the active agents and the model each one runs on (--all: inactive too)
-    adyusuf_config.py reset-agents [--project]   remove every agents.<role>.* setting (back to the mode's own set)
-    adyusuf_config.py context [--stdin]          the block the SessionStart hook prints (--stdin: take the session id from the hook payload)
-    adyusuf_config.py notify <event>             hook: tells the running session when a setting changed (stdin: the payload)
+    podium_config.py schema                     the keys with type, options and label
+    podium_config.py agents [--json] [--all]    the active agents and the model each one runs on (--all: inactive too)
+    podium_config.py reset-agents [--project]   remove every agents.<role>.* setting (back to the mode's own set)
+    podium_config.py context [--stdin]          the block the SessionStart hook prints (--stdin: take the session id from the hook payload)
+    podium_config.py notify <event>             hook: tells the running session when a setting changed (stdin: the payload)
 
-Layers, lowest first: defaults/adyusuf.json (shipped with the plugin) < ~/.claude/adyusuf.json (the user's own
-defaults) < <project>/.claude/adyusuf.json (committed, like .claude/mode) < the session's own layer (adyusuf_session.py:
+Layers, lowest first: defaults/podium.json (shipped with the plugin) < ~/.claude/podium.json (the user's own
+defaults) < <project>/.claude/podium.json (committed, like .claude/mode) < the session's own layer (podium_session.py:
 what the rail boxes change; gone with the session). The user changes them with the
-`adyusuf:config` skill; Claude never asks what a setting already answers (global rule #34).
+`podium:config` skill; Claude never asks what a setting already answers (global rule #34).
 
 Keys are dotted (`push.prod`); files hold them nested. A key is validated against SCHEMA, a file that does not
 parse is reported and ignored (the layer below wins) - the SessionStart hook must never fail a session.
@@ -29,15 +29,15 @@ import os
 import sys
 
 # The schema and the layers live beside this file (split so no file passes 300 lines, rule #9); every name they hold is
-# re-exported here, so callers keep reading them from adyusuf_config.
+# re-exported here, so callers keep reading them from podium_config.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import adyusuf_session as sessions  # noqa: E402
-from adyusuf_schema import (  # noqa: E402,F401
+import podium_session as sessions  # noqa: E402
+from podium_schema import (  # noqa: E402,F401
     AGENTS_DIR, AGENT_MODELS, AGENT_STATES, B_ROLES, CI_RUNNERS, C_ROLES,
     DEFAULTS_FILE, DEPLOY_ENVS, D_ROLES, E2E_STAGES, MODELS, MODES,
     MODE_ROLES, POD_FORMATS, REPLY_LENGTHS, RETIRED_KEYS, ROOT, SCHEMA,
     SPECS, TARGETS, agents, defined_model, effective_model, front_matter)
-from adyusuf_layers import (  # noqa: E402,F401
+from podium_layers import (  # noqa: E402,F401
     ConfigError, check, flatten, load, locked, nest,
     project_file, read_layer, user_file, write_layer)
 
@@ -82,7 +82,7 @@ def context(effective, problems, session=None):
             shown(value('ci_after_push.' + target))))
     steps.append('e2e before deploy: ' + ', '.join(
         'on %s before deploying %s %s' % (on, after, shown(value('e2e_before_deploy.' + after))) for on, after in E2E_STAGES))
-    lines = ['adyusuf configuration (effective; global rule #34 - follow it, do not ask what it answers):',
+    lines = ['podium configuration (effective; global rule #34 - follow it, do not ask what it answers):',
              '  for code work: changing a project repository\'s files. A no-code task (a question, research, Claude\'s own '
              'bookkeeping in ~/.claude) makes no branch or commit and runs no merge, push, gate, coverage, CI, deploy, e2e, '
              'test writing or agent; replies, the Status box and #14/#15/#24 still apply (standards/13 §8a).',
@@ -94,16 +94,16 @@ def context(effective, problems, session=None):
     active = agents({k: v[0] for k, v in effective.items()})
     lines.append('  agents: %s' % (', '.join('%s (%s)' % (row['role'], row['runs_on']) for row in active) or 'none'))
     lines.extend('  ' + step for step in steps)
-    lines.append('  change it with the adyusuf:config skill; the mode may also be set per session or per project.')
+    lines.append('  change it with the podium:config skill; the mode may also be set per session or per project.')
     if sessions.valid(session):
-        lines.append('  this session is %s: what the rail boxes change applies to it only (adyusuf_config.py set --session %s '
+        lines.append('  this session is %s: what the rail boxes change applies to it only (podium_config.py set --session %s '
                      '<key> <value>); a new session starts from the saved defaults.' % (session, session))
         lines.append('  status box and steps (steps.enforce: %s): analyse every task first and write its steps, in order, '
                      'before acting: python3 "%s" --session %s step "<n. step>" "<state>" <percent> [--blocker "<what>"] '
                      '[--after "<step>"]; a new request mid-work goes in as steps with --after. Keep state (not started, '
                      'running, done, blocked, did not run) and %% current; now|next <text> say what runs. The hooks set now '
                      'on each message and "waiting for you" at each turn\'s end (standards/00 §1a, §10d).'
-                     % (value('steps.enforce'), os.path.join(ROOT, 'scripts', 'adyusuf_status.py'), session))
+                     % (value('steps.enforce'), os.path.join(ROOT, 'scripts', 'podium_status.py'), session))
     lines.extend('  ! ' + problem for problem in problems)
     return '\n'.join(lines)
 
@@ -119,7 +119,7 @@ def render_agents(values):
 
 
 def seen_dir():
-    return os.environ.get('ADYUSUF_SEEN_DIR') or os.path.join(os.path.expanduser('~'), '.claude', 'adyusuf-seen')
+    return os.environ.get('PODIUM_SEEN_DIR') or os.environ.get('ADYUSUF_SEEN_DIR') or os.path.join(os.path.expanduser('~'), '.claude', 'podium-seen')
 
 
 def notify(event, payload_text):
@@ -161,7 +161,7 @@ def notify(event, payload_text):
             return None
     if not remember() or before is None:
         return None
-    text = ('adyusuf settings changed (/adyusuf:config). Apply them from the NEXT task on; finish the step in progress as it '
+    text = ('podium settings changed (/podium:config). Apply them from the NEXT task on; finish the step in progress as it '
             'was started, do not restart or split it. Reply length is the exception: it applies from your next reply. '
             'Changes: ' + '; '.join(changes) + '.\n' + context(effective, problems, session))
     return {'hookSpecificOutput': {'hookEventName': event, 'additionalContext': text}}

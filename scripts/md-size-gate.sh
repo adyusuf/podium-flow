@@ -16,7 +16,7 @@
 set -uo pipefail
 
 # ⚠️ ROOT and BUDGET can be supplied from outside. Reason: the CANONICAL copy of
-# this script lives in the adyusuf plugin's `scripts/` (canonical), and when it is
+# this script lives in the podium plugin's `scripts/` (canonical), and when it is
 # called from there a ROOT derived from the script's own location is wrong (it
 # resolves to the plugin, not the project). For the copy COPIED INTO a project the defaults are correct;
 # the hook passes MD_ROOT.
@@ -96,7 +96,7 @@ if [ -z "${BUDGET:-}" ] || [ ! -f "$BUDGET" ]; then
   # file would delete the gate along with it.
   if [ "$HOOK" -eq 1 ]; then
     echo "· No CLAUDE.md budget is installed in this project (md-budget.tsv is missing)."
-    echo "  To install it: /adyusuf:apply-project-standards  or"
+    echo "  To install it: /podium:apply-project-standards  or"
     echo "  copy md-*.sh and md-*.py into scripts/, then: bash scripts/md-size-gate.sh --init"
     exit 0
   fi

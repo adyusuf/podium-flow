@@ -1,4 +1,4 @@
-"""scripts/md-hook.sh, the CLAUDE.md size ratchet and twin-drift hook of the adyusuf plugin.
+"""scripts/md-hook.sh, the CLAUDE.md size ratchet and twin-drift hook of the podium plugin.
 
 It is self-relative: its siblings (md-size-gate.sh, twins.txt and the canonical copies of the twins) are the
 files NEXT TO IT, whichever plugin root it runs from. Three fixtures say so:
@@ -88,7 +88,7 @@ class PluginRootCopy(PluginRoot):
         for name in names:
             self.assertIn(name, output)
         self.assertIn('DRIFTED', output)
-        self.assertIn(f'Canonical: the adyusuf plugin\'s scripts/ ({self.scripts}/)', output)
+        self.assertIn(f'Canonical: the podium plugin\'s scripts/ ({self.scripts}/)', output)
 
     def test_a_drifted_gate_library_is_reported_like_the_gate_itself(self):
         # gate-core.sh is split over four files; a copy of the core with a stale library is a stale gate.

@@ -1,5 +1,5 @@
-"""The plugin's hooks on the Status box (user decisions 02/11/2026), split out of adyusuf_status.py so no file passes 300
-lines (rule #9). `adyusuf_status.py hook EVENT` reads the hook payload on stdin and calls `hook` here.
+"""The plugin's hooks on the Status box (user decisions 02/11/2026), split out of podium_status.py so no file passes 300
+lines (rule #9). `podium_status.py hook EVENT` reads the hook payload on stdin and calls `hook` here.
 
     session     a session starts: `now` is "waiting for you"
     prompt      the user's message: `now` is its first line, and Claude is reminded to analyse it into steps first
@@ -16,22 +16,23 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from adyusuf_status import EMPTY, OPEN, StatusError, clip, load, locked, save, valid  # noqa: E402
+from podium_status import EMPTY, OPEN, StatusError, clip, load, locked, save, valid  # noqa: E402
 
-SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'adyusuf_status.py')
+SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'podium_status.py')
 # What `now` says when a session starts or a turn ends: it waits for the user, or for its own background work.
 WAITING = 'waiting for you'
 WAITING_BACKGROUND = 'waiting for background work'
 # The turns a person starts: a system-started turn (a task notification, a wake-up) must not replace the user's task.
 USER_SOURCES = (None, 'user', 'sdk')
-# Where an edit is Claude's own bookkeeping, never code work (standards/13 §8a): its notes and plans, the adyusuf settings
+# Where an edit is Claude's own bookkeeping, never code work (standards/13 §8a): its notes and plans, the podium settings
 # and status files, a project's mode files, temp files. Code under ~/.claude (a mod, a plugin) is code work.
 CLAUDE_HOME = os.path.join(os.path.expanduser('~'), '.claude')
 BOOKKEEPING = tuple(os.path.normcase(os.path.join(CLAUDE_HOME, name)) for name in (
-    'projects', 'plans', 'todos', 'adyusuf.json', 'adyusuf-status', 'adyusuf-session', 'adyusuf-seen')) + tuple(
+    'projects', 'plans', 'todos', 'podium-status', 'podium-session', 'podium-seen')) + tuple(
     os.path.normcase(path) + os.sep for path in {os.path.realpath(tempfile.gettempdir()), '/tmp', '/private/tmp', '/var/folders',
                                                  '/private/var/folders'})
-PROJECT_BOOKKEEPING = ('mode', 'mode-model', 'adyusuf.json')       # <project>/.claude/<name>
+# <any>/.claude/<name>: a project's mode and settings files, and the user's own ~/.claude/podium.json (adyusuf.json before).
+PROJECT_BOOKKEEPING = ('mode', 'mode-model', 'podium.json', 'adyusuf.json')
 # `git commit` where a command starts (after ;, &, |, a newline or the line's start), options such as -C <dir> allowed.
 COMMIT = re.compile(r'(?:^|[;&|\n])\s*git(?:\s+(?:-[Cc]\s+\S+|-\S+))*\s+commit(?![-\w])')
 
@@ -50,8 +51,8 @@ def hook_text(event, payload):
 def enforce(session):
     """The `steps.enforce` setting this session runs on: 'block' or 'remind' (block when it cannot be read)."""
     try:
-        import adyusuf_layers
-        value = adyusuf_layers.load(session=session)[0].get('steps.enforce', ('block', ''))[0]
+        import podium_layers
+        value = podium_layers.load(session=session)[0].get('steps.enforce', ('block', ''))[0]
     except Exception:  # noqa: BLE001 - a hook falls back to the shipped default, never fails
         return 'block'
     return value if value in ('block', 'remind') else 'block'
@@ -75,7 +76,7 @@ def bookkeeping(path):
 
 def reminder(session):
     """What every user message carries: analyse first, steps in the box, % and blockers kept current."""
-    return ('adyusuf steps (setting steps.enforce: %s): before acting on this message, analyse it. If it adds work, '
+    return ('podium steps (setting steps.enforce: %s): before acting on this message, analyse it. If it adds work, '
             'write its steps into the Status box first, in order, as phases where it helps: python3 "%s" --session %s '
             'step "<n. step>" "not started" 0 [--after "<step>"] (a request that arrives mid-work goes in with --after). '
             'Keep each step current: state running/done/blocked/did not run, its %% done, --blocker "<what>" when stuck. '
@@ -89,7 +90,7 @@ def agent_name(payload):
 
 def subagent_note(session, payload):
     name = agent_name(payload)
-    return ('adyusuf steps: you are "%s". Write your own steps into the parent\'s Status box before working: python3 "%s" '
+    return ('podium steps: you are "%s". Write your own steps into the parent\'s Status box before working: python3 "%s" '
             '--session %s step "<n. step>" "not started" 0 --agent "%s"; keep state and %% current, --blocker "<what>" '
             'when stuck.' % (name.strip(), SCRIPT, session, name.strip()))
 
@@ -111,10 +112,10 @@ def blocked(payload):
     if found or enforce(session) != 'block':
         return ''
     if found is None:
-        return ('adyusuf steps: the Status file cannot be read; replace it with python3 "%s" --session %s clear, then write '
+        return ('podium steps: the Status file cannot be read; replace it with python3 "%s" --session %s clear, then write '
                 'the steps. Then retry.' % (SCRIPT, session))
     sign = ' --agent "%s"' % name if name else ''
-    return ('adyusuf steps (steps.enforce: block): no step of this task is open. Analyse the work and write its steps into '
+    return ('podium steps (steps.enforce: block): no step of this task is open. Analyse the work and write its steps into '
             'the Status box first: python3 "%s" --session %s step "<n. step>" "not started" 0%s. Then retry.'
             % (SCRIPT, session, sign))
 

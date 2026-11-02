@@ -651,7 +651,7 @@ agent's own setting lives in the claude-monitor project.
 is no longer read-only: `agents.<role>.enabled` (auto, on, off) and `agents.<role>.model` (default, opus, sonnet, haiku,
 fable) are settings for each of the 14 roles. `auto` keeps the mode's role set, `on` adds a role the mode lacks (an extra
 `security` in mode C), `off` removes one it has; a model set for one agent beats the mode's Opus override. Mode A still runs
-no agent whatever these say (rule #27). `scripts/adyusuf_config.py agents --json [--all]` is the effective list and the
+no agent whatever these say (rule #27). `scripts/podium_config.py agents --json [--all]` is the effective list and the
 model each `Agent` call passes; the settings page and the side-pane mod edit the same keys.
 
 **Amended 17/10/2026, round 6 (user request: "changes should be active at once, but without splitting the work in progress").**
@@ -1804,7 +1804,7 @@ nothing in this repository's copy was changed for it.** The project below worked
 - **Decision:** a click in the Settings or Agents box changes that session, nothing else. A new session loads the saved
   defaults (plugin defaults < `~/.claude/adyusuf.json` < the project's file); if nothing was changed it stays that way.
   The mechanism is one more layer on top: `adyusuf_config.py set|unset|apply|reset-agents --session <id>` writes
-  `~/.claude/adyusuf-session/<id>.json` (`scripts/adyusuf_session.py`; `ADYUSUF_SESSION_DIR` overrides the folder),
+  `~/.claude/adyusuf-session/<id>.json` (`scripts/podium_session.py`; `ADYUSUF_SESSION_DIR` overrides the folder),
   `show|get|agents|context --session <id>` read it, and the hooks (`context` at session start, `notify` on each prompt)
   take the id from the hook payload's `session_id`, so a change is announced to its own session only.
 - **How the panel knows its session:** it calls `$.session.id()` for every read and every click (the id changes on `/clear`)
@@ -2009,7 +2009,7 @@ string, so a project is not broken until its next merge rewrites `.claude/sdlc-s
 - **Why:** the status table of a long run lived only in the replies; the user asked to see it in the pane, current while
   work runs ("now running this, next that").
 - **Decision:** a fourth box, *Status*, first in the pane. Its source is a per-session file
-  (`~/.claude/adyusuf-status/<session id>.json`) that `scripts/adyusuf_status.py` writes atomically: `now`, `next`, rows of
+  (`~/.claude/adyusuf-status/<session id>.json`) that `scripts/podium_status.py` writes atomically: `now`, `next`, rows of
   item · state · measured figure · waiting on. Claude writes it at every state change; background runs write their steps.
   The reply table stays the deliverable (`standards/00-working-method.md` §10d).
 - **Trigger or polling? Both.** The engine has no file watcher. A `tool.call` hook refreshes after every tool call
@@ -2166,3 +2166,24 @@ a command starts. `step` also writes the % into `figure` and the blocker into `w
 `figure`, so an older plugin's rewrite keeps them (rule #4); the runner (`--agent`) is lost in such a rewrite until every
 session runs this version, a known window. Past 50 rows, finished subagent steps go first and this session's open steps
 last. A step's % is counted (k of n, or a measured figure), else marked as an estimate (`standards/00` §10d).
+
+## The plugin is called podium and lives in adyusuf/podium-flow (02/11/2026, user decisions)
+
+The plugin `adyusuf` is renamed `podium`, everywhere: the plugin and its marketplace (`podium@podium-marketplace`),
+the commands and skills (`/podium:<name>`), the agents (`podium:<role>`), the pane, the scripts
+(`scripts/podium_*.py`), the shipped defaults (`defaults/podium.json`), the settings files (`~/.claude/podium.json`, a
+project's `.claude/podium.json`), the status, session and seen folders (`~/.claude/podium-*`) and the environment
+variables (`PODIUM_*`). It moves to a new public repository, `adyusuf/podium-flow`, with `dev`, `test` and `prod`;
+`adyusuf/claude-code-standards` stays as it is, so an install from it keeps working until it is moved.
+
+Moving (rule #4): `ADYUSUF_*` variables are still read; `~/.claude/adyusuf.json` is copied to `podium.json` on first use
+(a temporary file renamed over, so a cut-short copy leaves no half file); a project's `.claude/adyusuf.json` is read
+while it is the only one; step statistics count `adyusuf:<role>` runs as our own. `plugin-setup.py` links and installs
+`podium` first, in the old install's scope and branch, then removes `adyusuf@adyusuf-marketplace` (its data kept), keeps
+a disabled one disabled and repoints `CLAUDE_CODE_PLUGIN_DIRS`; the old marketplace link stays, because a session that is
+still running calls its folder from its hooks. A qa pass on a first version showed why the order matters: with the
+rename on the same repository, Claude Code keys a marketplace by its source, the old link had to go first and its folder
+with it, which would have blocked every running session's tools. `plugin-setup.py` stays one standalone file because it
+is downloaded and run before any checkout exists; that is its written exception to rule #9 (419 lines). This log keeps
+the old name in its earlier entries, which record what happened then; only their file paths point at the new names.
+Other repositories that name `adyusuf:<role>` or `.claude/adyusuf.json` are moved separately.

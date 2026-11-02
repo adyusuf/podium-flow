@@ -15,7 +15,7 @@ skill is the **index**: it names the one standard the task is about, and only th
 is read. Same rules in every project, every session and every agent; context spent only
 where the work is.
 
-Contributions are welcome: https://github.com/adyusuf/claude-code-standards
+Contributions are welcome: https://github.com/adyusuf/podium-flow
 
 The standards live under `${CLAUDE_PLUGIN_ROOT}/standards/`, **one file per topic**. Do not
 read them all — read **the one the task is about**.
@@ -33,7 +33,7 @@ read them all — read **the one the task is about**.
 | Endpoint contract, error format, pagination, idempotency | `07-api-design.md` |
 | Changing a field/endpoint, deprecation, expand-contract | `08-backward-compatibility.md` |
 | Schema, migration, index, transaction, soft delete | `09-database.md` |
-| Unit/integration/contract tests, flaky policy, screen-by-screen test audit (`/adyusuf:test-inventory`) | `10-test-strategy.md` |
+| Unit/integration/contract tests, flaky policy, screen-by-screen test audit (`/podium:test-inventory`) | `10-test-strategy.md` |
 | Web e2e | `11-playwright.md` |
 | Mobile e2e | `12-maestro.md` |
 | Commit, branch, PR, code review | `13-pr-and-review.md` |

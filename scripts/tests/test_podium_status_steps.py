@@ -13,15 +13,15 @@ import tempfile
 import unittest
 
 SCRIPTS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(SCRIPTS, 'adyusuf_status.py')
+SCRIPT = os.path.join(SCRIPTS, 'podium_status.py')
 SESSION = 'abc-123'
 
 
 class Steps(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
-        self.env = dict(os.environ, ADYUSUF_STATUS_DIR=self.dir, ADYUSUF_CONFIG_USER=os.path.join(self.dir, 'u.json'),
-                        ADYUSUF_SESSION_DIR=os.path.join(self.dir, 'sessions'))
+        self.env = dict(os.environ, PODIUM_STATUS_DIR=self.dir, PODIUM_CONFIG_USER=os.path.join(self.dir, 'u.json'),
+                        PODIUM_SESSION_DIR=os.path.join(self.dir, 'sessions'))
 
     def run_tool(self, *args):
         done = subprocess.run([sys.executable, SCRIPT, '--session', SESSION, *args], env=self.env, capture_output=True, text=True)

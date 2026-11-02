@@ -19,10 +19,10 @@
 #
 # ⚠️ This is NOT a release gate, it is a behavioural warning; the exit code is
 # always 0. In a project where it is a real merge gate, a COPY of the script lives
-# in the repository and CI runs that (see the adyusuf plugin's scripts/README.md).
+# in the repository and CI runs that (see the podium plugin's scripts/README.md).
 # Keep the distinction.
 #
-# It ships with the adyusuf plugin (hooks/hooks.json runs it as
+# It ships with the podium plugin (hooks/hooks.json runs it as
 # "${CLAUDE_PLUGIN_ROOT}/scripts/md-hook.sh") and finds its siblings RELATIVE TO
 # ITSELF: the plugin's scripts/ is the canonical set. `cd` + `pwd` keeps the path
 # it was invoked with, so an old install that still calls it through the
@@ -69,7 +69,7 @@ fi
 
 # ── Twin drift ───────────────────────────────────────────────────────────────
 # Every script a project COPIES is a deliberate TWIN: the canonical copy lives in
-# the adyusuf plugin's scripts/ (this file's own directory), and every project takes a COPY into its own scripts/ and
+# the podium plugin's scripts/ (this file's own directory), and every project takes a COPY into its own scripts/ and
 # commits it (a project's gate cannot depend on a path outside the repository).
 # Where there are twins there must also be a DRIFT TEST — this repository does
 # exactly that for its other twins. Drift did happen once: the canonical copy was
@@ -92,7 +92,7 @@ if ! { [ -f "$root/standards/README.md" ] && [ -d "$root/modes" ]; }; then
 fi
 if [ -n "$drifted" ]; then
   echo "⚠️ The copied scripts have DRIFTED from the canonical copy:$drifted"
-  echo "   Canonical: the adyusuf plugin's scripts/ ($here/)  ·  This project: $root/scripts/"
+  echo "   Canonical: the podium plugin's scripts/ ($here/)  ·  This project: $root/scripts/"
   echo "   Which one is current? Compare first, then bring BOTH into line:"
   echo "   diff \"$here/<tool>\" scripts/<tool>"
 fi

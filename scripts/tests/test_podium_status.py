@@ -1,6 +1,6 @@
 """The session's status table: what the pane's Status box shows, written by Claude and by background runs.
 
-Each test runs the script as a command, with ADYUSUF_STATUS_DIR pointed at a temporary directory, so no real status file
+Each test runs the script as a command, with PODIUM_STATUS_DIR pointed at a temporary directory, so no real status file
 is read or written.
 """
 import importlib.util
@@ -13,9 +13,9 @@ import time
 import unittest
 
 SCRIPTS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(SCRIPTS, 'adyusuf_status.py')
+SCRIPT = os.path.join(SCRIPTS, 'podium_status.py')
 
-_spec = importlib.util.spec_from_file_location('adyusuf_status', SCRIPT)
+_spec = importlib.util.spec_from_file_location('podium_status', SCRIPT)
 status = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(status)
 
@@ -25,8 +25,8 @@ SESSION = 'abc-123'
 class StatusTable(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
-        self.env = dict(os.environ, ADYUSUF_STATUS_DIR=self.dir, ADYUSUF_CONFIG_USER=os.path.join(self.dir, 'u.json'),
-                        ADYUSUF_SESSION_DIR=os.path.join(self.dir, 'sessions'))
+        self.env = dict(os.environ, PODIUM_STATUS_DIR=self.dir, PODIUM_CONFIG_USER=os.path.join(self.dir, 'u.json'),
+                        PODIUM_SESSION_DIR=os.path.join(self.dir, 'sessions'))
 
     def run_tool(self, *args, session=SESSION):
         done = subprocess.run([sys.executable, SCRIPT, '--session', session, *args], env=self.env,
@@ -204,7 +204,7 @@ class StatusTable(unittest.TestCase):
         self.assertEqual((status.MAX_ROWS, 'i5', 'i%d' % (status.MAX_ROWS + 4)), (len(items), items[0], items[-1]))
 
     def test_a_relative_status_folder_is_refused(self):
-        self.env['ADYUSUF_STATUS_DIR'] = 'relative/dir'
+        self.env['PODIUM_STATUS_DIR'] = 'relative/dir'
         _, err, code = self.run_tool('now', 'x')
         self.assertEqual(2, code)
         self.assertIn('absolute path', err)

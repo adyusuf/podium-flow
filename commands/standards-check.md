@@ -52,4 +52,4 @@ standards the change touches, so the review stays cheap enough to run on every c
 The project's own `CLAUDE.md` overrides the global standard, so the check follows the
 project's real rules.
 
-Contributions are welcome: https://github.com/adyusuf/claude-code-standards
+Contributions are welcome: https://github.com/adyusuf/podium-flow

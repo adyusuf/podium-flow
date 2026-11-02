@@ -81,7 +81,7 @@ class Fake:
     def disturb(self):
         """What a bad replacement could do: wipe the user's settings and mark the plugin enabled."""
         if getattr(self, 'wipe', False):
-            os.remove(os.path.join(self.home, '.claude', 'adyusuf.json'))
+            os.remove(os.path.join(self.home, '.claude', 'podium.json'))
 
 
 class Case(unittest.TestCase):
@@ -93,7 +93,7 @@ class Case(unittest.TestCase):
     def settings(self, config=CONFIG, enabled=True):
         os.makedirs(os.path.join(self.home, '.claude'), exist_ok=True)
         if config is not None:
-            with open(os.path.join(self.home, '.claude', 'adyusuf.json'), 'wb') as handle:
+            with open(os.path.join(self.home, '.claude', 'podium.json'), 'wb') as handle:
                 handle.write(config)
         with open(os.path.join(self.home, '.claude', 'settings.json'), 'w', encoding='utf-8') as handle:
             json.dump({'enabledPlugins': {setup.PLUGIN_ID: enabled}}, handle)

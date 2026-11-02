@@ -17,7 +17,7 @@ class FreshInstall(Case):
         self.assertEqual(fake.verbs(), ['claude plugin marketplace', 'git', 'claude plugin marketplace',
                                         'claude plugin install'])
         self.assertIn(['claude', 'plugin', 'marketplace', 'add', f'{setup.REPO}#prod'], fake.commands)
-        self.assertIn('✓ adyusuf@adyusuf-marketplace', out)
+        self.assertIn('✓ podium@podium-marketplace', out)
         self.assertEqual(len(self.logs()), 1)
 
     def test_with_the_link_already_there_it_refreshes_it_instead_of_adding_it_again(self):

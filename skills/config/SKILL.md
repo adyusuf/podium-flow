@@ -1,25 +1,25 @@
 ---
 name: config
-description: Shows or changes the adyusuf defaults that replace questions - working mode and the model for the Opus agents, whether unit tests and e2e specs are written, which of dev/test/prod are merged and pushed, and which tests run before a push. Also shows which agents the mode enables and the model each one runs on. Use it when the user says "/adyusuf:config", "change the defaults", "stop asking me", "don't push prod", "run e2e before test", "show the settings" or "which agents are active".
+description: Shows or changes the podium defaults that replace questions - working mode and the model for the Opus agents, whether unit tests and e2e specs are written, which of dev/test/prod are merged and pushed, and which tests run before a push. Also shows which agents the mode enables and the model each one runs on. Use it when the user says "/podium:config", "change the defaults", "stop asking me", "don't push prod", "run e2e before test", "show the settings" or "which agents are active".
 ---
 
-# adyusuf configuration
+# podium configuration
 
 Claude does not ask what a setting already answers (global rule #34). These settings are the answers. The user
 changes them here; everything else in this skill is mechanics.
 
-Layers, lowest first: the plugin's `defaults/adyusuf.json` < the user's `~/.claude/adyusuf.json` < the project's
-`.claude/adyusuf.json` (committed, like `.claude/mode`) < **this session's own layer**. A change typed as a command is
+Layers, lowest first: the plugin's `defaults/podium.json` < the user's `~/.claude/podium.json` < the project's
+`.claude/podium.json` (committed, like `.claude/mode`) < **this session's own layer**. A change typed as a command is
 written to the **user** layer unless the user says "for this project" (the project layer) or "for this session" (the
 session layer, `--session <id>`; the id is on the `this session is <id>` line of the start-of-session block).
 
 **The clickable questions and the Settings box's Session tab change the session layer only.** A new session has a new
 id, finds no session file and starts from the saved defaults; nothing such a click did is kept. A press in the System
-tab writes the saved defaults (`~/.claude/adyusuf.json`), which every new session starts from. To keep a value, say so ("make it my
+tab writes the saved defaults (`~/.claude/podium.json`), which every new session starts from. To keep a value, say so ("make it my
 default"): then `set <key> <value>` (user layer) or `--project`. A resumed session keeps its id, so its changes stay;
 `/clear` starts a new one.
 
-The tool is `${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_config.py` (`python3`):
+The tool is `${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py` (`python3`):
 
 | The user says | Run |
 |---|---|
@@ -40,7 +40,7 @@ The tool is `${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_config.py` (`python3`):
 | "back to the default" | `unset <key>` (add `--project` for the project layer) |
 | several at once | `apply <file or ->` with a JSON object `{"push.prod": false, ...}` |
 | "what can I change" | `schema` |
-| "update the plugin" / "get the new version" | Run, in this order, with Bash: `claude plugin marketplace update adyusuf-marketplace`, then `claude plugin update adyusuf@adyusuf-marketplace`, then `claude plugin list` and report the version. Tell the user to run `/reload-plugins` (a plugin loads into a session only after that). The slash form `/plugin marketplace update ...` only opens the plugin page, which is why this goes through the shell. If the plugin is not installed at all: `claude plugin install adyusuf@adyusuf-marketplace`. |
+| "update the plugin" / "get the new version" | Run, in this order, with Bash: `claude plugin marketplace update podium-marketplace`, then `claude plugin update podium@podium-marketplace`, then `claude plugin list` and report the version. Tell the user to run `/reload-plugins` (a plugin loads into a session only after that). The slash form `/plugin marketplace update ...` only opens the plugin page, which is why this goes through the shell. If the plugin is not installed at all: `claude plugin install podium@podium-marketplace`. |
 
 A value that is not valid is refused and **nothing is written** (exit 2); an unreadable file is never overwritten
 (exit 1) - say which file and let the user fix or delete it. After a change, print the changed line and say which layer it
@@ -75,7 +75,7 @@ When the user wants to change settings without naming them (no argument, "change
 **The rail boxes first.** This plugin's mod (`hooks/register.tsx`, the boxes in `hooks/boxes.ts`) draws ONE pane beside the
 conversation with four bordered boxes, each folded by the arrow before its title, with nothing beside the title: *Status*
 (what runs now and next), *Settings* (a checkbox for every yes/no setting, a radio list for every choice), *Agents* (a
-checkbox per agent, a model radio list; folded at start) and *Promotion* (dev/test/prod, read-only; folded at start). A click in the Session tab runs `adyusuf_config.py set --session <id>` and changes this session only; one in the System tab changes the saved defaults. Open them with `/adyusuf:panels`, say that they are
+checkbox per agent, a model radio list; folded at start) and *Promotion* (dev/test/prod, read-only; folded at start). A click in the Session tab runs `podium_config.py set --session <id>` and changes this session only; one in the System tab changes the saved defaults. Open them with `/podium:panels`, say that they are
 there and stop: the user changes the settings in the boxes, not in the chat. Never build a page or an Artifact for this.
 In the Claude desktop app the mod only loads when `CLAUDE_CODE_PLUGIN_DIRS` in `~/.claude/settings.json` names the
 plugin's folder (`SETUP.md` §6); say so rather than falling back to a page.
@@ -105,7 +105,7 @@ Put the current value in each question or option ("now: yes"), because the tool 
 ## When a change takes effect
 
 At once, but never in the middle of a step. The files change immediately. A `UserPromptSubmit` hook and a `PostToolUse` hook (agent calls and shell
-commands, the task boundaries) run `adyusuf_config.py notify`: the first time a session sees different effective settings it
+commands, the task boundaries) run `podium_config.py notify`: the first time a session sees different effective settings it
 receives a note naming what changed, and the note says to apply them **from the next task** and not to restart or split the
 step in progress. A note is sent once per change and per session; a session that never saw the settings stays silent.
 
@@ -115,4 +115,4 @@ step in progress. A note is sent once per change and per session; a session that
 - Rule #34 (`CLAUDE.md`): the merge/push/gate behaviour. A gate set to no is **not run and recorded**, never skipped
   silently; a red gate that was asked for still blocks. Force pushes, DROP, deploys and `main` stay out of reach of every
   setting (`guard-destructive.sh`, #20, #27).
-- `adyusuf:working-mode` falls back to `mode` / `mode_model` when no session or project choice exists.
+- `podium:working-mode` falls back to `mode` / `mode_model` when no session or project choice exists.

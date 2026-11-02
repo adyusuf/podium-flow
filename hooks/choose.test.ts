@@ -5,14 +5,14 @@ import {
   settingGroups, waivedLines, waivedRange,
 } from './choose'
 
-const ID = 'adyusuf@adyusuf-marketplace'
+const ID = 'podium@podium-marketplace'
 
 test('the install folder is the one the plugin manager records, not a newer replaced one', () => {
   const record = JSON.stringify({
     version: 2,
-    plugins: { [ID]: [{ scope: 'user', installPath: '/c/adyusuf/3a60fbd765af/', version: '3a60fbd765af' }] },
+    plugins: { [ID]: [{ scope: 'user', installPath: '/c/podium/3a60fbd765af/', version: '3a60fbd765af' }] },
   })
-  expect(installPathOf(record, ID)).toBe('/c/adyusuf/3a60fbd765af')
+  expect(installPathOf(record, ID)).toBe('/c/podium/3a60fbd765af')
 })
 
 test('a single object entry and several entries are both read, the first with a path wins', () => {

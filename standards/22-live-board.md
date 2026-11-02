@@ -9,7 +9,7 @@
 
 ## 1. What it is
 
-One Markdown file per session, written by Claude through `/adyusuf:board-plan`:
+One Markdown file per session, written by Claude through `/podium:board-plan`:
 `.claude/board/plan-<session id>.md` at the repository root. It holds the mode, the role set and one row
 per task (id, task, role, branch, status, commit, note). It is an **extra record**: the status table in the
 reply stays the deliverable (`00-working-method.md` §10).
@@ -17,7 +17,7 @@ reply stays the deliverable (`00-working-method.md` §10).
 ## 2. Enabling it in a project
 
 1. `.gitignore` carries `.claude/board/` (runtime data, never committed).
-2. Nothing else: the skill ships in the `adyusuf` plugin; no hook, no server, no port.
+2. Nothing else: the skill ships in the `podium` plugin; no hook, no server, no port.
 3. **Migrating a project that had the old board:** remove the board hooks from its `.claude/settings.json`
    (every command that runs `scripts/board/board_*.py`) — merge, never overwrite: keep every other hook.
    They fail silently today (`|| true`) but still start a process on every tool call. Verify with
@@ -37,6 +37,6 @@ reply stays the deliverable (`00-working-method.md` §10).
   data or sending anything outward still needs the user's yes in the chat; a `test`/`prod` promotion follows the
   configuration (#34), never a decision noted in the file.
 - **The role set is copied from the mode file**, not from memory (#27); roles are called as
-  `adyusuf:<role>`.
+  `podium:<role>`.
 - **No published board.** No Artifact dashboard or hosted page (`00-working-method.md` §10).
 - **Progress percentages are not written.** They cannot be measured; states and commits can (§10b).

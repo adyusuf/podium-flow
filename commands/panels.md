@@ -1,5 +1,5 @@
 ---
-description: Open the adyusuf status, settings, agents and promotion boxes in the right-hand rail
+description: Open the podium status, settings, agents and promotion boxes in the right-hand rail
 ---
 
 Open the four right-hand rail boxes (*Status*, *Settings*, *Agents*, *Promotion*) of this plugin.
@@ -9,8 +9,8 @@ when mods are loaded. If you are reading this text, the mod did not answer: this
 panes (for example a client that has not switched mods on).
 
 1. Say in one sentence that the boxes cannot be shown in this session.
-2. Run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_config.py" show` and print the result as a short table
+2. Run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py" show` and print the result as a short table
    (setting, value).
-3. Tell the user to change a setting with `/adyusuf:config`, which asks with clickable questions in the chat.
+3. Tell the user to change a setting with `/podium:config`, which asks with clickable questions in the chat.
 
 Change nothing yourself. Never build a page or an Artifact for this.

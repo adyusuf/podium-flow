@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install or update the adyusuf plugin from GitHub. One standalone file, standard library only.
+"""Install or update the podium plugin from GitHub. One standalone file, standard library only.
 
 It asks GitHub which commit the plugin's branch is on, compares that with the commit Claude Code has installed, and:
     not installed      adds the marketplace (the link to GitHub) and installs the plugin;
@@ -15,8 +15,8 @@ Usage:
     python3 plugin-setup.py --ref test     # the branch to install when no marketplace is linked yet
     python3 plugin-setup.py --claude PATH  # the claude program, when it is installed but not on PATH
 
-Your settings live outside the plugin (~/.claude/adyusuf.json, a project's .claude/adyusuf.json) and the marketplace
-link lives in Claude Code's own settings; neither is touched. ~/.claude/adyusuf.json is copied to
+Your settings live outside the plugin (~/.claude/podium.json, a project's .claude/podium.json) and the marketplace
+link lives in Claude Code's own settings; neither is touched. ~/.claude/podium.json is copied to
 ~/.claude-standards/backups/ first anyway. Every run but --check writes ~/.claude-standards/logs/plugin-setup-<stamp>.log.
 Exit codes: 0 done / current / you answered no · 1 --check found work to do · 2 refused or failed.
 """
@@ -31,10 +31,13 @@ import subprocess
 import sys
 import types
 
-REPO = 'adyusuf/claude-code-standards'
+REPO = 'adyusuf/podium-flow'
 GIT_URL = f'https://github.com/{REPO}.git'
-MARKETPLACE = 'adyusuf-marketplace'
-PLUGIN_ID = f'adyusuf@{MARKETPLACE}'
+MARKETPLACE = 'podium-marketplace'
+PLUGIN_ID = f'podium@{MARKETPLACE}'
+# The plugin's name until 02/11/2026: an install under it is moved to the new name (rule #4).
+LEGACY_MARKETPLACE = 'adyusuf-marketplace'
+LEGACY_ID = f'adyusuf@{LEGACY_MARKETPLACE}'
 DEFAULT_REF = 'prod'
 REF_OK = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._/-]*$')       # never starts with "-": it becomes a command argument
 SHA = re.compile(r'^[0-9a-f]{40}$')
@@ -60,10 +63,10 @@ def read_json(path):
         return None
 
 
-def installed_entry(home):
+def installed_entry(home, plugin_id=PLUGIN_ID):
     """{sha, version, scope} of the installed plugin from Claude Code's own record, or None."""
     data = read_json(os.path.join(home, '.claude', 'plugins', 'installed_plugins.json'))
-    entries = (data or {}).get('plugins', {}).get(PLUGIN_ID) if isinstance(data, dict) else None
+    entries = (data or {}).get('plugins', {}).get(plugin_id) if isinstance(data, dict) else None
     entries = [e for e in (entries if isinstance(entries, list) else [entries]) if isinstance(e, dict)]
     if not entries:
         return None
@@ -77,7 +80,8 @@ def is_current(entry, remote):
 
 
 def marketplace_entry(ctx):
-    """(entry or None, problem or None): this plugin's marketplace as Claude Code lists it."""
+    """(entry or None, problem or None): this plugin's marketplace as Claude Code lists it; the whole list is kept in
+    ctx.legacy_market for the move from the old name."""
     code, out = ctx.run(['claude', 'plugin', 'marketplace', 'list', '--json'])
     try:
         listed = json.loads(out)
@@ -85,6 +89,7 @@ def marketplace_entry(ctx):
         listed = None
     if code or not isinstance(listed, list):
         return None, f'cannot read the marketplace list ({out[:200] or "exit " + str(code)})'
+    ctx.legacy_market = next((m for m in listed if isinstance(m, dict) and m.get('name') == LEGACY_MARKETPLACE), None)
     return next((m for m in listed if isinstance(m, dict) and m.get('name') == MARKETPLACE), None), None
 
 
@@ -100,7 +105,7 @@ def remote_sha(ctx, ref):
 
 def snapshot(home):
     settings = read_json(os.path.join(home, '.claude', 'settings.json')) or {}
-    path = os.path.join(home, '.claude', 'adyusuf.json')
+    path = os.path.join(home, '.claude', 'podium.json')
     config = None
     if os.path.isfile(path):
         with open(path, 'rb') as handle:
@@ -114,9 +119,9 @@ def back_up(ctx, before):
         return
     folder = os.path.join(ctx.home, '.claude-standards', 'backups', f'plugin-setup-{ctx.stamp}')
     os.makedirs(folder, exist_ok=True)
-    with open(os.path.join(folder, 'adyusuf.json'), 'wb') as handle:
+    with open(os.path.join(folder, 'podium.json'), 'wb') as handle:
         handle.write(before['config'])
-    ctx.say(f'  backup    {folder}/adyusuf.json')
+    ctx.say(f'  backup    {folder}/podium.json')
 
 
 def step(ctx, label, command):
@@ -183,6 +188,69 @@ def replace(ctx, entry, market, ref, remote):
     return 2 if keep_settings(ctx, before) else finish(ctx, remote)
 
 
+def plugin_dirs(home):
+    """(settings, value) of CLAUDE_CODE_PLUGIN_DIRS in ~/.claude/settings.json, which the desktop app loads the plugin from."""
+    settings = read_json(os.path.join(home, '.claude', 'settings.json'))
+    env = settings.get('env') if isinstance(settings, dict) else None
+    return settings, (env.get('CLAUDE_CODE_PLUGIN_DIRS') if isinstance(env, dict) else None)
+
+
+def repoint_plugin_dirs(ctx):
+    """The desktop app's plugin folder follows the new marketplace folder; the settings file is backed up first."""
+    settings, value = plugin_dirs(ctx.home)
+    old = os.sep + LEGACY_MARKETPLACE
+    if not isinstance(value, str) or old not in value:
+        return
+    path = os.path.join(ctx.home, '.claude', 'settings.json')
+    folder = os.path.join(ctx.home, '.claude-standards', 'backups', f'plugin-setup-{ctx.stamp}')
+    os.makedirs(folder, exist_ok=True)
+    shutil.copyfile(path, os.path.join(folder, 'settings.json'))
+    settings['env']['CLAUDE_CODE_PLUGIN_DIRS'] = value.replace(old, os.sep + MARKETPLACE)
+    with open(path, 'w', encoding='utf-8') as handle:
+        json.dump(settings, handle, indent=2)
+        handle.write('\n')
+    ctx.say(f'  CLAUDE_CODE_PLUGIN_DIRS now {settings["env"]["CLAUDE_CODE_PLUGIN_DIRS"]} (backup in {folder})')
+
+
+def move_from_legacy(ctx, old, ref, remote):
+    """The plugin was renamed adyusuf -> podium and moved to its own repository (02/11/2026). The new one is linked and
+    installed first, in the old install's scope and branch; only then is the old plugin removed (its data kept) and a
+    disabled one disabled again. The old marketplace link stays, so sessions that were running keep their folder."""
+    scope = old['scope'] if old else 'user'
+    settings, _ = plugin_dirs(ctx.home)
+    enabled = (settings or {}).get('enabledPlugins', {}).get(LEGACY_ID) if isinstance(settings, dict) else None
+    if not connect(ctx, None, ref) or not install(ctx, scope):
+        ctx.say(f'✗ the new plugin is not installed — the old one is left as it was. Retry, or: claude plugin marketplace '
+                f'add {REPO}#{ref} && claude plugin install {PLUGIN_ID} --scope {scope}')
+        return 2
+    if old and not step(ctx, 'removing the old name (its data is kept)',
+                        ['claude', 'plugin', 'uninstall', LEGACY_ID, '--keep-data', '--scope', scope]):
+        ctx.say(f'! both are installed now; remove the old one with: claude plugin uninstall {LEGACY_ID}')
+    if enabled is False:
+        step(ctx, 'disabled before — disabling again', ['claude', 'plugin', 'disable', PLUGIN_ID])
+    repoint_plugin_dirs(ctx)
+    ctx.say(f'  the old link {LEGACY_MARKETPLACE} stays for running sessions; remove it later with '
+            f'claude plugin marketplace remove {LEGACY_MARKETPLACE}. Open new Claude Code sessions.')
+    return finish(ctx, remote)
+
+
+def legacy(ctx, args, old, old_market, remote):
+    """An install under the old name: report it (--check), or ask, then move it."""
+    ctx.say(f'! found the plugin under its old name ({LEGACY_ID}); it moves to {PLUGIN_ID}')
+    if args.check:
+        ctx.say('! moving from the old name is due')
+        return 1
+    if not args.yes:
+        if not ctx.tty:
+            ctx.say('✗ the move needs an answer and there is no terminal — rerun with --yes')
+            return 2
+        if ctx.ask(f'Install {PLUGIN_ID} and remove {LEGACY_ID}? [y/N] ').strip().lower() not in ('y', 'yes'):
+            ctx.say('left as it is — nothing was changed')
+            return 0
+    ref = (old_market or {}).get('ref') or args.ref
+    return move_from_legacy(ctx, old, ref, remote)
+
+
 def decide(ctx, args):
     market, why = marketplace_entry(ctx)
     if why:
@@ -191,13 +259,17 @@ def decide(ctx, args):
     if market and market.get('source') != 'github':
         ctx.say(f'✗ {MARKETPLACE} is linked to a {market.get("source")} source, not GitHub — left as it is')
         return 2
-    ref = (market.get('ref') or 'HEAD') if market else args.ref
+    linked = market or getattr(ctx, 'legacy_market', None)       # the old link's branch carries over to the new one
+    ref = (linked.get('ref') or 'HEAD') if linked else args.ref
     if market and ref != args.ref and args.ref != DEFAULT_REF:
         ctx.say(f'note: the marketplace is already linked to "{ref}"; it stays as it is, --ref {args.ref} is ignored')
     remote, why = remote_sha(ctx, ref)
     if why:
         ctx.say(f'✗ {why} — nothing was changed')
         return 2
+    old, old_market = installed_entry(ctx.home, LEGACY_ID), getattr(ctx, 'legacy_market', None)
+    if (old or old_market) and market is None:
+        return legacy(ctx, args, old, old_market, remote)
     entry = installed_entry(ctx.home)
     ctx.say(f'GitHub    {ref} is at {remote[:12]}')
     ctx.say('installed ' + (f'{entry["version"] or "?"} ({entry["scope"]} scope)' if entry else 'not installed'))

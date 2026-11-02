@@ -67,7 +67,7 @@ export function warning(change: Change, scope: string, schema: Spec[]): string {
   const tail = rules.length === 0
     ? 'No rule reads this setting.'
     : `Rules in play: ${rules.map(rule => `${rule} ${RULES[rule] ?? ''}`.trim()).join('; ')}.`
-  return `⚠ adyusuf setting changed (${scope}): ${label} (${change.key}) ${shown(change.from)} → ${shown(change.to)}. ${tail}`
+  return `⚠ podium setting changed (${scope}): ${label} (${change.key}) ${shown(change.from)} → ${shown(change.to)}. ${tail}`
 }
 
 /**
@@ -143,6 +143,6 @@ export function operationWarnings(command: string): string[] {
     const where = details.size > 0 ? ` (${[...details].join(', ')})` : ''
     const rules = OPERATION_RULES[name].map(rule => `${rule} ${RULES[rule] ?? ''}`.trim()).join('; ')
     const never = details.has('FORCED') ? ' A force push is on the never-do list.' : ''
-    return `⚠ adyusuf operation: ${what}${where}. Rules in play: ${rules}.${never}`
+    return `⚠ podium operation: ${what}${where}. Rules in play: ${rules}.${never}`
   })
 }

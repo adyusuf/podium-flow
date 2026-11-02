@@ -1,4 +1,4 @@
-// What the boxes of the adyusuf pane show, kept apart from the engine so it can be tested without one: no import from
+// What the boxes of the podium pane show, kept apart from the engine so it can be tested without one: no import from
 // 'claude-code', no JSX. The element factory `h` and the elements themselves (Box, Text, Button) are handed in as
 // `ui`: each surface has its own elements, and a test hands in a recording factory instead of the engine's. A choice among
 // several values is a row of options, not a dropdown (user decision 24/10/2026); every setting sits on one line, the label
@@ -189,7 +189,7 @@ export function section(ui: Ui, id: SectionId, title: string, folded: boolean, t
 
 /**
  * The settings under two tabs (user decision 02/11/2026): Session (this session's options; a press changes this session
- * only) and System (the saved defaults in `~/.claude/adyusuf.json`, which new sessions start from). One tab shows at a
+ * only) and System (the saved defaults in `~/.claude/podium.json`, which new sessions start from). One tab shows at a
  * time, the chosen one at full strength (in brackets in the terminal); the choice is kept as the fold id `claude`, so
  * a saved state from the System column it replaces still applies.
  */
@@ -224,7 +224,7 @@ export function settingsBody(ui: Ui, data: SettingsData | null, problem: string,
     { flexDirection: 'column' },
     problem !== '' ? h(ui.Text, { color: 'red' }, problem) : null,
     problems.map(line => h(ui.Text, { color: WARN }, `! ${line}`)),
-    codeWork ? null : h(ui.Text, { dimColor: true }, 'No repository here: only Replies shows. Change the rest with /adyusuf:config.'),
+    codeWork ? null : h(ui.Text, { dimColor: true }, 'No repository here: only Replies shows. Change the rest with /podium:config.'),
     table(ui, data, press, claude, codeWork),
   )
 }

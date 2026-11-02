@@ -11,11 +11,11 @@ import time
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import test_adyusuf_config as base  # noqa: E402
+import test_podium_config as base  # noqa: E402
 
 SCRIPTS = base.SCRIPTS
 
-_spec = importlib.util.spec_from_file_location('adyusuf_session', os.path.join(SCRIPTS, 'adyusuf_session.py'))
+_spec = importlib.util.spec_from_file_location('podium_session', os.path.join(SCRIPTS, 'podium_session.py'))
 sessions = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(sessions)
 
@@ -125,20 +125,20 @@ class SessionStorage(unittest.TestCase):
             sessions.session_file('../x')
 
     def test_the_directory_defaults_under_dot_claude_and_follows_the_environment(self):
-        saved = os.environ.pop('ADYUSUF_SESSION_DIR', None)
+        saved = os.environ.pop('PODIUM_SESSION_DIR', None)
         try:
-            self.assertTrue(sessions.session_dir().endswith(os.path.join('.claude', 'adyusuf-session')))
-            os.environ['ADYUSUF_SESSION_DIR'] = '/somewhere'
+            self.assertTrue(sessions.session_dir().endswith(os.path.join('.claude', 'podium-session')))
+            os.environ['PODIUM_SESSION_DIR'] = '/somewhere'
             self.assertEqual('/somewhere', sessions.session_dir())
         finally:
-            os.environ.pop('ADYUSUF_SESSION_DIR', None)
+            os.environ.pop('PODIUM_SESSION_DIR', None)
             if saved is not None:
-                os.environ['ADYUSUF_SESSION_DIR'] = saved
+                os.environ['PODIUM_SESSION_DIR'] = saved
 
     def test_prune_removes_only_old_json_files(self):
         import tempfile
         with tempfile.TemporaryDirectory() as folder:
-            os.environ['ADYUSUF_SESSION_DIR'] = folder
+            os.environ['PODIUM_SESSION_DIR'] = folder
             try:
                 old, fresh, other = (os.path.join(folder, n) for n in ('old.json', 'fresh.json', 'keep.txt'))
                 for path in (old, fresh, other):
@@ -148,10 +148,10 @@ class SessionStorage(unittest.TestCase):
                 os.utime(other, (long_ago, long_ago))
                 self.assertEqual(1, sessions.prune())
                 self.assertEqual(['fresh.json', 'keep.txt'], sorted(os.listdir(folder)))
-                os.environ['ADYUSUF_SESSION_DIR'] = os.path.join(folder, 'missing')
+                os.environ['PODIUM_SESSION_DIR'] = os.path.join(folder, 'missing')
                 self.assertEqual(0, sessions.prune())            # no folder: nothing to do, no error
             finally:
-                os.environ.pop('ADYUSUF_SESSION_DIR', None)
+                os.environ.pop('PODIUM_SESSION_DIR', None)
 
 
 class SessionNotify(base.Notify):

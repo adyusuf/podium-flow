@@ -85,7 +85,7 @@ class Workflow(unittest.TestCase):
         text = read(CALLER)
         self.assertEqual(2, text.count('<standards-sha>'))
         self.assertIn("vars.SDLC_RUNNER_LABELS || '[\"ubuntu-latest\"]'", text)
-        self.assertIn('uses: adyusuf/claude-code-standards/.github/workflows/sdlc.yml@', text)
+        self.assertIn('uses: adyusuf/podium-flow/.github/workflows/sdlc.yml@', text)
 
 
 class PlanStep(unittest.TestCase):

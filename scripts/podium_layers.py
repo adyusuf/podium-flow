@@ -1,12 +1,13 @@
-"""The adyusuf configuration's layers on disk: where each file is, how a file is read, merged and written.
+"""The podium configuration's layers on disk: where each file is, how a file is read, merged and written.
 
-Split out of adyusuf_config.py so no file passes 300 lines (rule #9); adyusuf_config.py re-exports every name here.
+Split out of podium_config.py so no file passes 300 lines (rule #9); podium_config.py re-exports every name here.
 Layers, lowest first: the shipped defaults < the user's file < the project's file < the session's own layer.
 """
 import contextlib
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,8 +18,8 @@ except ImportError:      # Windows: no advisory lock, the atomic replace below s
     fcntl = None
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import adyusuf_session as sessions  # noqa: E402
-from adyusuf_schema import DEFAULTS_FILE, RETIRED_KEYS, SCHEMA, SPECS  # noqa: E402
+import podium_session as sessions  # noqa: E402
+from podium_schema import DEFAULTS_FILE, RETIRED_KEYS, SCHEMA, SPECS  # noqa: E402
 
 class ConfigError(Exception):
     """A usage error (exit 2) or an unreadable file (exit 1)."""
@@ -28,16 +29,39 @@ class ConfigError(Exception):
         self.code = code
 
 
+# The plugin was called `adyusuf` until 02/11/2026: its files and variables keep working (rule #4).
+LEGACY = 'adyusuf'
+
+
 def user_file():
-    return os.environ.get('ADYUSUF_CONFIG_USER') or os.path.join(os.path.expanduser('~'), '.claude', 'adyusuf.json')
+    """PODIUM_CONFIG_USER (or the older ADYUSUF_CONFIG_USER), else ~/.claude/podium.json. A user who has only the older
+    ~/.claude/adyusuf.json gets it copied to the new name once; if that copy fails, the older file is used."""
+    chosen = os.environ.get('PODIUM_CONFIG_USER') or os.environ.get('ADYUSUF_CONFIG_USER')
+    if chosen:
+        return chosen
+    home = os.path.join(os.path.expanduser('~'), '.claude')
+    path, older = os.path.join(home, 'podium.json'), os.path.join(home, LEGACY + '.json')
+    if not os.path.exists(path) and os.path.isfile(older):
+        try:      # a temporary file renamed over: a copy cut short never leaves a half file under the new name
+            fd, temp = tempfile.mkstemp(dir=home, prefix='.podium-', suffix='.tmp')
+            os.close(fd)
+            shutil.copyfile(older, temp)
+            os.replace(temp, path)
+        except OSError:
+            with contextlib.suppress(OSError, UnboundLocalError):
+                os.remove(temp)
+            return older
+    return path
 
 
 def project_file():
+    """The project's committed <root>/.claude/podium.json, or its older .claude/adyusuf.json while that is the only one."""
     try:
         top = subprocess.run(['git', 'rev-parse', '--show-toplevel'], capture_output=True, text=True, check=True).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         top = os.getcwd()
-    return os.path.join(top, '.claude', 'adyusuf.json')
+    path, older = os.path.join(top, '.claude', 'podium.json'), os.path.join(top, '.claude', LEGACY + '.json')
+    return older if not os.path.exists(path) and os.path.isfile(older) else path
 
 
 def flatten(tree, prefix=''):
@@ -66,7 +90,7 @@ def check(key, value):
     """The value as the schema wants it, or ConfigError (exit 2)."""
     spec = SPECS.get(key)
     if spec is None:
-        raise ConfigError("unknown setting '%s' (see: adyusuf_config.py schema)" % key)
+        raise ConfigError("unknown setting '%s' (see: podium_config.py schema)" % key)
     if spec['type'] == 'bool':
         if isinstance(value, bool):
             return value
@@ -136,7 +160,7 @@ def load(user_path=None, session=None, project=True):
 def locked(path):
     """One writer at a time per configuration file (clicks in the rail boxes arrive in quick succession). The lock file
     lives in the temp folder, keyed by the path, so no `.lock` lands in ~/.claude or in a project's committed `.claude/`."""
-    name = 'adyusuf-config-%s.lock' % hashlib.sha1(os.path.abspath(path).encode('utf-8')).hexdigest()[:16]
+    name = 'podium-config-%s.lock' % hashlib.sha1(os.path.abspath(path).encode('utf-8')).hexdigest()[:16]
     with open(os.path.join(tempfile.gettempdir(), name), 'a') as handle:
         if fcntl:
             fcntl.flock(handle, fcntl.LOCK_EX)

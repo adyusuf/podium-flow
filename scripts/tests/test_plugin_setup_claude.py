@@ -113,8 +113,8 @@ class Locate(unittest.TestCase):
         _, problem = setup.locate_claude(self.ctx(), None, self.env)
         self.assertIn('claude is not on PATH', problem)
         self.assertIn("desktop app's own copy", problem)
-        self.assertIn('/plugin marketplace add adyusuf/claude-code-standards#prod', problem)
-        self.assertIn('/plugin install adyusuf@adyusuf-marketplace', problem)
+        self.assertIn('/plugin marketplace add adyusuf/podium-flow#prod', problem)
+        self.assertIn('/plugin install podium@podium-marketplace', problem)
         self.assertIn('--claude <full path>', problem)
 
 
@@ -130,7 +130,7 @@ class InTheRun(Case):
         fake = Fake(self.home)
         code, _, err = self.go(fake, which=lambda tool: '/bin/git' if tool == 'git' else None)
         self.assertEqual(code, 2)
-        self.assertIn('/plugin install adyusuf@adyusuf-marketplace', err)
+        self.assertIn('/plugin install podium@podium-marketplace', err)
         self.assertEqual(fake.commands, [])
 
 

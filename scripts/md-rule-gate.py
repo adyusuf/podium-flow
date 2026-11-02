@@ -6,7 +6,7 @@ Usage:  python3 scripts/md-rule-gate.py <old-file> <new-file>
 ⚠️ If the move was spread across several files, the "new" side is given CONCATENATED:
      cat CLAUDE.md docs/decision-log.md > /tmp/new.md
      python3 scripts/md-rule-gate.py <(git show origin/dev:CLAUDE.md) /tmp/new.md
-⚠️ The master copy lives in the adyusuf plugin's `scripts/` (canonical); every
+⚠️ The master copy lives in the podium plugin's `scripts/` (canonical); every
    project takes a COPY and commits it. The three tools are twins — changing one means changing all.
 
 The only acceptable form of simplification is MOVING content, not deleting it.

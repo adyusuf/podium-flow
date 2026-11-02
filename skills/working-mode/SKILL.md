@@ -1,6 +1,6 @@
 ---
 name: working-mode
-description: Shows or changes the operating mode (A/B/C/D/E) for this project, optionally with a model that replaces Opus for the Opus agents ("C sonnet"). The mode determines agent usage, review and the approval policy, and so how fast the session spends tokens. Use it when the user says "/adyusuf:working-mode", "change the mode", "which mode are we in", "work as a full team", or "work without agents".
+description: Shows or changes the operating mode (A/B/C/D/E) for this project, optionally with a model that replaces Opus for the Opus agents ("C sonnet"). The mode determines agent usage, review and the approval policy, and so how fast the session spends tokens. Use it when the user says "/podium:working-mode", "change the mode", "which mode are we in", "work as a full team", or "work without agents".
 ---
 
 # Working mode
@@ -25,12 +25,12 @@ The work is **audited** in every mode: a producing role closes with an evidence 
 and the auditor checks it and sends gaps back (global #28). In C/D/E the auditor is the
 `qa` agent (the session verifies its critical findings); in A/B it is the session itself.
 
-Contributions are welcome: https://github.com/adyusuf/claude-code-standards
+Contributions are welcome: https://github.com/adyusuf/podium-flow
 
 ## 0. At session start - no question
 
 A session does not ask the mode (user decision 17/10/2026): the read order of §1 decides, and the SessionStart hook has
-already printed the effective values. Apply nothing at start. The defaults themselves are changed with `/adyusuf:config`.
+already printed the effective values. Apply nothing at start. The defaults themselves are changed with `/podium:config`.
 Rules: `${CLAUDE_PLUGIN_ROOT}/modes/README.md` › *Session start*.
 
 ## 1. Read the current mode
@@ -40,7 +40,7 @@ Priority order: **session-scoped selection** → project file → the configurat
 ```bash
 S="<the Scratchpad Directory from the system prompt>"   # session-scoped, survives compaction
 root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-cfg="${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_config.py"
+cfg="${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py"
 if [ -f "$S/mode" ]; then d="$S"; elif [ -f "$root/.claude/mode" ]; then d="$root/.claude"; else d=""; fi
 echo "mode: $( [ -n "$d" ] && cat "$d/mode" || python3 "$cfg" get mode )"
 echo "opus agents run on: $( if [ -n "$d" ]; then cat "$d/mode-model" 2>/dev/null || echo 'their defined model'; else python3 "$cfg" get mode_model; fi )"
@@ -50,7 +50,7 @@ The model override is read **from the layer that supplied the letter** — a ses
 or project letter without its own `mode-model` means "defined models", even if the
 configuration has an override. Rules: `${CLAUDE_PLUGIN_ROOT}/modes/README.md` › *Model override*.
 
-If none of them exists the configuration's mode applies (default **C**, `adyusuf:config`); its agents are approved
+If none of them exists the configuration's mode applies (default **C**, `podium:config`); its agents are approved
 by the default itself. Propose a lower or higher mode in one line only if the work clearly deserves it - never switch on
 your own (README › "If no mode is given").
 
@@ -74,7 +74,7 @@ Show the current mode, what it means and the other options **briefly**: letter +
 name + agent set + who reviews + cost multiplier. Do not paste the whole matrix;
 5-6 lines are enough (A-E).
 
-## 4. If a letter is given (`/adyusuf:working-mode B`, `/adyusuf:working-mode C sonnet`)
+## 4. If a letter is given (`/podium:working-mode B`, `/podium:working-mode C sonnet`)
 
 0. Split the argument: the letter, an optional **model word**, an optional `--once`/`--tek`.
    The model word must be `sonnet` · `haiku` · `fable` · `opus`; anything else is
@@ -111,10 +111,10 @@ name + agent set + who reviews + cost multiplier. Do not paste the whole matrix;
    reviews, approval policy, expected multiplier) **and the model line**: which
    agents are Opus by definition and what they run on now. 4-6 lines.
 5. **From then on**, every `Agent` call (and every `Workflow` `agent()`) passes `model: "<runs_on>"` for
-   its role as `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_config.py agents --json` lists it: the mode's Opus
-   override, or the model the user set for that one agent (`/adyusuf:config`); an agent whose `runs_on` is its
+   its role as `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py agents --json` lists it: the mode's Opus
+   override, or the model the user set for that one agent (`/podium:config`); an agent whose `runs_on` is its
    defined model gets no override, and a role that is not listed is not called. Report the model that actually ran. A role agent is always
-   called by its plugin name, `subagent_type: "adyusuf:<role>"`; a bare `<role>` is not found.
+   called by its plugin name, `subagent_type: "podium:<role>"`; a bare `<role>` is not found.
 
 ## Permanent rules
 

@@ -21,11 +21,11 @@
           },
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_config.py\" context --stdin"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py\" context --stdin"
           },
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_status.py\" hook session"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_status.py\" hook session"
           }
         ]
       }
@@ -51,7 +51,7 @@
           },
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_status.py\" hook subagent"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_status.py\" hook subagent"
           }
         ]
       }
@@ -71,7 +71,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_status.py\" hook guard"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_status.py\" hook guard"
           }
         ]
       }
@@ -91,7 +91,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_config.py\" notify PostToolUse"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py\" notify PostToolUse"
           }
         ]
       }
@@ -105,7 +105,7 @@
           },
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_status.py\" hook stop"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_status.py\" hook stop"
           }
         ]
       }
@@ -115,7 +115,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_status.py\" hook stop"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_status.py\" hook stop"
           }
         ]
       }
@@ -125,11 +125,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_config.py\" notify UserPromptSubmit"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py\" notify UserPromptSubmit"
           },
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/adyusuf_status.py\" hook prompt"
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_status.py\" hook prompt"
           }
         ]
       }

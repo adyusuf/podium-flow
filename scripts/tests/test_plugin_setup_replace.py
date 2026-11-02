@@ -27,7 +27,7 @@ class Replace(Case):
     def test_the_settings_file_is_backed_up_and_survives_byte_for_byte(self):
         self.settings()
         self.go(self.fake())
-        with open(os.path.join(self.home, '.claude', 'adyusuf.json'), 'rb') as handle:
+        with open(os.path.join(self.home, '.claude', 'podium.json'), 'rb') as handle:
             self.assertEqual(handle.read(), CONFIG)
         backups = os.listdir(os.path.join(self.home, '.claude-standards', 'backups'))
         self.assertEqual(len(backups), 1)
@@ -39,7 +39,7 @@ class Replace(Case):
         code, out, _ = self.go(fake)
         self.assertEqual(code, 0)
         self.assertIn('restored', out)
-        with open(os.path.join(self.home, '.claude', 'adyusuf.json'), 'rb') as handle:
+        with open(os.path.join(self.home, '.claude', 'podium.json'), 'rb') as handle:
             self.assertEqual(handle.read(), CONFIG)
 
     def test_a_plugin_that_was_disabled_is_disabled_again(self):

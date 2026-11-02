@@ -96,18 +96,18 @@ test('an error keeps the table and resets the stamp, so the next look reads agai
   expect(statusStep(-1, { kind: 'file', mtimeMs: 5 }).action).toBe('read')
 })
 
-test('the folder: an absolute ADYUSUF_STATUS_DIR, else USERPROFILE, else HOME; nothing usable gives none', () => {
+test('the folder: an absolute PODIUM_STATUS_DIR, else USERPROFILE, else HOME; nothing usable gives none', () => {
   expect(statusDir('/tmp/st/', 'C:\\Users\\u', '/home/u')).toBe('/tmp/st')
   expect(statusDir('D:\\st', undefined, '/home/u')).toBe('D:\\st')
   expect(statusDir('relative/dir', undefined, '/home/u')).toBe('')
-  expect(statusDir(undefined, 'C:\\Users\\u', '/home/u')).toBe('C:\\Users\\u/.claude/adyusuf-status')
-  expect(statusDir(undefined, undefined, '/home/u/')).toBe('/home/u/.claude/adyusuf-status')
+  expect(statusDir(undefined, 'C:\\Users\\u', '/home/u')).toBe('C:\\Users\\u/.claude/podium-status')
+  expect(statusDir(undefined, undefined, '/home/u/')).toBe('/home/u/.claude/podium-status')
   expect(statusDir('', '', '')).toBe('')
   expect(statusDir(undefined, undefined, undefined)).toBe('')
 })
 
 test('the status script sits beside the configuration script the pane found; none found, none run', () => {
-  expect(statusScript('/cache/adyusuf/1a2b/scripts/adyusuf_config.py')).toBe('/cache/adyusuf/1a2b/scripts/adyusuf_status.py')
+  expect(statusScript('/cache/podium/1a2b/scripts/podium_config.py')).toBe('/cache/podium/1a2b/scripts/podium_status.py')
   expect(statusScript('')).toBe('')
   expect(statusScript('/elsewhere/other.py')).toBe('')
 })

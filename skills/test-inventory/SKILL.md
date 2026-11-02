@@ -1,6 +1,6 @@
 ---
 name: test-inventory
-description: Screen-by-screen test audit in four phases — (1) inventory every test layer of a screen as use cases, hunt for defects, gaps and unhandled cases, and report; (2) write the approved missing tests and report; (3) run every suite, list and classify each failure one by one, report; (4) fix the failures, re-run only what was fixed, then hand back to phase 3 for one full run — the 3 → 4 → 3 loop repeats until green or the ceiling. Use when the user says "/adyusuf:test-inventory", "review the tests", "find the missing tests", "which use cases are tested", "test inventory per page", "eksik testleri bul", "testleri gözden geçir", "sayfa sayfa test envanteri".
+description: Screen-by-screen test audit in four phases — (1) inventory every test layer of a screen as use cases, hunt for defects, gaps and unhandled cases, and report; (2) write the approved missing tests and report; (3) run every suite, list and classify each failure one by one, report; (4) fix the failures, re-run only what was fixed, then hand back to phase 3 for one full run — the 3 → 4 → 3 loop repeats until green or the ceiling. Use when the user says "/podium:test-inventory", "review the tests", "find the missing tests", "which use cases are tested", "test inventory per page", "eksik testleri bul", "testleri gözden geçir", "sayfa sayfa test envanteri".
 ---
 
 # Test inventory — audit → write → run ⇄ fix
@@ -15,7 +15,7 @@ defects and unhandled cases, then writes only the tests you approve and runs and
 them in a bounded loop. Every claim carries a `file:line` or a command, so the report
 can be trusted, and the token spend stays bounded by the one screen.
 
-Contributions are welcome: https://github.com/adyusuf/claude-code-standards
+Contributions are welcome: https://github.com/adyusuf/podium-flow
 
 One screen at a time, every layer at once (web unit · e2e · backend unit/integration ·
 Android · iOS · Maestro). The unit of work is a **use case**, not a file: a report tells
@@ -24,7 +24,7 @@ what nobody handled.
 
 ## Arguments
 
-`/adyusuf:test-inventory <phase> <target>`
+`/podium:test-inventory <phase> <target>`
 
 | Argument | Values | Default |
 |---|---|---|
