@@ -38,7 +38,12 @@ export function line(ui: Ui, head: unknown, columns: unknown[], width: number, c
     }, parts)))
 }
 
-export const label = (ui: Ui, text: string) => (text === '' ? null : ui.h(ui.Text, { bold: true }, text))
+/** A row's bold label; `indent` cells in for a row that belongs under another (the gate's steps under Gates). */
+export function label(ui: Ui, text: string, indent = 0) {
+  if (text === '') return null
+  const bold = ui.h(ui.Text, { bold: true }, text)
+  return indent > 0 ? ui.h(ui.Box, { marginLeft: indent }, bold) : bold
+}
 
 /**
  * One pressable part. `chosen` fills its icon (desktop) or puts it in brackets (terminal) and draws it at full strength,

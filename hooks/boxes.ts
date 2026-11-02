@@ -9,6 +9,7 @@
 // as a native button and drops a Text's underline inside it); a box's body and a block's lines start one step in.
 import { enabledFor, settingGroups } from './choose'
 import { helpCard, hoverable, INDENT, label, line, option, WARN } from './controls'
+import { GATE_STEP_PREFIX, stepLines, stepsWidth } from './gatesteps'
 import { COLUMN_HELP, ROW_HELP, SECTION_HELP } from './help'
 import type { Ui } from './controls'
 
@@ -18,7 +19,7 @@ export type { Factory, Ui } from './controls'
 export type Scope = 'session' | 'saved'
 export type Press = (key: string, value: string, scope?: Scope) => void
 
-type Spec = { key: string; type: 'bool' | 'enum'; label: string; group: string; options?: string[] }
+type Spec = { key: string; type: 'bool' | 'enum'; label: string; group: string; options?: string[]; step?: string; heading?: string }
 type AgentRow = {
   role: string; defined: string; runs_on: string; default_model?: string; active: boolean; in_mode: boolean; enabled: string; model: string
   description?: string
@@ -79,7 +80,8 @@ export const ROWS: Row[] = [
   // The star ties it to the Agents rows it acts on: the roles whose file says opus carry the same star.
   { label: 'Model*', key: 'mode_model', names: { keep: 'opus' } },
   { label: 'Replies', key: 'reply.length' },
-  { label: 'Steps', key: 'steps.enforce' },
+  // `Plan` since 02/11/2026 (was `Steps`, which now names the gate's steps under Gates); the key stays (rule #4).
+  { label: 'Plan', key: 'steps.enforce' },
   { label: 'Pod', items: [{ key: 'pod.connect', name: 'on' }] },
   { label: 'Format', key: 'pod.message_format' },
   { label: 'Tests', items: [{ key: 'write.unit_tests', name: 'unit' }, { key: 'write.e2e', name: 'e2e' }] },
@@ -115,7 +117,7 @@ function agentMark(agent: AgentRow, mode: string) {
  * that is off has no radios after it, so its name does not widen the column.
  */
 export function headWidth(data: SettingsData) {
-  return Math.max(LABEL_WIDTH, ...data.agents.filter(agent => agent.active).map(agent => agentName(agent).length + 3))
+  return Math.max(LABEL_WIDTH, stepsWidth(data.schema), ...data.agents.filter(agent => agent.active).map(agent => agentName(agent).length + 3))
 }
 
 /** The options of one setting, the chosen one marked. */
@@ -132,8 +134,14 @@ function checks(ui: Ui, scope: Scope, items: Item[], values: Layer['values'], pr
   })
 }
 
-/** One settings row: its label, the names it draws (to size the column) and how it draws its options for one layer. */
-type SettingLine = { label: string; names: string[]; draw: (scope: Scope, layer: Layer) => unknown[] }
+/**
+ * One settings row: its label, the names it draws (to size the column) and how it draws its options for one layer. A gate
+ * step row also has its own hover id, an indent, its card text and whether the layer shows it (gatesteps.ts).
+ */
+type SettingLine = {
+  label: string; names: string[]; draw: (scope: Scope, layer: Layer) => unknown[]
+  id?: string; indent?: number; help?: string; shown?: (layer: Layer) => boolean
+}
 
 /** The rows of the settings table, in order. */
 function settingLines(ui: Ui, schema: Spec[], press: Press): SettingLine[] {
@@ -152,6 +160,11 @@ function settingLines(ui: Ui, schema: Spec[], press: Press): SettingLine[] {
       if (items.length > 0) {
         lines.push({ label: row.label, names: items.map(item => item.name), draw: (scope, layer) => checks(ui, scope, items, layer.values, press) })
       }
+      // The gate's steps sit right under Gates, indented (user decision 02/11/2026).
+      if (row.label === 'Gates') {
+        lines.push(...stepLines(ui, shown, press).map((one): SettingLine =>
+          ({ ...one, draw: (scope, layer) => one.draw(scope, layer.values), shown: layer => one.shown(layer.values) })))
+      }
       continue
     }
     const spec = shown.find(one => one.key === row.key)
@@ -160,7 +173,7 @@ function settingLines(ui: Ui, schema: Spec[], press: Press): SettingLine[] {
     lines.push(radios(row.label, row.key, (spec.options ?? []).map(option => ({ key: option, name: row.names?.[option] ?? option }))))
   }
   // A setting no row names (a newer plugin than this pane) must not vanish from view.
-  for (const spec of shown.filter(one => !covered.has(one.key))) {
+  for (const spec of shown.filter(one => !covered.has(one.key) && !one.key.startsWith(GATE_STEP_PREFIX))) {
     const items = [{ key: spec.key, name: spec.label }]
     lines.push(spec.type === 'bool'
       ? { label: '', names: [spec.label], draw: (scope, layer) => checks(ui, scope, items, layer.values, press) }
@@ -195,10 +208,11 @@ export function section(ui: Ui, id: SectionId, title: string, folded: boolean, t
  */
 function table(ui: Ui, data: SettingsData, press: Press, tabs: ColumnFold, codeWork: boolean) {
   const { h } = ui
-  const lines = settingLines(ui, data.schema, press).filter(one => codeWork || NO_CODE_ROWS.includes(one.label))
   const head = headWidth(data)
   const system = data.saved !== undefined && !tabs.folded
   const [scope, layer]: [Scope, Layer] = system && data.saved ? ['saved', data.saved] : ['session', data]
+  const lines = settingLines(ui, data.schema, press)
+    .filter(one => (codeWork || NO_CODE_ROWS.includes(one.label)) && (one.shown?.(layer) ?? true))
   // A tab is drawn as every other choice of the pane: a radio icon on the desktop, brackets in the terminal.
   const tab = (name: 'Session' | 'System', chosen: boolean) => hoverable(ui, `column-${name}`,
     option(ui, `tab-${name}`, name, 'radio', chosen, () => { if (!chosen) tabs.toggle() }))
@@ -208,8 +222,8 @@ function table(ui: Ui, data: SettingsData, press: Press, tabs: ColumnFold, codeW
     helpCard(ui, 'column-Session', COLUMN_HELP.Session),
     data.saved ? helpCard(ui, 'column-System', COLUMN_HELP.System) : null,
     lines.flatMap(one => [
-      line(ui, hoverable(ui, `row-${one.label}`, label(ui, one.label)), [one.draw(scope, layer)], head),
-      helpCard(ui, `row-${one.label}`, ROW_HELP[one.label])]))
+      line(ui, hoverable(ui, `row-${one.id ?? one.label}`, label(ui, one.label, one.indent)), [one.draw(scope, layer)], head),
+      helpCard(ui, `row-${one.id ?? one.label}`, one.help ?? ROW_HELP[one.label])]))
 }
 
 /** The Session tab, for a caller that keeps no tab state. */

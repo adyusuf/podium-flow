@@ -34,9 +34,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import podium_session as sessions  # noqa: E402
 from podium_schema import (  # noqa: E402,F401
     AGENTS_DIR, AGENT_MODELS, AGENT_STATES, B_ROLES, CI_RUNNERS, C_ROLES,
-    DEFAULTS_FILE, DEPLOY_ENVS, D_ROLES, E2E_STAGES, MODELS, MODES,
+    DEFAULTS_FILE, DEPLOY_ENVS, D_ROLES, E2E_STAGES, GATE_STEPS, MODELS, MODES,
     MODE_ROLES, POD_FORMATS, REPLY_LENGTHS, RETIRED_KEYS, ROOT, SCHEMA,
-    SPECS, TARGETS, agents, defined_model, effective_model, front_matter)
+    SPECS, TARGETS, agents, defined_model, effective_model, front_matter, gate_steps_off)
 from podium_layers import (  # noqa: E402,F401
     ConfigError, check, flatten, load, locked, nest,
     project_file, read_layer, user_file, write_layer)
@@ -80,6 +80,9 @@ def context(effective, problems, session=None):
             target, shown(value('merge.' + target)), shown(value('gates_before_push.' + target)),
             shown(value('coverage_before_push.' + target)), shown(value('push.' + target)),
             shown(value('ci_after_push.' + target))))
+        off = gate_steps_off({key: pair[0] for key, pair in effective.items()}, target)
+        if off and value('gates_before_push.' + target):     # an unticked step is waived and named (02/11/2026)
+            steps[-1] += ', gate steps off (waived, named in Gate-Waived): %s' % ', '.join(off)
     steps.append('e2e before deploy: ' + ', '.join(
         'on %s before deploying %s %s' % (on, after, shown(value('e2e_before_deploy.' + after))) for on, after in E2E_STAGES))
     lines = ['podium configuration (effective; global rule #34 - follow it, do not ask what it answers):',

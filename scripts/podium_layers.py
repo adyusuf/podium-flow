@@ -143,7 +143,8 @@ def load(user_path=None, session=None, project=True):
     defaults, problem = read_layer(DEFAULTS_FILE)
     if problem:
         problems.append(problem)
-    effective = {spec['key']: (defaults.get(spec['key']), 'default') for spec in SCHEMA}
+    # A setting the shipped file does not hold takes its schema default (the gate steps: on).
+    effective = {spec['key']: (defaults.get(spec['key'], spec.get('default')), 'default') for spec in SCHEMA}
     layers = [('user', user_path or user_file())] + ([('project', project_file())] if project else [])
     if sessions.valid(session):
         layers.append(('session', sessions.session_file(session)))

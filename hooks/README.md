@@ -15,7 +15,7 @@ All of them run locally; none opens a network connection.
 | `SessionStart`, `UserPromptSubmit`, `Stop`, `StopFailure` | `scripts/podium_status.py hook` | keeps every session's Status box alive: a session starts `waiting for you`, your message's first line becomes *Now* (`working on: …`; a system-started turn leaves it), the end of a turn sets `waiting for you` or `waiting for background work`; Claude's rows stay. The mod does the same after an interrupted turn. Writes only `~/.claude/podium-status/<session id>.json`, pruned after 14 days |
 | `UserPromptSubmit` (same hook) | `scripts/podium_status.py hook prompt` | also reminds Claude to analyse the message and write or insert its steps first |
 | `SubagentStart` | `scripts/podium_status.py hook subagent` | tells each subagent how to write its own steps into this session's Status box under its name |
-| `PreToolUse` (Edit, Write, NotebookEdit, Bash) | `scripts/podium_status.py hook guard` | with *Steps* on `block`, refuses a code edit or a `git commit` until the Status box holds steps; `~/.claude` and temp files are never refused |
+| `PreToolUse` (Edit, Write, NotebookEdit, Bash) | `scripts/podium_status.py hook guard` | with *Plan* on `block`, refuses a code edit or a `git commit` until the Status box holds steps; `~/.claude` and temp files are never refused |
 | `PreToolUse` (Bash) | `scripts/guard-destructive.sh` | refuses the never-do commands (forced push, push to `main`, `--no-verify`, `DROP`/`TRUNCATE`, `rm -rf` on `/` `~` `.` `*`); a push to `prod` is not judged here, it follows `push.prod` in the configuration |
 | `PostToolUse` (Edit, Write), `Stop` | `scripts/md-hook.sh` | checks a touched `CLAUDE.md` against its size budget and for dropped rules, and the copied scripts for drift; warns only |
 
@@ -29,7 +29,9 @@ What the mod runs and reads:
 
 - `python3` to find the installed `podium` plugin in `~/.claude/plugins/installed_plugins.json`, then
   `python3 scripts/podium_config.py show/agents/schema/set` from that copy. A press in the pane runs `set --session <id>`:
-  it changes this session only, never the saved defaults, unless the press is in the *System* column.
+  it changes this session only, never the saved defaults, unless the press is in the *System* column. The one
+  exception is a gate step under *Gates*: it is written to this session and saved as the default too, so the last
+  selection comes back.
 - read-only `git` (`for-each-ref`, `rev-parse`, `rev-list`, `log`) in the session's repository, for Promotion.
 - `~/.claude/podium-status/<session id>.json` (or `PODIUM_STATUS_DIR`) for Status: after every tool call, and every
   2 s when its modification time changed.
@@ -42,8 +44,8 @@ What the mod runs and reads:
 
 It opens no network connection. The code is split so the drawing can be tested without the engine: `boxes.ts` (Settings,
 Agents, Promotion), `controls.ts` (the shared icons, options, aligned lines and hover cards), `help.ts` (what the hover
-cards say), `status.ts` (Status), `choose.ts` (pure decisions), `notices.ts` (chat lines); `register.tsx` is the
-engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (79 tests).
+cards say), `gatesteps.ts` (the gate's step rows under Gates), `status.ts` (Status), `choose.ts` (pure decisions), `notices.ts` (chat lines); `register.tsx` is the
+engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (88 tests).
 
 ## The four boxes
 
@@ -72,7 +74,7 @@ reopening them.
   - *Mode* A–E (rule #27) and *Model\**, the model that replaces Opus in the roles marked `*` in Agents.
   - *Replies* (`short`, `normal`, `long`; default `short`): how much Claude writes in a reply
     ([`standards/00-working-method.md`](../standards/00-working-method.md) §5a).
-  - *Steps* (`block`, `remind`; default `block`): every task is split into steps in Status first; `block` refuses a
+  - *Plan* (`steps.enforce`: `block`, `remind`; default `block`; labelled *Steps* until 02/11/2026): every task is split into steps in Status first; `block` refuses a
     code edit or a commit until the steps exist, `remind` only reminds on each message.
   - *Pod* and *Format* are stored only; nothing acts on them yet.
   - *Tests* (`unit`, `e2e`): whether Claude writes unit tests and e2e specs.
@@ -80,6 +82,11 @@ reopening them.
     instead of asking: when a piece of work is done Claude reads them afresh and merges and pushes at once
     ([`standards/13-pr-and-review.md`](../standards/13-pr-and-review.md) §8a). A gate set to no is recorded as
     `Gate-Waived` on the merge commit.
+  - *steps*, one step in under *Gates*, then one row per step of the shared gate two steps in (`gate_steps.<id>.<t>`,
+    default on), each with a checkbox for every target whose gate is on; with no gate on, the block is hidden. The rows
+    come from `GATE_STEPS` in `scripts/gate-lib.sh`, so the pane names no step itself. An unticked step does not run and
+    is recorded as `Gate-Waived`. A press on the Session tab also saves the choice as the default, so the next session
+    starts with the last selection (user decision 02/11/2026).
   - *Runner* (`cloud` = GitHub's runners, `local` = this machine's), *Deploy* (which environments a pushed update is
     deployed to) and *E2E* (run e2e before that deploy; rule #33).
 - **Agents.** One line per role: the role's checkbox and name (pressing either switches the role on or off),
