@@ -45,7 +45,7 @@ What the mod runs and reads:
 It opens no network connection. The code is split so the drawing can be tested without the engine: `boxes.ts` (Settings,
 Agents, Promotion), `controls.ts` (the shared icons, options, aligned lines and hover cards), `help.ts` (what the hover
 cards say), `gatesteps.ts` (the gate's step rows under Gates), `status.ts` (Status), `choose.ts` (pure decisions), `notices.ts` (chat lines); `register.tsx` is the
-engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (90 tests).
+engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (91 tests).
 
 ## The four boxes
 

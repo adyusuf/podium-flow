@@ -677,8 +677,9 @@ now names the gate's.
 the project's own `.claude/sdlc-settings.json`, so a pull request could commit the secret scan or SAST off and CI would
 skip them. Rule #19 says these are never switched off, so the two steps are **locked**: `GATE_STEPS` marks them with a
 fourth column `locked`; `podium_config.py set`/`apply` refuse to turn them off at every layer (user, project, session);
-a layer that holds them off anyway keeps them on and the rest of that layer still counts; the gate runs them whatever the
-file says and prints a warning that the off value was ignored; the pane draws their ticks checked and a press changes
+a layer that holds them off anyway keeps them on and the rest of that layer still counts; the gate runs them whatever
+`.claude/sdlc-settings.json` says and prints a warning that the off value was ignored (a project's own `merge-gate.conf`
+can still point `SECRET_CMD`/`SAST_CMD` elsewhere: that file is reviewed like code); the pane draws their ticks checked and a press changes
 nothing. The other steps stay tickable.
 
 **Amended 02/11/2026, the same day (user request: "an accordion, closed under Gates, no steps label").** The `steps`

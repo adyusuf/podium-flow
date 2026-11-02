@@ -78,6 +78,15 @@ class GateSteps(GateProject):
         out, _ = self.gate(self.conf)
         self.assertTrue(os.path.exists(self.compat), out)
 
+    def test_a_key_that_is_no_step_id_waives_nothing_even_where_it_would_glob(self):
+        # `*` used to expand over the project's files, so a file named `compat` waived that step (qa 02/11/2026).
+        for name in ('compat', 'lint'):
+            open(os.path.join(self.project, name), 'w', encoding='utf-8').close()
+        self.steps(**{'*': {'dev': False}, 'com pat': {'dev': False}})
+        out, _ = self.gate(self.conf)
+        self.assertTrue(os.path.exists(self.compat), out)
+        self.assertNotIn('WAIVED', out)
+
     def test_a_file_that_does_not_parse_runs_every_step_and_says_so(self):
         os.makedirs(os.path.join(self.project, '.claude'), exist_ok=True)
         with open(os.path.join(self.project, '.claude', 'sdlc-settings.json'), 'w', encoding='utf-8') as handle:

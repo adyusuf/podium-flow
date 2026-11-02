@@ -87,6 +87,13 @@ class Locked(Tool):
                          (values['gate_steps.sast.test'], values['gate_steps.secrets.dev'], values['gate_steps.compat.test'],
                           values['push.prod']))
 
+    def test_any_other_bad_value_on_a_locked_step_is_still_a_problem(self):
+        with open(self.user, 'w', encoding='utf-8') as handle:
+            json.dump({'gate_steps': {'sast': {'test': 'maybe'}}}, handle)
+        problems = self.values().get('problems', [])
+        self.assertEqual(1, len(problems), problems)
+        self.assertIn("got 'maybe'", problems[0])
+
     def test_the_schema_marks_them_locked_for_the_pane(self):
         out, _, _ = self.run_tool('schema')
         locked = sorted({spec['key'].split('.')[1] for spec in json.loads(out) if spec.get('locked')})

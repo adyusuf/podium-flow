@@ -63,6 +63,9 @@ export const nextFold = (fold: Record<string, boolean>, id: FoldId) => ({ ...fol
 /** The Settings tab: `folded` (the fold id `claude`, folded at start) means the Session tab; `toggle` switches tabs. It
  * also carries the gate steps' accordion (`steps`), so the engine glue hands the box one fold object. */
 export type ColumnFold = { folded: boolean; toggle: () => void; steps?: StepsFold }
+/** That fold object, from the pane's fold state and its toggles. */
+export const settingsFolds = (fold: Record<string, boolean>, toggle: (id: FoldId) => () => void): ColumnFold =>
+  ({ folded: isFolded(fold, 'claude'), toggle: toggle('claude'), steps: { folded: isFolded(fold, 'steps'), toggle: toggle('steps') } })
 
 /** The radio group of an agent's model. */
 const AGENT_MODELS = ['opus', 'sonnet', 'haiku', 'fable']

@@ -160,14 +160,16 @@ gate_steps_off() {
   GATE_STEPS_READ=1
   [ -f "$SDLC_SETTINGS_FILE" ] || return 0
   have python3 || { warn "python3 is missing: $SDLC_SETTINGS_FILE not read - every gate step runs (fail closed)"; return 0; }
-  GATE_STEPS_OFF="$(python3 -c 'import json, sys
+  # Only well-formed ids come back (qa 02/11/2026): a key such as `*` would otherwise glob over the files in the project.
+  GATE_STEPS_OFF="$(python3 -c 'import json, re, sys
 try:
     steps = json.load(open(sys.argv[1], encoding="utf-8"))["settings"].get("gate_steps", {})
 except (KeyError, TypeError, AttributeError):
     sys.exit(0)
 except Exception:
     sys.exit(3)
-print(" ".join(sorted(i for i, t in steps.items() if isinstance(t, dict) and t.get(sys.argv[2]) is False)))' \
+print(" ".join(sorted(i for i, t in steps.items()
+                     if re.fullmatch("[a-z0-9_]+", i) and isinstance(t, dict) and t.get(sys.argv[2]) is False)))' \
     "$SDLC_SETTINGS_FILE" "$TARGET" 2>/dev/null)" || {
     GATE_STEPS_OFF=""; warn "$SDLC_SETTINGS_FILE could not be read - every gate step runs (fail closed)"; }
   # A locked step runs whatever the file says: a pull request that commits it off changes nothing, and the gate says so.

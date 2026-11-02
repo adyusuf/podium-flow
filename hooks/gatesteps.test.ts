@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { FOLDED_AT_START, headWidth, isFolded, ROW_LABELS, settingsBody } from './boxes'
+import { FOLDED_AT_START, headWidth, isFolded, ROW_LABELS, settingsBody, settingsFolds } from './boxes'
 import { gatedTargets, gateSteps, pressStep, STEP_INDENT, stepOn, stepsWidth } from './gatesteps'
 import { LOCKED_STEP_HELP, ROW_HELP, STEP_HELP } from './help'
 
@@ -143,4 +143,16 @@ test('a locked step (the secret scan, SAST) is drawn ticked whatever the value, 
   const cards = all(body, 'Box').filter(node => node.props.display === 'none').map(words)
   expect(cards.includes(`secret scan: ${LOCKED_STEP_HELP}`) && LOCKED_STEP_HELP.includes('#19')).toBe(true)
   expect(gateSteps(locked).map(one => one.locked)).toEqual([false, false, true])
+})
+
+test('the engine glue builds the fold object from the saved state: the tab and the accordion, each with its own toggle', () => {
+  const toggles: string[] = []
+  const toggle = (id: string) => () => { toggles.push(id) }
+  const start = settingsFolds({}, toggle)
+  expect([start.folded, start.steps!.folded]).toEqual([true, true])
+  const opened = settingsFolds({ steps: false, claude: false }, toggle)
+  expect([opened.folded, opened.steps!.folded]).toEqual([false, false])
+  opened.toggle()
+  opened.steps!.toggle()
+  expect(toggles).toEqual(['claude', 'steps'])
 })
