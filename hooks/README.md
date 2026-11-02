@@ -45,7 +45,7 @@ What the mod runs and reads:
 It opens no network connection. The code is split so the drawing can be tested without the engine: `boxes.ts` (Settings,
 Agents, Promotion), `controls.ts` (the shared icons, options, aligned lines and hover cards), `help.ts` (what the hover
 cards say), `gatesteps.ts` (the gate's step rows under Gates), `status.ts` (Status), `choose.ts` (pure decisions), `notices.ts` (chat lines); `register.tsx` is the
-engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (88 tests).
+engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (90 tests).
 
 ## The four boxes
 
@@ -82,8 +82,9 @@ reopening them.
     instead of asking: when a piece of work is done Claude reads them afresh and merges and pushes at once
     ([`standards/13-pr-and-review.md`](../standards/13-pr-and-review.md) §8a). A gate set to no is recorded as
     `Gate-Waived` on the merge commit.
-  - *steps*, one step in under *Gates*, then one row per step of the shared gate two steps in (`gate_steps.<id>.<t>`,
-    default on), each with a checkbox for every target whose gate is on; with no gate on, the block is hidden. The rows
+  - The gate's steps: an arrow beside *Gates* (`▸` closed, `▾` open; closed at start, the fold id `steps`) opens one row
+    per step of the shared gate, one step in, with no label of its own (`gate_steps.<id>.<t>`, default on), each with a
+    checkbox for every target whose gate is on; with no gate on, there is no arrow and no row (user decisions 02/11/2026). The rows
     come from `GATE_STEPS` in `scripts/gate-lib.sh`, so the pane names no step itself. An unticked step does not run and
     is recorded as `Gate-Waived`. The secret scan and SAST are locked (#19): their ticks stay checked and a press changes nothing. A press on the Session tab also saves the choice as the default, so the next session
     starts with the last selection (user decision 02/11/2026).

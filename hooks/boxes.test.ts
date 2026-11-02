@@ -63,7 +63,7 @@ function data(over: Record<string, unknown> = {}) {
 
 test('the pane has four sections, Status first, and starts with Agents and Promotion folded and Settings on the Session tab', () => {
   expect([...SECTIONS]).toEqual(['status', 'settings', 'agents', 'promotion'])
-  expect(FOLDED_AT_START).toEqual({ agents: true, promotion: true, claude: true })
+  expect(FOLDED_AT_START).toEqual({ agents: true, promotion: true, claude: true, steps: true })
 })
 
 test('a fold state saved before something could fold falls back to how it starts; a saved one wins', () => {

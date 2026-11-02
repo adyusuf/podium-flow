@@ -681,6 +681,9 @@ a layer that holds them off anyway keeps them on and the rest of that layer stil
 file says and prints a warning that the off value was ignored; the pane draws their ticks checked and a press changes
 nothing. The other steps stay tickable.
 
+**Amended 02/11/2026, the same day (user request: "an accordion, closed under Gates, no steps label").** The `steps`
+label is gone: an arrow beside *Gates* opens the step rows (closed at start, kept as the fold id `steps`), one step in.
+
 ## Model per job — run on Sonnet, diagnose on Opus (29/09/2026, user decision)
 
 **The rule:** `standards/23-delivery-flow-tuning.md` §13b. Running a suite or gate is

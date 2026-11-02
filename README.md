@@ -49,8 +49,8 @@ Your settings move by themselves: `~/.claude/adyusuf.json` and the `ADYUSUF_*` v
 | Working rules, loaded into every session | [`CLAUDE.md`](CLAUDE.md) | 34 rules | why each exists: [`docs/decision-log.md`](docs/decision-log.md) |
 | Engineering standards | `standards/` | 24 documents + 8 templates | [`standards/README.md`](standards/README.md) |
 | Operating modes and the role agents | `modes/`, `agents/` | 5 modes, 14 roles | [`modes/README.md`](modes/README.md) |
-| Gate, hook scripts, measurement, install | `scripts/` | 37 scripts, 879 tests | [`scripts/README.md`](scripts/README.md) |
-| Hooks and the `podium` pane (`/podium:panels`) | `hooks/` | 88 tests | [`hooks/README.md`](hooks/README.md) |
+| Gate, hook scripts, measurement, install | `scripts/` | 37 scripts, 884 tests | [`scripts/README.md`](scripts/README.md) |
+| Hooks and the `podium` pane (`/podium:panels`) | `hooks/` | 90 tests | [`hooks/README.md`](hooks/README.md) |
 | Slash commands | `commands/` | `apply-project-standards`, `panels`, `prod-readiness`, `standards-check` | each file |
 | Skills | `skills/` | `board-plan`, `config`, `software-standards`, `test-inventory`, `working-mode` | each `SKILL.md` |
 | The record: motivation, measurements, case studies | `docs/` | 4 case studies | [`docs/README.md`](docs/README.md) |

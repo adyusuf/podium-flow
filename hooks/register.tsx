@@ -273,7 +273,7 @@ const onRender: Hook<'ui.render'> = async ($, e) => {
   const press = (key: string, value: string, scope: Scope = 'session') => click($, key, value, scope)
   const toggle = (id: FoldId) => () => void flip($, id)
   const shut = (id: SectionId) => isFolded(fold, id)
-  const claude = { folded: isFolded(fold, 'claude'), toggle: toggle('claude') }
+  const claude = { folded: isFolded(fold, 'claude'), toggle: toggle('claude'), steps: { folded: isFolded(fold, 'steps'), toggle: toggle('steps') } }
   const pane = paneFor(stages)
   return (
     <Box flexDirection="column">
