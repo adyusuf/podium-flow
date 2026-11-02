@@ -31,7 +31,7 @@ export const ROW_HELP: Record<string, string> = {
   'Mode': 'How many agents work: A none, B three helpers, C the full team with qa review, D wide team, E fan-out.',
   'Model*': 'The model the roles marked * in Agents run on instead of Opus. opus keeps them on Opus.',
   'Replies': 'How much Claude writes: short, normal or long. Red tests and skipped steps are said at every length.',
-  'Steps': 'Every task is split into steps in Status first. block: no code edit or commit until the steps exist. remind: only a reminder.',
+  'Plan': 'Every task is split into steps in Status first. block: no code edit or commit until the steps exist. remind: only a reminder.',
   'Pod': 'Connect to a pod. Stored only; nothing acts on it yet.',
   'Format': 'The pod message format. Stored only; nothing acts on it yet.',
   'Tests': 'Whether Claude writes unit tests and e2e specs for its changes.',
@@ -44,3 +44,9 @@ export const ROW_HELP: Record<string, string> = {
   'Deploy': 'Which environments a pushed update is deployed to.',
   'E2E': 'Run the e2e suite before deploying to that environment.',
 }
+
+/** The `steps` label under Gates: the gate's own steps, ticked per target whose gate is on (user decision 02/11/2026). */
+export const STEPS_HELP = 'The steps of the shared gate, shown for each branch whose gate is on. Untick one to skip it there; your last choice is kept.'
+
+/** Every gate step row's card, after the step's own heading from the gate (gate-lib.sh), so no step is named here. */
+export const STEP_HELP = 'a step of the shared gate. Unticked, it does not run on that branch; the gate reports it as waived and the merge names it in Gate-Waived, never as passed.'

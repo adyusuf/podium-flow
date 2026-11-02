@@ -135,6 +135,89 @@ gate_coverage() {
   else skip "coverage: set COVERAGE_CMD in scripts/merge-gate.conf — the threshold is NOT measured"; fi
 }
 
+# ── The steps the user can untick (user decision 02/11/2026) ─────────────────
+# THE ONE LIST of the gate's steps (rule #2): id|the name the podium Settings pane shows|the heading the gate prints.
+# podium_schema.py reads this block for the pane's rows (gate_steps.<id>.<target>); keep it one step per line, between
+# the quotes. Coverage is not here: it has its own setting (coverage_before_push.<t>, rule #29).
+GATE_STEPS='lint|lint|formatter / linter
+typecheck|types|typecheck
+build|build|build
+unit|unit|unit tests
+secrets|secrets|secret scan
+cve|CVE|dependency CVE
+sast|SAST|SAST
+compat|compat|backward compatibility
+md|md size|CLAUDE.md gates
+documents|docs|project documents (rule #16 — fail closed)
+e2e_specs|e2e|e2e specs — CHECK ONLY, nothing is run here'
+# The ids unticked for $TARGET, read once from the panel's settings in the project. Only an explicit `false` unticks a
+# step; a missing file or key runs it, and an unreadable file runs every step with a warning (fail closed).
+GATE_STEPS_OFF=""; GATE_STEPS_READ=0
+gate_steps_off() {
+  [ "$GATE_STEPS_READ" = 0 ] || return 0
+  GATE_STEPS_READ=1
+  [ -f "$SDLC_SETTINGS_FILE" ] || return 0
+  have python3 || { warn "python3 is missing: $SDLC_SETTINGS_FILE not read - every gate step runs (fail closed)"; return 0; }
+  GATE_STEPS_OFF="$(python3 -c 'import json, sys
+try:
+    steps = json.load(open(sys.argv[1], encoding="utf-8"))["settings"].get("gate_steps", {})
+except (KeyError, TypeError, AttributeError):
+    sys.exit(0)
+except Exception:
+    sys.exit(3)
+print(" ".join(sorted(i for i, t in steps.items() if isinstance(t, dict) and t.get(sys.argv[2]) is False)))' \
+    "$SDLC_SETTINGS_FILE" "$TARGET" 2>/dev/null)" || {
+    GATE_STEPS_OFF=""; warn "$SDLC_SETTINGS_FILE could not be read - every gate step runs (fail closed)"; }
+}
+step_on() { gate_steps_off; case " $GATE_STEPS_OFF " in *" $1 "*) return 1 ;; esac; return 0; }
+# gate_step <id>: print the step's heading; 0 when it runs, 1 when the user unticked it. An unticked step is WAIVED:
+# reported on every run and named in the merge commit's Gate-Waived line, never counted as passed.
+gate_step() {
+  local heading; heading="$(printf '%s\n' "$GATE_STEPS" | awk -F'|' -v id="$1" '$1 == id { print $3 }')"
+  say "${heading:-$1}"
+  step_on "$1" && return 0
+  printf '  \033[33m-\033[0m WAIVED: %s (gate_steps.%s.%s = no in %s)\n' "$1" "$1" "$TARGET" "$SDLC_SETTINGS_FILE"
+  WAIVED+=("$1"); return 1
+}
+
+# The e2e spec check: a WARNING in both directions, it blocks nothing (#33). Moved here from gate-core.sh unchanged, so
+# that file stays under 300 lines (rule #9).
+gate_e2e_specs() {
+  missing=0
+  if [ "$LIST_ONLY" = 1 ]; then
+    printf '  → %-42s %s\n' "e2e spec check" "git diff --name-only <base>..HEAD (no e2e run)"
+    PASS+=("e2e spec check")
+    return 0
+  fi
+  if [ "$HAS_E2E_WEB" = 1 ] || [ "$HAS_E2E_MOBILE" = 1 ]; then
+    base="$(git merge-base HEAD "origin/$TARGET" 2>/dev/null || git rev-parse HEAD~1 2>/dev/null)"
+    changed="$(git diff --name-only "$base"..HEAD 2>/dev/null)"
+    behaviour="$(printf '%s\n' "$changed" | grep -Ev '^(docs/|\.github/|scripts/|e2e/|[^/]+/e2e/|.*\.md$)' | grep -E '\.(cs|ts|tsx|js|jsx|kt|swift)$' || true)"
+    specs_touched="$(printf '%s\n' "$changed" | grep -E '^(e2e/|tests/e2e/|[^/]+/e2e/|.*\.maestro/|.*\.spec\.ts)' || true)"
+    if [ -n "$behaviour" ] && [ -z "$specs_touched" ]; then
+      missing=1
+      warn "behaviour changed in $(printf '%s\n' "$behaviour" | wc -l | tr -d ' ') file(s) but no e2e spec was touched"
+      printf '%s\n' "$behaviour" | head -8 | sed 's/^/      /'
+    else
+      ok "e2e specs: nothing missing for this change"
+    fi
+  else
+    skip "e2e spec check: this project has no e2e suite"
+  fi
+  # A missing spec is a WARNING in both directions and blocks nothing. It used to
+  # fail the dev -> test promotion, which put the whole e2e backlog in front of an
+  # integration merge and stopped work that had nothing to do with e2e. #33 moved
+  # the writing to the pre-prod gate, where a spec can actually be verified
+  # against a deployed test environment — writing it earlier means writing it
+  # blind. The gap is NOT dropped: step 2 of the test -> prod gate writes every
+  # missing spec before the suite runs, and that gate does block. The gate still
+  # SAYS it on every run, so the backlog stays visible rather than silent.
+  # User decision.
+  if [ "$missing" = 1 ] && [ "$TARGET" = "test" ]; then
+    warn "the missing spec(s) above are a reminder only: e2e is optional (#33); dev -> test is not blocked"
+  fi
+}
+
 # ── The verdict ──────────────────────────────────────────────────────────────
 gate_result() {
   printf '\n\033[1m── result ──\033[0m\n'

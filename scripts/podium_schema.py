@@ -3,6 +3,7 @@
 Split out of podium_config.py so no file passes 300 lines (rule #9); podium_config.py re-exports every name here.
 """
 import os
+import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULTS_FILE = os.path.join(ROOT, 'defaults', 'podium.json')
@@ -42,6 +43,22 @@ DEPLOY_ENVS = ('test', 'prod')                    # which environment a push is 
 CI_RUNNERS = ('hosted', 'self-hosted')            # where the shared SDLC workflow runs (self-hosted: this Mac's runners)
 AGENT_STATES = ('auto', 'on', 'off')
 AGENT_MODELS = ('default', 'opus', 'sonnet', 'haiku', 'fable')
+GATE_LIB = os.path.join(ROOT, 'scripts', 'gate-lib.sh')
+
+
+def gate_steps(path=GATE_LIB):
+    """[(id, name, heading)] of the gate's steps, read from GATE_STEPS in gate-lib.sh: the one list of them (rule #2;
+    user decision 02/11/2026). An unreadable file gives none, so the pane shows no step rows rather than a guessed list."""
+    try:
+        with open(path, encoding='utf-8') as handle:
+            found = re.search(r"^GATE_STEPS='(.*?)'", handle.read(), re.S | re.M)
+    except OSError:
+        return []
+    rows = [line.split('|') for line in found.group(1).splitlines()] if found else []
+    return [tuple(part.strip() for part in row) for row in rows if len(row) == 3 and re.fullmatch(r'[a-z0-9_]+', row[0].strip())]
+
+
+GATE_STEPS = tuple(gate_steps())
 
 
 # The one definition of what can be set: order is the display order. `group` titles the sections of `show`.
@@ -59,6 +76,10 @@ SCHEMA = (
     + [dict(_bool('gates_before_push.' + t, 'Run gates before pushing %s' % t), group='Gates before a push') for t in TARGETS]
     + [dict(_bool('coverage_before_push.' + t, 'Run coverage before pushing %s' % t), group='Coverage before a push')
        for t in TARGETS]
+    # One tick per step of the gate and target; each defaults to on here, not in defaults/podium.json, so the step list
+    # is written only in gate-lib.sh. `step` and `heading` are what the pane shows and its hover card says.
+    + [dict(_bool('gate_steps.%s.%s' % (step, t), 'Gate step %s on %s' % (name, t)), group='Gate steps', step=name,
+            heading=heading, default=True) for step, name, heading in GATE_STEPS for t in TARGETS]
     + [dict(_bool('ci_after_push.' + t, 'Run CI after pushing %s' % t), group='CI after push') for t in TARGETS]
     + [dict(_bool('deploy_after_push.' + env, 'After pushing update, deploy to ' + env), group='Deploy after push') for env in DEPLOY_ENVS]
     + [dict(_enum('ci.runner', 'CI runner', CI_RUNNERS), group='CI after push')]
@@ -67,6 +88,12 @@ SCHEMA = (
     + [dict(_enum('agents.%s.%s' % (role, field), '%s: %s' % (role, field), options), group='Agents')
        for role in D_ROLES for field, options in (('enabled', AGENT_STATES), ('model', AGENT_MODELS))])
 SPECS = {spec['key']: spec for spec in SCHEMA}
+
+
+def gate_steps_off(values, target):
+    """The ids of the gate's steps unticked for `target` (a value other than False runs the step): the gate prints the
+    id, so the Gate-Waived line names the same word (qa 02/11/2026)."""
+    return [step for step, _, _ in GATE_STEPS if values.get('gate_steps.%s.%s' % (step, target)) is False]
 
 
 def front_matter(role, field, missing):

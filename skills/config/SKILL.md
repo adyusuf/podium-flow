@@ -29,6 +29,7 @@ The tool is `${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py` (`python3`):
 | "don't push prod" / "push prod: no" | `set push.prod no` |
 | "run the gates before pushing dev" | `set gates_before_push.dev yes` |
 | "run coverage before pushing dev" | `set coverage_before_push.dev yes` |
+| "skip SAST in the test gate" | `set gate_steps.sast.test no` |
 | "wait for CI after pushing prod" | `set ci_after_push.prod yes` |
 | "run e2e on dev before deploying test" | `set e2e_before_deploy.test yes` |
 | "mode D, haiku" | `set mode D` and `set mode_model haiku` |
@@ -64,6 +65,7 @@ went to. Never edit the JSON files by hand when the tool can do it.
 | `push.dev` `push.test` `push.prod` | yes/no | Push that branch after its merge. |
 | `gates_before_push.<t>` | yes/no | Run the gates (unit tests, coverage, secret scan, SAST: `scripts/merge-gate.sh`) on the merged result before pushing `<t>` (defaults: dev no, test yes, prod yes). Not run = recorded as `Gate-Waived: gates` on the merge commit (#34); coverage then runs alone (`gate-core.sh <t> --coverage-only`) if `coverage_before_push.<t>` is yes. |
 | `coverage_before_push.<t>` | yes/no | "Run coverage before pushing": measure line coverage (≥ 80% per codebase, #29) before pushing `<t>` (defaults: dev no, test yes, prod yes). The gate reads it from the project's `.claude/sdlc-settings.json`; no = the step prints WAIVED and the merge commit carries `Gate-Waived: coverage`. A project keeps no coverage switch of its own. |
+| `gate_steps.<id>.<t>` | yes/no | One per step of the shared gate (`gate-core.sh <t> --list`; ids in `GATE_STEPS` of `scripts/gate-lib.sh`) and target, default yes. No = the step does not run where the gate does, prints WAIVED and is named in the merge commit's `Gate-Waived:` line. Shown under *Gates* only while that target's gate is on. |
 | `ci_after_push.<t>` | yes/no | After pushing `<t>`, wait for the project's CI to be green on the pushed commit; red stops the later targets (defaults: dev no, test yes, prod yes). Not waited for = `Gate-Waived: ci` on the merge commit. A project with no CI reports "no CI". |
 | `e2e_before_deploy.<t>` (`test`, `prod`) | yes/no | Before `<t>` is deployed, run the e2e suite on the environment below it (`test`: on dev, `prod`: on test); red blocks the promotion (defaults: both no). Applies only where the project has an e2e suite and that environment; otherwise the report says so. |
 
