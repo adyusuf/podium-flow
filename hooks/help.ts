@@ -37,7 +37,7 @@ export const ROW_HELP: Record<string, string> = {
   'Tests': 'Whether Claude writes unit tests and e2e specs for its changes.',
   'Merge': 'Which branches Claude merges finished work into, without asking.',
   'Push': 'Which branches Claude pushes after merging, without asking.',
-  'Gates': 'Run the shared gate (lint, build, tests, scans) before pushing to that branch. Off is recorded as Gate-Waived.',
+  'Gates': 'Run the shared gate (lint, build, tests, scans) before pushing to that branch. Off is recorded as Gate-Waived. The arrow opens its steps.',
   'Coverage': 'Measure line coverage (80% per codebase) before pushing to that branch.',
   'CI': 'Wait for CI to pass after pushing to that branch.',
   'Runner': 'Where CI runs: cloud (GitHub runners) or local (this machine).',
@@ -45,8 +45,8 @@ export const ROW_HELP: Record<string, string> = {
   'E2E': 'Run the e2e suite before deploying to that environment.',
 }
 
-/** The `steps` label under Gates: the gate's own steps, ticked per target whose gate is on (user decision 02/11/2026). */
-export const STEPS_HELP = 'The steps of the shared gate, shown for each branch whose gate is on. Untick one to skip it there; your last choice is kept.'
-
 /** Every gate step row's card, after the step's own heading from the gate (gate-lib.sh), so no step is named here. */
 export const STEP_HELP = 'a step of the shared gate. Unticked, it does not run on that branch; the gate reports it as waived and the merge names it in Gate-Waived, never as passed.'
+
+/** A locked step's card (the secret scan and SAST), after its heading: why its tick cannot be changed. */
+export const LOCKED_STEP_HELP = 'always on. Rule #19: security scans are never switched off, so this tick cannot be removed and the gate runs it even if a settings file says no.'

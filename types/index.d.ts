@@ -1,6 +1,7 @@
-/** `step`, `heading`, `default`: a gate step's name in the pane, its heading in the gate, its default (additive, 02/11/2026). */
+/** `step`, `heading`, `default`, `locked`: a gate step's name in the pane, its heading in the gate, its default, and whether it
+ * can never be unticked (additive, 02/11/2026). */
 export type Spec = {
-  key: string; type: 'bool' | 'enum'; label: string; group: string; options?: string[]; step?: string; heading?: string; default?: boolean
+  key: string; type: 'bool' | 'enum'; label: string; group: string; options?: string[]; step?: string; heading?: string; default?: boolean; locked?: boolean
 }
 export type AgentRow = {
   role: string

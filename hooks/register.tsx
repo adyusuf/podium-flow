@@ -1,7 +1,7 @@
 import type { EngineInterface, Hook, Register } from 'claude-code'
 import type { AgentRow, Promotion, Settings, Stage } from '../types'
 import {
-  agentsBody, FOLDED_AT_START, isFolded, nextFold, outsideRepository, paneFor, promotionBody, section, settingsBody,
+  agentsBody, FOLDED_AT_START, isFolded, nextFold, outsideRepository, paneFor, promotionBody, section, settingsBody, settingsFolds,
   type FoldId, type Scope, type SectionId,
 } from './boxes'
 import {
@@ -273,7 +273,7 @@ const onRender: Hook<'ui.render'> = async ($, e) => {
   const press = (key: string, value: string, scope: Scope = 'session') => click($, key, value, scope)
   const toggle = (id: FoldId) => () => void flip($, id)
   const shut = (id: SectionId) => isFolded(fold, id)
-  const claude = { folded: isFolded(fold, 'claude'), toggle: toggle('claude') }
+  const claude = settingsFolds(fold, toggle)
   const pane = paneFor(stages)
   return (
     <Box flexDirection="column">
