@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import podium_session as sessions  # noqa: E402
 from podium_schema import (  # noqa: E402,F401
     AGENTS_DIR, AGENT_MODELS, AGENT_STATES, B_ROLES, CI_RUNNERS, C_ROLES,
-    DEFAULTS_FILE, DEPLOY_ENVS, D_ROLES, E2E_STAGES, GATE_STEPS, MODELS, MODES,
+    DEFAULTS_FILE, DEPLOY_ENVS, D_ROLES, E2E_STAGES, GATE_STEPS, LOCKED_STEPS, MODELS, MODES,
     MODE_ROLES, POD_FORMATS, REPLY_LENGTHS, RETIRED_KEYS, ROOT, SCHEMA,
     SPECS, TARGETS, agents, defined_model, effective_model, front_matter, gate_steps_off)
 from podium_layers import (  # noqa: E402,F401

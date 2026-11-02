@@ -9,7 +9,7 @@
 // as a native button and drops a Text's underline inside it); a box's body and a block's lines start one step in.
 import { enabledFor, settingGroups } from './choose'
 import { helpCard, hoverable, INDENT, label, line, option, WARN } from './controls'
-import { GATE_STEP_PREFIX, stepLines, stepsWidth } from './gatesteps'
+import { GATE_STEP_PREFIX, stepLines, stepsArrow, stepsWidth, type StepsFold } from './gatesteps'
 import { COLUMN_HELP, ROW_HELP, SECTION_HELP } from './help'
 import type { Ui } from './controls'
 
@@ -19,7 +19,7 @@ export type { Factory, Ui } from './controls'
 export type Scope = 'session' | 'saved'
 export type Press = (key: string, value: string, scope?: Scope) => void
 
-type Spec = { key: string; type: 'bool' | 'enum'; label: string; group: string; options?: string[]; step?: string; heading?: string }
+type Spec = { key: string; type: 'bool' | 'enum'; label: string; group: string; options?: string[]; step?: string; heading?: string; locked?: boolean }
 type AgentRow = {
   role: string; defined: string; runs_on: string; default_model?: string; active: boolean; in_mode: boolean; enabled: string; model: string
   description?: string
@@ -48,19 +48,24 @@ export const outsideRepository = (repo: unknown) => repo === null
 const NO_CODE_ROWS = ['Replies']
 
 /**
- * What starts folded, so the pane opens as a short card and not as one long list: two boxes, and `claude`, which keeps
- * the Settings tab (folded = Session, the tab at start; the saved defaults are under System, opened when wanted).
+ * What starts folded, so the pane opens as a short card and not as one long list: two boxes, `claude`, which keeps
+ * the Settings tab (folded = Session, the tab at start; the saved defaults are under System, opened when wanted), and
+ * `steps`, the gate's steps under Gates (user decision 02/11/2026: an accordion, closed at start).
  */
-export const FOLDED_AT_START: Record<string, boolean> = { agents: true, promotion: true, claude: true }
-/** What can fold: a box, or `claude`, the Settings tab (folded = Session; the id is kept from the column it replaced). */
-export type FoldId = SectionId | 'claude'
+export const FOLDED_AT_START: Record<string, boolean> = { agents: true, promotion: true, claude: true, steps: true }
+/** What can fold: a box, `claude` (the Settings tab; the id is kept from the column it replaced) or `steps`. */
+export type FoldId = SectionId | 'claude' | 'steps'
 
 /** Whether `id` is folded; a state saved before `id` could fold falls back to how it starts. */
 export const isFolded = (fold: Record<string, boolean>, id: FoldId) => fold[id] ?? FOLDED_AT_START[id] ?? false
 /** The fold state after a press on `id`'s header: what it reads as now, turned over. */
 export const nextFold = (fold: Record<string, boolean>, id: FoldId) => ({ ...fold, [id]: !isFolded(fold, id) })
-/** The Settings tab: `folded` (the fold id `claude`, folded at start) means the Session tab; `toggle` switches tabs. */
-export type ColumnFold = { folded: boolean; toggle: () => void }
+/** The Settings tab: `folded` (the fold id `claude`, folded at start) means the Session tab; `toggle` switches tabs. It
+ * also carries the gate steps' accordion (`steps`), so the engine glue hands the box one fold object. */
+export type ColumnFold = { folded: boolean; toggle: () => void; steps?: StepsFold }
+/** That fold object, from the pane's fold state and its toggles. */
+export const settingsFolds = (fold: Record<string, boolean>, toggle: (id: FoldId) => () => void): ColumnFold =>
+  ({ folded: isFolded(fold, 'claude'), toggle: toggle('claude'), steps: { folded: isFolded(fold, 'steps'), toggle: toggle('steps') } })
 
 /** The radio group of an agent's model. */
 const AGENT_MODELS = ['opus', 'sonnet', 'haiku', 'fable']
@@ -140,11 +145,11 @@ function checks(ui: Ui, scope: Scope, items: Item[], values: Layer['values'], pr
  */
 type SettingLine = {
   label: string; names: string[]; draw: (scope: Scope, layer: Layer) => unknown[]
-  id?: string; indent?: number; help?: string; shown?: (layer: Layer) => boolean
+  id?: string; indent?: number; help?: string; shown?: (layer: Layer) => boolean; after?: (layer: Layer) => unknown
 }
 
 /** The rows of the settings table, in order. */
-function settingLines(ui: Ui, schema: Spec[], press: Press): SettingLine[] {
+function settingLines(ui: Ui, schema: Spec[], press: Press, steps: StepsFold): SettingLine[] {
   const { shown } = settingGroups(schema)
   const has = new Set(shown.map(spec => spec.key))
   const covered = new Set<string>()
@@ -157,12 +162,13 @@ function settingLines(ui: Ui, schema: Spec[], press: Press): SettingLine[] {
     if ('items' in row) {
       const items = row.items.filter(item => has.has(item.key))
       items.forEach(item => covered.add(item.key))
+      // The gate's steps sit right under Gates, behind an arrow beside its label (user decisions 02/11/2026).
+      const after = row.label === 'Gates' ? (layer: Layer) => stepsArrow(ui, shown, layer.values, steps) : undefined
       if (items.length > 0) {
-        lines.push({ label: row.label, names: items.map(item => item.name), draw: (scope, layer) => checks(ui, scope, items, layer.values, press) })
+        lines.push({ label: row.label, names: items.map(item => item.name), draw: (scope, layer) => checks(ui, scope, items, layer.values, press), after })
       }
-      // The gate's steps sit right under Gates, indented (user decision 02/11/2026).
       if (row.label === 'Gates') {
-        lines.push(...stepLines(ui, shown, press).map((one): SettingLine =>
+        lines.push(...stepLines(ui, shown, press, steps).map((one): SettingLine =>
           ({ ...one, draw: (scope, layer) => one.draw(scope, layer.values), shown: layer => one.shown(layer.values) })))
       }
       continue
@@ -211,7 +217,7 @@ function table(ui: Ui, data: SettingsData, press: Press, tabs: ColumnFold, codeW
   const head = headWidth(data)
   const system = data.saved !== undefined && !tabs.folded
   const [scope, layer]: [Scope, Layer] = system && data.saved ? ['saved', data.saved] : ['session', data]
-  const lines = settingLines(ui, data.schema, press)
+  const lines = settingLines(ui, data.schema, press, tabs.steps ?? { folded: true, toggle: () => undefined })
     .filter(one => (codeWork || NO_CODE_ROWS.includes(one.label)) && (one.shown?.(layer) ?? true))
   // A tab is drawn as every other choice of the pane: a radio icon on the desktop, brackets in the terminal.
   const tab = (name: 'Session' | 'System', chosen: boolean) => hoverable(ui, `column-${name}`,
@@ -222,7 +228,8 @@ function table(ui: Ui, data: SettingsData, press: Press, tabs: ColumnFold, codeW
     helpCard(ui, 'column-Session', COLUMN_HELP.Session),
     data.saved ? helpCard(ui, 'column-System', COLUMN_HELP.System) : null,
     lines.flatMap(one => [
-      line(ui, hoverable(ui, `row-${one.id ?? one.label}`, label(ui, one.label, one.indent)), [one.draw(scope, layer)], head),
+      line(ui, h(ui.Box, { flexDirection: 'row', columnGap: 1 }, hoverable(ui, `row-${one.id ?? one.label}`, label(ui, one.label, one.indent)),
+        one.after?.(layer) ?? null), [one.draw(scope, layer)], head),
       helpCard(ui, `row-${one.id ?? one.label}`, one.help ?? ROW_HELP[one.label])]))
 }
 
