@@ -53,11 +53,11 @@ const NO_CODE_ROWS = ['Replies']
  * `steps`, the gate's steps under Gates (user decision 02/11/2026: an accordion, closed at start).
  */
 export const FOLDED_AT_START: Record<string, boolean> = { agents: true, promotion: true, claude: true, steps: true }
-/** What can fold: a box, `claude` (the Settings tab; the id is kept from the column it replaced) or `steps`. */
-export type FoldId = SectionId | 'claude' | 'steps'
+/** What can fold: a box, `claude` (the Settings tab), `steps`, or a Status agent (`agent:<name>` and its `:todo`, `:done`). */
+export type FoldId = SectionId | 'claude' | 'steps' | `agent:${string}`
 
 /** Whether `id` is folded; a state saved before `id` could fold falls back to how it starts. */
-export const isFolded = (fold: Record<string, boolean>, id: FoldId) => fold[id] ?? FOLDED_AT_START[id] ?? false
+export const isFolded = (fold: Record<string, boolean>, id: FoldId) => fold[id] ?? FOLDED_AT_START[id] ?? id.endsWith(':done')
 /** The fold state after a press on `id`'s header: what it reads as now, turned over. */
 export const nextFold = (fold: Record<string, boolean>, id: FoldId) => ({ ...fold, [id]: !isFolded(fold, id) })
 /** The Settings tab: `folded` (the fold id `claude`, folded at start) means the Session tab; `toggle` switches tabs. It

@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { donePercent, groupState, noteOf, parseStatus, splitState, statusBody, stepGroups, statusDir, statusScript, statusStep } from './status'
+import { donePercent, groupState, noteOf, parseStatus, splitSteps, splitState, statusBody, stepGroups, statusDir, statusScript, statusStep } from './status'
 
 // A recording factory: an element is { type, props, children }, so the tests read what the box would draw.
 type Node = { type: unknown; props: Record<string, any>; children: unknown[] }
@@ -16,6 +16,8 @@ function all(node: unknown, type: string): Node[] {
   const here = one.type === type ? [one] : []
   return here.concat(...flat(one.children).map(child => all(child, type)))
 }
+// The Texts of the box without its hover cards (the cards repeat a label's text).
+const shown = (node: unknown) => all(node, 'Text').filter(text => text.props.color !== 'inverseText')
 function words(node: unknown): string {
   if (typeof node === 'string') return node
   if (typeof node !== 'object' || node === null) return ''
@@ -41,28 +43,38 @@ test('the status file is read as text: only strings are kept, anything else is n
   expect(parseStatus(JSON.stringify({ rows: [{ item: 'a', percent: '45' }, { item: 'b', percent: '45%' }, { item: 'c', percent: 7 }] }))!.rows.map(row => row.percent)).toEqual(['45', '', ''])
 })
 
-test('the body shows now and next, then step · state · % · note, a short state, -> blocker under the step', () => {
-  const lines = (body: unknown) => all(body, 'Box').filter(node => node.props.flexDirection === 'row' && !node.props.marginLeft)
-    .map(node => all(node, 'Text').map(words).join(' | '))
-  const body = statusBody(ui, parseStatus(FILE))
+test('the body shows now and next, then the agent, its To do branch and step · state · % · note, -> blocker under the step', () => {
+  const texts = (body: unknown) => shown(body).map(words)
   // An older row: its state has no short word, so the whole state goes to the note with the measured figure.
-  expect(lines(body)).toEqual(['Now | prod gate', 'Next | plugin update', 'Step | State | % | Note',
-    'dev |  |  | pushed · 4a45bda (promote.log)', 'prod |  |  | gate running · coverage step (gate-prod.log)'])
-  expect(all(body, 'Box').filter(node => node.props.marginLeft === 2).map(words)).toEqual(['-> promote.sh'])
+  expect(texts(statusBody(ui, parseStatus(FILE)))).toEqual(['Now', 'prod gate', 'Next', 'plugin update', 'Step', 'State', '%', 'Note',
+    'this session', 'todo', 'To do', '(2)', 'dev', '', '', 'pushed · 4a45bda (promote.log)', 'prod', '', '', 'gate running · coverage step (gate-prod.log)', '-> promote.sh'])
   const steps = statusBody(ui, parseStatus(JSON.stringify({ rows: [
     { item: '1. data', state: 'done', percent: '100' },
     { item: '2. pane', state: 'running: 3 of 8 files', percent: '40', blocker: 'qa review', note: 'tabs first' }] })))
-  expect(lines(steps).slice(1)).toEqual(['1. data | done | 100% | ', '2. pane | run | 40% | 3 of 8 files · tabs first'])
-  expect(all(steps, 'Text').filter(node => node.props.bold).map(words)).toEqual(['Step', 'State', '%', 'Note', '2. pane', 'run', '40%', '3 of 8 files · tabs first'])
-  expect(all(steps, 'Box').filter(node => node.props.marginLeft === 2).map(words)).toEqual(['-> qa review'])
+  // The running step is in To do, the finished one in Completed (closed at start, so its row is not drawn).
+  expect(texts(steps)).toEqual(['Step', 'State', '%', 'Note', 'this session', 'run · 70%', 'To do', '(1)', '2. pane', 'run', '40%',
+    '3 of 8 files · tabs first', '-> qa review', 'Completed', '(1)'])
+  expect(shown(steps).filter(node => node.props.bold).map(words)).toEqual(['Step', 'State', '%', 'Note', 'this session', 'To do', '2. pane', 'run', '40%',
+    '3 of 8 files · tabs first', 'Completed'])
+  expect(all(steps, 'Box').filter(node => node.props.marginLeft === 2).map(words)).toContain('-> qa review')
 })
 
-test('the columns have one width on every row, capped so a long text wraps inside its column; the note column takes the rest', () => {
+test('the columns have one width on every row, capped so a long text is cut inside its column; the note is one line that does not wrap', () => {
   const long = 'x'.repeat(80)
-  const body = statusBody(ui, parseStatus(JSON.stringify({ rows: [{ item: long, state: 'done', percent: '100', note: 'n' }] })))
-  const rows = all(body, 'Box').filter(node => node.props.flexDirection === 'row')
-  const widths = rows.map(row => flat(row.children).map(cell => (cell as Node).props.width))
-  expect(widths).toEqual([[37, 6, 5, undefined], [37, 6, 5, undefined]])
+  const body = statusBody(ui, parseStatus(JSON.stringify({ rows: [{ item: long, state: 'done', percent: '100', note: 'n' }, { item: 'a', state: 'running', note: 'n'.repeat(90) }] })))
+  const rows = all(body, 'Box').filter(node => node.props.flexDirection === 'row' && flat(node.children).some(cell => (cell as Node).props?.width !== undefined))
+  expect(rows.map(row => flat(row.children).map(cell => (cell as Node).props.width))).toEqual([[37, 6, 5, undefined], [37, 6, 5, undefined]])
+  // The last cell of a step row takes the rest of the line; its text is cut at the edge, never continued on a second line.
+  const last = (row: Node) => flat(row.children).at(-1) as Node
+  expect(rows.map(row => [last(row).props.flexGrow, last(row).props.overflow])).toEqual([[1, 'hidden'], [1, 'hidden']])
+  expect(shown(body).filter(node => words(node).startsWith('nnn')).map(node => node.props.wrap)).toEqual(['truncate-end'])
+})
+
+test('a note is shown whole in a card while the pointer is on its row; a row with no note has no card', () => {
+  const body = statusBody(ui, parseStatus(JSON.stringify({ rows: [{ item: 'a', state: 'running', note: 'the whole note' }, { item: 'b', state: 'running' }] })))
+  const cards = all(body, 'Box').filter(node => node.props.hover?.display === 'flex' && String(node.props.hover.scope).includes('note-'))
+  expect(cards.map(words)).toEqual(['the whole note'])
+  expect(all(body, 'Box').filter(node => node.props.hover?.scope === cards[0]!.props.hover.scope && node.props.display !== 'none').length).toBe(1)
 })
 
 test('an empty table, or none, says nothing running', () => {
@@ -112,7 +124,7 @@ test('the status script sits beside the configuration script the pane found; non
   expect(statusScript('/elsewhere/other.py')).toBe('')
 })
 
-test('steps group by who runs them, this session first; each group opens with a divider and a bold row with its state and %', () => {
+test('steps group by who runs them, this session first; each group is an accordion with its state and %', () => {
   const data = parseStatus(JSON.stringify({ rows: [
     { item: '1. plan', state: 'done', percent: '100' }, { item: 'review', state: 'running', percent: '50', agent: 'qa a9f3c2' },
     { item: '2. build', state: 'running', percent: '20' }, { item: 'scan', state: 'not started', percent: '0', agent: 'qa a9f3c2' }] }))!
@@ -124,15 +136,29 @@ test('steps group by who runs them, this session first; each group opens with a 
   expect(donePercent(half.rows.slice(0, 2))).toBe('63%')
   expect(stepGroups(half.rows).map(group => group.agent)).toEqual(['', 'qa x'])
   const body = statusBody(ui, data)
-  const groupRows = all(body, 'Box').filter(node => node.props.flexDirection === 'row')
-    .map(node => all(node, 'Text')).filter(texts => texts.length === 4 && texts.every(text => text.props.bold) && words(texts[0]) !== 'Step')
-    .map(texts => texts.map(words).join(' | '))
-  expect(groupRows.filter(row => row.startsWith('this session') || row.startsWith('qa a9f3c2 |'))).toEqual(['this session | run | 60% | ', 'qa a9f3c2 | run | 25% | '])
-  expect(all(body, 'Box').filter(node => node.props.borderTop === true && node.props.borderBottom === false).length).toBe(2)
-  // With this session's steps alone, no group row and no divider.
-  const alone = statusBody(ui, parseStatus(JSON.stringify({ rows: [{ item: '1. plan', state: 'done', percent: '100' }] })))
-  expect(all(alone, 'Text').some(node => words(node) === 'this session')).toBe(false)
-  expect(all(alone, 'Box').some(node => node.props.borderTop === true)).toBe(false)
+  const names = shown(body).filter(node => node.props.bold).map(words)
+  expect(names).toEqual(['Step', 'State', '%', 'Note', 'this session', 'To do', '2. build', 'run', '20%', '', 'Completed', 'qa a9f3c2', 'To do', 'review', 'run', '50%', ''])
+  expect(shown(body).map(words).filter(text => text.includes(' · '))).toEqual(['run · 60%', 'run · 25%'])
+  // Agents and To do open, Completed closed at start; a subagent with nothing over has no Completed branch.
+  expect(all(body, 'Button').map(words)).toEqual(['▾', '▾', '▸', '▾', '▾'])
+  expect(shown(body).map(words)).not.toContain('1. plan')
+})
+
+test('an agent and its branches fold: every id is its own, Completed starts closed, a closed agent hides its branches', () => {
+  const data = parseStatus(JSON.stringify({ rows: [{ item: '1. plan', state: 'done', percent: '100' }, { item: '2. build', state: 'running', percent: '20' }] }))!
+  const pressed: string[] = []
+  const folds = (open: string[]) => ({ folded: (id: string) => !open.includes(id), toggle: (id: string) => () => void pressed.push(id) })
+  const texts = (body: unknown) => shown(body).map(words)
+  const all3 = statusBody(ui, data, folds(['agent:this session', 'agent:this session:todo', 'agent:this session:done']))
+  expect(texts(all3)).toContain('1. plan')
+  expect(texts(all3)).toContain('2. build')
+  all(all3, 'Button').forEach(button => (button.props.onPress as () => void)())
+  expect(pressed).toEqual(['agent:this session', 'agent:this session:todo', 'agent:this session:done'])
+  const shut = statusBody(ui, data, folds([]))
+  expect(texts(shut).filter(text => ['To do', 'Completed', '2. build'].includes(text))).toEqual([])
+  expect(all(shut, 'Button').map(words)).toEqual(['▸'])
+  expect(splitSteps(data.rows).todo.map(row => row.item)).toEqual(['2. build'])
+  expect(splitSteps(data.rows).done.map(row => row.item)).toEqual(['1. plan'])
 })
 
 test('a state is a short word and its detail; a group runs while a step runs, is stuck while one is blocked, else done or todo', () => {
