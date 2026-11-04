@@ -16,14 +16,10 @@ export const COLUMN_HELP: Record<string, string> = {
   System: 'This tab: your saved defaults (~/.claude/podium.json), under any project file. New sessions start from them.',
 }
 
-/** The labels of the Status box: what runs now and next, and the headings of its table. */
+/** The labels of the Status box: what runs now and next. */
 export const STATUS_HELP: Record<string, string> = {
   'Now': 'The step running right now.',
   'Next': 'The step that comes after it.',
-  'Step': 'One step of the work, in order; a running step is bold. A request that arrives mid-work goes in as new steps.',
-  'State': 'Where the step stands: todo, run, done, stuck or skip. Under a step, -> what blocks it.',
-  '%': 'How much of the step is done; on a group row, how much of the group is.',
-  'Note': 'Everything else about the step: the detail of its state, its note, an older row\'s measured figure.',
 }
 
 /** The Settings rows, by the label the pane shows. */

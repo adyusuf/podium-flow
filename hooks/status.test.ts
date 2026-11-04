@@ -43,18 +43,18 @@ test('the status file is read as text: only strings are kept, anything else is n
   expect(parseStatus(JSON.stringify({ rows: [{ item: 'a', percent: '45' }, { item: 'b', percent: '45%' }, { item: 'c', percent: 7 }] }))!.rows.map(row => row.percent)).toEqual(['45', '', ''])
 })
 
-test('the body shows now and next, then the agent, its To do branch and step · state · % · note, -> blocker under the step', () => {
+test('the body shows now and next, then the agent, its To do branch and step · state · % · note (no heading row), -> blocker under the step', () => {
   const texts = (body: unknown) => shown(body).map(words)
   // An older row: its state has no short word, so the whole state goes to the note with the measured figure.
-  expect(texts(statusBody(ui, parseStatus(FILE)))).toEqual(['Now', 'prod gate', 'Next', 'plugin update', 'Step', 'State', '%', 'Note',
+  expect(texts(statusBody(ui, parseStatus(FILE)))).toEqual(['Now', 'prod gate', 'Next', 'plugin update',
     'this session', 'todo', 'To do', '(2)', 'dev', '', '', 'pushed · 4a45bda (promote.log)', 'prod', '', '', 'gate running · coverage step (gate-prod.log)', '-> promote.sh'])
   const steps = statusBody(ui, parseStatus(JSON.stringify({ rows: [
     { item: '1. data', state: 'done', percent: '100' },
     { item: '2. pane', state: 'running: 3 of 8 files', percent: '40', blocker: 'qa review', note: 'tabs first' }] })))
   // The running step is in To do, the finished one in Completed (closed at start, so its row is not drawn).
-  expect(texts(steps)).toEqual(['Step', 'State', '%', 'Note', 'this session', 'run · 70%', 'To do', '(1)', '2. pane', 'run', '40%',
+  expect(texts(steps)).toEqual(['this session', 'run · 70%', 'To do', '(1)', '2. pane', 'run', '40%',
     '3 of 8 files · tabs first', '-> qa review', 'Completed', '(1)'])
-  expect(shown(steps).filter(node => node.props.bold).map(words)).toEqual(['Step', 'State', '%', 'Note', 'this session', 'To do', '2. pane', 'run', '40%',
+  expect(shown(steps).filter(node => node.props.bold).map(words)).toEqual(['this session', 'To do', '2. pane', 'run', '40%',
     '3 of 8 files · tabs first', 'Completed'])
   expect(all(steps, 'Box').filter(node => node.props.marginLeft === 2).map(words)).toContain('-> qa review')
 })
@@ -63,10 +63,13 @@ test('the columns have one width on every row, capped so a long text is cut insi
   const long = 'x'.repeat(80)
   const body = statusBody(ui, parseStatus(JSON.stringify({ rows: [{ item: long, state: 'done', percent: '100', note: 'n' }, { item: 'a', state: 'running', note: 'n'.repeat(90) }] })))
   const rows = all(body, 'Box').filter(node => node.props.flexDirection === 'row' && flat(node.children).some(cell => (cell as Node).props?.width !== undefined))
-  expect(rows.map(row => flat(row.children).map(cell => (cell as Node).props.width))).toEqual([[37, 6, 5, undefined], [37, 6, 5, undefined]])
+  expect(rows.map(row => flat(row.children).map(cell => (cell as Node).props.width))).toEqual([[25, 5, 5, undefined]])
   // The last cell of a step row takes the rest of the line; its text is cut at the edge, never continued on a second line.
   const last = (row: Node) => flat(row.children).at(-1) as Node
-  expect(rows.map(row => [last(row).props.flexGrow, last(row).props.overflow])).toEqual([[1, 'hidden'], [1, 'hidden']])
+  expect(rows.map(row => [last(row).props.flexGrow, last(row).props.overflow])).toEqual([[1, 'hidden']])
+  // The step name is the narrow column and wraps inside it (no `wrap` prop: the default continues it on the next row); there is no heading row.
+  expect(shown(body).filter(node => words(node) === 'a').map(node => node.props.wrap)).toEqual([undefined])
+  expect(shown(body).map(words)).not.toContain('Step')
   expect(shown(body).filter(node => words(node).startsWith('nnn')).map(node => node.props.wrap)).toEqual(['truncate-end'])
 })
 
@@ -137,7 +140,7 @@ test('steps group by who runs them, this session first; each group is an accordi
   expect(stepGroups(half.rows).map(group => group.agent)).toEqual(['', 'qa x'])
   const body = statusBody(ui, data)
   const names = shown(body).filter(node => node.props.bold).map(words)
-  expect(names).toEqual(['Step', 'State', '%', 'Note', 'this session', 'To do', '2. build', 'run', '20%', '', 'Completed', 'qa a9f3c2', 'To do', 'review', 'run', '50%', ''])
+  expect(names).toEqual(['this session', 'To do', '2. build', 'run', '20%', '', 'Completed', 'qa a9f3c2', 'To do', 'review', 'run', '50%', ''])
   expect(shown(body).map(words).filter(text => text.includes(' · '))).toEqual(['run · 60%', 'run · 25%'])
   // Agents and To do open, Completed closed at start; a subagent with nothing over has no Completed branch.
   expect(all(body, 'Button').map(words)).toEqual(['▾', '▾', '▸', '▾', '▾'])

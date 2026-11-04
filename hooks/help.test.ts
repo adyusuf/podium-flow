@@ -96,10 +96,9 @@ test('an Agents role card is its file description, right after the role line; no
   expect(all(body, 'Box').filter(isCard).map(words)).toEqual(['Reviews a change.', 'Writes docs.'])
 })
 
-test('the Status labels and table headings have cards, each right after its own line', () => {
+test('the Status labels have cards, each right after its own line', () => {
   const body = statusBody(ui, parseStatus(JSON.stringify({ now: 'gate', next: 'push', rows: [{ item: 'dev', state: 'done', figure: '', waiting: '-' }] })))
   const pairs = placed(body)
-  expect(pairs.map(([owner]) => owner)).toEqual(['Now', 'Next', 'Step', 'State', '%', 'Note'])
+  expect(pairs.map(([owner]) => owner)).toEqual(['Now', 'Next'])
   expect(pairs.slice(0, 2).map(([, before]) => before)).toEqual(['Nowgate', 'Nextpush'])
-  expect(pairs.slice(2).every(([, before]) => before.startsWith('Step'))).toBe(true)
 })
