@@ -1,8 +1,8 @@
 // What the Status box of the podium pane shows: this session's status table (user decision 01/11/2026), the same table
 // `standards/00-working-method.md` §10 asks for in a reply during a long run. Engine-free like boxes.ts, so a test hands in
 // a recording factory. The file is written by scripts/podium_status.py; register.tsx reads it and hands its text here.
-import type { Ui } from './boxes'
-import { helpCard, hoverable } from './controls'
+import type { FoldId, Ui } from './boxes'
+import { helpCard, hoverable, INDENT } from './controls'
 import { STATUS_HELP } from './help'
 
 /** A step (user decision 02/11/2026): `percent` done ('' when not given), `blocker`, and `agent` ('' = this session). */
@@ -129,13 +129,27 @@ export function noteOf(row: StatusRow): string {
   return [splitState(row.state).detail, row.note, figure].filter(text => !PLACEHOLDERS.includes(text)).join(' · ')
 }
 
+/** The folds of the Status box's accordions: one per agent, and its To do and Completed branches under it. */
+export type AgentFolds = { folded: (id: FoldId) => boolean; toggle: (id: FoldId) => () => void }
+/** A box with no fold state of its own: every agent open, every Completed branch closed (the start state of the pane). */
+const START_FOLDS: AgentFolds = { folded: id => id.endsWith(':done'), toggle: () => () => undefined }
+
+/** The state words of a step that is over; every other step (todo, run, stuck, or a state this box does not know) is still to do. */
+const OVER = ['done', 'skip']
+/** A group's steps split into those still to do (the one running among them) and those over, each in the order written. */
+export function splitSteps(rows: StatusRow[]): { todo: StatusRow[]; done: StatusRow[] } {
+  const over = (row: StatusRow) => OVER.includes(splitState(row.state).short)
+  return { todo: rows.filter(row => !over(row)), done: rows.filter(over) }
+}
+
 /**
- * The status box (user decisions 01/11 and 02/11/2026): what runs now and next, then the steps under step · state · % ·
- * note, a running step in bold. State is a short word, % sits right after it, and the note column at the end holds every
- * other explanation. Under a step: `-> what blocks it`. With subagents, each group (this session first) opens with a
- * divider and a bold row naming it, with its own state and %.
+ * The status box (user decisions 01/11, 02/11 and 04/11/2026): what runs now and next, then one accordion per agent, this
+ * session first and each subagent after it, named in bold with its state and %. Under an agent two branches: To do (what
+ * runs and what runs next, open) and Completed (closed at start), each a table of step · state · % · note, a running step in
+ * bold; under a step, `-> what blocks it`. The note is one line that does not wrap (the pane cannot scroll sideways, so a
+ * longer one is cut at the edge and shows whole while the pointer is on it).
  */
-export function statusBody(ui: Ui, data: StatusData | null) {
+export function statusBody(ui: Ui, data: StatusData | null, folds: AgentFolds = START_FOLDS) {
   const { h } = ui
   if (!busy(data)) return h(ui.Text, { dimColor: true }, 'nothing running')
   const heads = ['Step', 'State', '%', 'Note']
@@ -143,27 +157,47 @@ export function statusBody(ui: Ui, data: StatusData | null) {
   const blocker = (row: StatusRow) => (PLACEHOLDERS.includes(row.blocker || row.waiting) ? '' : `-> ${row.blocker || row.waiting}`)
   const widths = heads.map((head, at) =>
     Math.min(STATUS_COLUMN, Math.max(head.length, ...data.rows.map(row => (fields(row)[at] ?? '').length))) + 1)
-  const cellsOf = (texts: string[], kind: 'head' | 'group' | 'running' | 'plain') => h(ui.Box, { flexDirection: 'row', columnGap: 1 },
-    texts.map((text, at) => h(ui.Box, at < texts.length - 1 ? { width: widths[at], flexShrink: 0 } : { flexGrow: 1 },
+  const cellsOf = (texts: string[], kind: 'head' | 'running' | 'plain') => h(ui.Box, { flexDirection: 'row', columnGap: 1 },
+    texts.map((text, at) => h(ui.Box, at < texts.length - 1 ? { width: widths[at], flexShrink: 0 } : { flexGrow: 1, overflow: 'hidden' },
       kind === 'head' ? hoverable(ui, `status-${text}`, h(ui.Text, { bold: true }, text))
-        : h(ui.Text, kind === 'plain' ? (at === 0 ? {} : { dimColor: true }) : { bold: true }, text))))
+        : h(ui.Text, { ...(kind === 'plain' ? (at === 0 ? {} : { dimColor: true }) : { bold: true }), ...(at === texts.length - 1 ? { wrap: 'truncate-end' } : {}) }, text))))
   const said = (title: string, text: string) => (text === ''
     ? null
     : [h(ui.Box, { flexDirection: 'row', columnGap: 1 },
       h(ui.Box, { minWidth: 6, flexShrink: 0 }, hoverable(ui, `status-${title}`, h(ui.Text, { bold: true }, title))), h(ui.Text, {}, text)),
     helpCard(ui, `status-${title}`, STATUS_HELP[title])])
-  const groups = stepGroups(data.rows)
-  const titled = groups.some(group => group.agent !== '')
-  // A divider: a box with only its top border, as wide as the table.
-  const divider = () => h(ui.Box, { borderStyle: 'single', borderTop: true, borderBottom: false, borderLeft: false, borderRight: false, borderDimColor: true })
+  // A branch header or an agent header: the arrow presses, the rest is its label.
+  const fold = (id: FoldId, label: unknown[]) => h(ui.Box, { flexDirection: 'row', columnGap: 1 },
+    h(ui.Button, { key: `fold-${id}`, plain: true, onPress: folds.toggle(id) }, folds.folded(id) ? '▸' : '▾'), ...label)
+  const stepRows = (agent: string, rows: StatusRow[]) => rows.map(row => {
+    const cells = cellsOf(fields(row), splitState(row.state).short === RUNNING ? 'running' : 'plain')
+    const id = `note-${agent}-${row.item}`
+    return [
+      // The row shows one line of its note; while the pointer is on the row, a card shows the whole of it.
+      noteOf(row) === '' ? cells : hoverable(ui, id, cells),
+      helpCard(ui, id, noteOf(row)),
+      blocker(row) === '' ? null : h(ui.Box, { marginLeft: 2 }, h(ui.Text, { dimColor: true }, blocker(row)))]
+  })
+  const branch = (agent: string, kind: 'todo' | 'done', rows: StatusRow[]) => {
+    const id: FoldId = `agent:${agent}:${kind}`
+    return rows.length === 0 ? null : h(ui.Box, { flexDirection: 'column', marginLeft: INDENT },
+      fold(id, [h(ui.Text, { bold: true }, kind === 'todo' ? 'To do' : 'Completed'), h(ui.Text, { dimColor: true }, `(${rows.length})`)]),
+      folds.folded(id) ? null : h(ui.Box, { flexDirection: 'column', marginLeft: INDENT }, stepRows(agent, rows)))
+  }
+  const accordion = (group: { agent: string; rows: StatusRow[] }) => {
+    const name = group.agent || 'this session'
+    const id: FoldId = `agent:${name}`
+    const { todo, done } = splitSteps(group.rows)
+    return h(ui.Box, { flexDirection: 'column', marginTop: 1 },
+      fold(id, [h(ui.Text, { bold: true }, name), h(ui.Text, { dimColor: true }, [groupState(group.rows), donePercent(group.rows)].filter(Boolean).join(' · '))]),
+      folds.folded(id) ? null : [branch(name, 'todo', todo), branch(name, 'done', done)])
+  }
   return h(ui.Box, { flexDirection: 'column' },
     said('Now', data.now),
     said('Next', data.next),
     data.rows.length === 0 ? null : h(ui.Box, { flexDirection: 'column', marginTop: 1 },
-      cellsOf(heads, 'head'),
+      // Rows sit two branches in (agent, then To do or Completed), so the header starts there too and the columns line up.
+      h(ui.Box, { marginLeft: INDENT * 2 }, cellsOf(heads, 'head')),
       heads.map(head => helpCard(ui, `status-${head}`, STATUS_HELP[head])),
-      groups.map(group => [
-        titled ? [divider(), cellsOf([group.agent || 'this session', groupState(group.rows), donePercent(group.rows), ''], 'group')] : null,
-        group.rows.map(row => [cellsOf(fields(row), splitState(row.state).short === RUNNING ? 'running' : 'plain'),
-          blocker(row) === '' ? null : h(ui.Box, { marginLeft: 2 }, h(ui.Text, { dimColor: true }, blocker(row)))])])))
+      stepGroups(data.rows).map(accordion)))
 }
