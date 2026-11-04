@@ -3,7 +3,6 @@
 // a recording factory. The file is written by scripts/podium_status.py; register.tsx reads it and hands its text here.
 import type { FoldId, Ui } from './boxes'
 import { helpCard, hoverable, INDENT } from './controls'
-import { STATUS_HELP } from './help'
 
 /** A step (user decision 02/11/2026): `percent` done ('' when not given), `blocker`, and `agent` ('' = this session). */
 type StatusRow = { item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string; note: string }
@@ -85,8 +84,9 @@ const RUNNING = 'run'
 /** What a writer puts where it has nothing to say: the box leaves it out. */
 const PLACEHOLDERS = ['', '-', '—']
 
-const busy = (data: StatusData | null): data is StatusData =>
-  data !== null && (data.now !== '' || data.next !== '' || data.rows.length > 0)
+// The box draws the steps only (user decision 04/11/2026): `now` and `next` stay in the file for the hooks and `show`, but
+// are not drawn, so a table with no steps reads as nothing running.
+const busy = (data: StatusData | null): data is StatusData => data !== null && data.rows.length > 0
 
 /** A cap on one table column, in cells: a longer text wraps inside its column instead of pushing the next one away. */
 const STATUS_COLUMN = 24
@@ -159,11 +159,6 @@ export function statusBody(ui: Ui, data: StatusData | null, folds: AgentFolds = 
   const cellsOf = (texts: string[], kind: 'running' | 'plain') => h(ui.Box, { flexDirection: 'row', columnGap: 1 },
     texts.map((text, at) => h(ui.Box, at < texts.length - 1 ? { width: widths[at], flexShrink: 0 } : { flexGrow: 1, overflow: 'hidden' },
       h(ui.Text, { ...(kind === 'plain' ? (at === 0 ? {} : { dimColor: true }) : { bold: true }), ...(at === texts.length - 1 ? { wrap: 'truncate-end' } : {}) }, text))))
-  const said = (title: string, text: string) => (text === ''
-    ? null
-    : [h(ui.Box, { flexDirection: 'row', columnGap: 1 },
-      h(ui.Box, { minWidth: 6, flexShrink: 0 }, hoverable(ui, `status-${title}`, h(ui.Text, { bold: true }, title))), h(ui.Text, {}, text)),
-    helpCard(ui, `status-${title}`, STATUS_HELP[title])])
   // A branch header or an agent header: the arrow presses, the rest is its label.
   const fold = (id: FoldId, label: unknown[]) => h(ui.Box, { flexDirection: 'row', columnGap: 1 },
     h(ui.Button, { key: `fold-${id}`, plain: true, onPress: folds.toggle(id) }, folds.folded(id) ? '▸' : '▾'), ...label)
@@ -191,8 +186,5 @@ export function statusBody(ui: Ui, data: StatusData | null, folds: AgentFolds = 
       folds.folded(id) ? null : [branch(name, 'todo', todo), branch(name, 'done', done)])
   }
   return h(ui.Box, { flexDirection: 'column' },
-    said('Now', data.now),
-    said('Next', data.next),
-    data.rows.length === 0 ? null : h(ui.Box, { flexDirection: 'column', marginTop: 1 },
-      stepGroups(data.rows).map(accordion)))
+    stepGroups(data.rows).map(accordion))
 }
