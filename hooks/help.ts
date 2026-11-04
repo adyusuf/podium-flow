@@ -16,12 +16,6 @@ export const COLUMN_HELP: Record<string, string> = {
   System: 'This tab: your saved defaults (~/.claude/podium.json), under any project file. New sessions start from them.',
 }
 
-/** The labels of the Status box: what runs now and next. */
-export const STATUS_HELP: Record<string, string> = {
-  'Now': 'The step running right now.',
-  'Next': 'The step that comes after it.',
-}
-
 /** The Settings rows, by the label the pane shows. */
 export const ROW_HELP: Record<string, string> = {
   'Mode': 'How many agents work: A none, B three helpers, C the full team with qa review, D wide team, E fan-out.',

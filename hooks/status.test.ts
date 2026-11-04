@@ -43,10 +43,10 @@ test('the status file is read as text: only strings are kept, anything else is n
   expect(parseStatus(JSON.stringify({ rows: [{ item: 'a', percent: '45' }, { item: 'b', percent: '45%' }, { item: 'c', percent: 7 }] }))!.rows.map(row => row.percent)).toEqual(['45', '', ''])
 })
 
-test('the body shows now and next, then the agent, its To do branch and step · state · % · note (no heading row), -> blocker under the step', () => {
+test('the body shows the agents (not now and next), its To do branch and step · state · % · note (no heading row), -> blocker under the step', () => {
   const texts = (body: unknown) => shown(body).map(words)
   // An older row: its state has no short word, so the whole state goes to the note with the measured figure.
-  expect(texts(statusBody(ui, parseStatus(FILE)))).toEqual(['Now', 'prod gate', 'Next', 'plugin update',
+  expect(texts(statusBody(ui, parseStatus(FILE)))).toEqual([
     'this session', 'todo', 'To do', '(2)', 'dev', '', '', 'pushed · 4a45bda (promote.log)', 'prod', '', '', 'gate running · coverage step (gate-prod.log)', '-> promote.sh'])
   const steps = statusBody(ui, parseStatus(JSON.stringify({ rows: [
     { item: '1. data', state: 'done', percent: '100' },
@@ -83,8 +83,8 @@ test('a note is shown whole in a card while the pointer is on its row; a row wit
 test('an empty table, or none, says nothing running', () => {
   expect(words(statusBody(ui, null))).toBe('nothing running')
   expect(words(statusBody(ui, parseStatus('{"now": "", "rows": []}')))).toBe('nothing running')
-  const onlyNow = statusBody(ui, parseStatus('{"now": "tests"}'))
-  expect(all(onlyNow, 'Text').filter(node => node.props.color !== 'inverseText').map(words)).toEqual(['Now', 'tests'])
+  // Now and next are not drawn: a table with only those says nothing running.
+  expect(words(statusBody(ui, parseStatus('{"now": "tests", "next": "push"}')))).toBe('nothing running')
 })
 
 test('the file is untrusted text: control characters go, each field is one capped line, rows are capped at 50', () => {
