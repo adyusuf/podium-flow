@@ -1,8 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { agentsBody, ROW_LABELS, ROWS, SECTIONS, section, settingsBody } from './boxes'
-import { COLUMN_HELP, ROW_HELP, SECTION_HELP, STATUS_HELP } from './help'
-import { parseStatus, statusBody } from './status'
+import { COLUMN_HELP, ROW_HELP, SECTION_HELP } from './help'
 
 // The hover cards (user decision 01/11/2026): a label joins a hover group, and a hidden row of the same group, right after
 // the label's line, opens while the pointer rests on it. A recording factory lets the tests read what would be drawn.
@@ -52,7 +51,7 @@ const data = (over: Record<string, unknown> = {}) => ({
 
 test('every Settings row label has a card text, and every card text a row', () => {
   expect(Object.keys(ROW_HELP).sort()).toEqual([...ROW_LABELS].sort())
-  expect(Object.values({ ...ROW_HELP, ...SECTION_HELP, ...COLUMN_HELP, ...STATUS_HELP }).every(text => text.length > 10)).toBe(true)
+  expect(Object.values({ ...ROW_HELP, ...SECTION_HELP, ...COLUMN_HELP }).every(text => text.length > 10)).toBe(true)
 })
 
 test('a card is a hidden row of its label hover group, readable in either theme, not placed over other rows', () => {
@@ -94,11 +93,4 @@ test('an Agents role card is its file description, right after the role line; no
   const body = agentsBody(ui, data({ agents: [agent('qa', 'Reviews a change.'), agent('analyst'), agent('doc-writer', 'Writes docs.')] }), () => undefined)
   expect(placed(body)).toEqual([['[qa]', '[qa]opus[sonnet]haikufable'], ['[doc]', '[doc]opus[sonnet]haikufable']])
   expect(all(body, 'Box').filter(isCard).map(words)).toEqual(['Reviews a change.', 'Writes docs.'])
-})
-
-test('the Status labels have cards, each right after its own line', () => {
-  const body = statusBody(ui, parseStatus(JSON.stringify({ now: 'gate', next: 'push', rows: [{ item: 'dev', state: 'done', figure: '', waiting: '-' }] })))
-  const pairs = placed(body)
-  expect(pairs.map(([owner]) => owner)).toEqual(['Now', 'Next'])
-  expect(pairs.slice(0, 2).map(([, before]) => before)).toEqual(['Nowgate', 'Nextpush'])
 })
