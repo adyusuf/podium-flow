@@ -97,7 +97,7 @@ test('an Agents role card is its file description, right after the role line; no
 })
 
 test('the Status labels and table headings have cards, each right after its own line', () => {
-  const body = statusBody(ui, parseStatus(JSON.stringify({ now: 'gate', next: 'push', rows: [{ item: 'dev', state: 'ok', figure: '1', waiting: '-' }] })))
+  const body = statusBody(ui, parseStatus(JSON.stringify({ now: 'gate', next: 'push', rows: [{ item: 'dev', state: 'done', figure: '', waiting: '-' }] })))
   const pairs = placed(body)
   expect(pairs.map(([owner]) => owner)).toEqual(['Now', 'Next', 'Step', 'State', '%', 'Note'])
   expect(pairs.slice(0, 2).map(([, before]) => before)).toEqual(['Nowgate', 'Nextpush'])

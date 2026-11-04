@@ -277,7 +277,7 @@ const onRender: Hook<'ui.render'> = async ($, e) => {
   const pane = paneFor(stages)
   return (
     <Box flexDirection="column">
-      {section(ui, 'status', 'Status', shut('status'), toggle('status'), statusBody(ui, now))}
+      {section(ui, 'status', 'Status', shut('status'), toggle('status'), statusBody(ui, now, { folded: id => isFolded(fold, id), toggle }))}
       {section(ui, 'settings', 'Settings', shut('settings'), toggle('settings'),
         settingsBody(ui, data, problem, problems, press, claude, pane.codeWork))}
       {pane.sections.includes('agents') ? section(ui, 'agents', 'Agents', shut('agents'), toggle('agents'),

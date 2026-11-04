@@ -63,8 +63,10 @@ reopening them.
 
 - **Status.** What runs now and next, then the work's steps: step · state · % · note. The state is one short word (todo,
   run, done, stuck, skip), the % sits right after it, the note column holds every other detail (the state's own detail,
-  `--note`, an older row's figure), and `-> what blocks it` sits under the step; a running step is bold. With subagents,
-  this session and each subagent open their group with a divider and a bold row giving the group's state and %. Claude
+  `--note`, an older row's figure), and `-> what blocks it` sits under the step; a running step is bold. Each agent
+  (this session first, then every subagent) is an accordion named in bold with its state and %; under it **To do** (what
+  runs and what is next, open) and **Completed** (closed at start). The note is one line that does not wrap (the pane
+  cannot scroll sideways): a long one is cut at the edge and shows whole in a card while the pointer is on the row. Claude
   writes the steps first, before any work, with `scripts/podium_status.py step`; a background gate or promotion writes
   its own ([`standards/00-working-method.md`](../standards/00-working-method.md) §1a, §10d).
 - **Settings.** Two tabs: **Session** (what this session runs on; a press changes this session only) and **System** (the
