@@ -89,7 +89,7 @@ const busy = (data: StatusData | null): data is StatusData =>
   data !== null && (data.now !== '' || data.next !== '' || data.rows.length > 0)
 
 /** A cap on one table column, in cells: a longer text wraps inside its column instead of pushing the next one away. */
-const STATUS_COLUMN = 36
+const STATUS_COLUMN = 24
 
 /**
  * A state as its short word and what else the writer put in it (`running: 3 of 8` -> run, `3 of 8`). A state that is
@@ -152,15 +152,13 @@ export function splitSteps(rows: StatusRow[]): { todo: StatusRow[]; done: Status
 export function statusBody(ui: Ui, data: StatusData | null, folds: AgentFolds = START_FOLDS) {
   const { h } = ui
   if (!busy(data)) return h(ui.Text, { dimColor: true }, 'nothing running')
-  const heads = ['Step', 'State', '%', 'Note']
   const fields = (row: StatusRow) => [row.item, splitState(row.state).short, row.percent === '' ? '' : `${row.percent}%`, noteOf(row)]
   const blocker = (row: StatusRow) => (PLACEHOLDERS.includes(row.blocker || row.waiting) ? '' : `-> ${row.blocker || row.waiting}`)
-  const widths = heads.map((head, at) =>
-    Math.min(STATUS_COLUMN, Math.max(head.length, ...data.rows.map(row => (fields(row)[at] ?? '').length))) + 1)
-  const cellsOf = (texts: string[], kind: 'head' | 'running' | 'plain') => h(ui.Box, { flexDirection: 'row', columnGap: 1 },
+  // No heading row (user decision 04/11/2026): the columns are step · state · % · note, in that order, and need no names.
+  const widths = [0, 1, 2].map(at => Math.min(STATUS_COLUMN, Math.max(...data.rows.map(row => (fields(row)[at] ?? '').length))) + 1)
+  const cellsOf = (texts: string[], kind: 'running' | 'plain') => h(ui.Box, { flexDirection: 'row', columnGap: 1 },
     texts.map((text, at) => h(ui.Box, at < texts.length - 1 ? { width: widths[at], flexShrink: 0 } : { flexGrow: 1, overflow: 'hidden' },
-      kind === 'head' ? hoverable(ui, `status-${text}`, h(ui.Text, { bold: true }, text))
-        : h(ui.Text, { ...(kind === 'plain' ? (at === 0 ? {} : { dimColor: true }) : { bold: true }), ...(at === texts.length - 1 ? { wrap: 'truncate-end' } : {}) }, text))))
+      h(ui.Text, { ...(kind === 'plain' ? (at === 0 ? {} : { dimColor: true }) : { bold: true }), ...(at === texts.length - 1 ? { wrap: 'truncate-end' } : {}) }, text))))
   const said = (title: string, text: string) => (text === ''
     ? null
     : [h(ui.Box, { flexDirection: 'row', columnGap: 1 },
@@ -196,8 +194,5 @@ export function statusBody(ui: Ui, data: StatusData | null, folds: AgentFolds = 
     said('Now', data.now),
     said('Next', data.next),
     data.rows.length === 0 ? null : h(ui.Box, { flexDirection: 'column', marginTop: 1 },
-      // Rows sit two branches in (agent, then To do or Completed), so the header starts there too and the columns line up.
-      h(ui.Box, { marginLeft: INDENT * 2 }, cellsOf(heads, 'head')),
-      heads.map(head => helpCard(ui, `status-${head}`, STATUS_HELP[head])),
       stepGroups(data.rows).map(accordion)))
 }

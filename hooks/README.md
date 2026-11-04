@@ -61,7 +61,7 @@ whose folder is in no git repository, no code work happens: the pane shows only 
 boxes refresh after every turn, so a merge, a push or a `/podium:config` change shows without
 reopening them.
 
-- **Status.** What runs now and next, then the work's steps: step · state · % · note. The state is one short word (todo,
+- **Status.** What runs now and next, then the work's steps: step · state · % · note, with no heading row (the step column is narrow and wraps). The state is one short word (todo,
   run, done, stuck, skip), the % sits right after it, the note column holds every other detail (the state's own detail,
   `--note`, an older row's figure), and `-> what blocks it` sits under the step; a running step is bold. Each agent
   (this session first, then every subagent) is an accordion named in bold with its state and %; under it **To do** (what
