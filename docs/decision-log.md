@@ -2219,3 +2219,17 @@ column, last, gathers every detail (the state's own, `--note`, an older row's me
 under the step. With subagents, each group opens with a divider and a bold row with the group's state (run while a step
 runs, stuck while one is blocked, done when all are over, else todo) and its %. Step names stay short; details go in
 `--note`, which `step` now takes.
+
+## A subagent's Status row is written by the hooks, and a % is only measured (05/11/2026, user decision)
+
+The user saw one of three concurrent agents in the Status box: only an agent with a Bash tool could write its own row, a
+finished agent's row stayed "in progress | 10%" until dropped by hand, three display shapes (session step, free `row`,
+`--agent` step) had been mixed into five, and the "5%" written at an agent's start was invented (an iOS download read 5% while
+it was at 95.7%). Now the hooks write the row: `SubagentStart` opens a `task` step, `SubagentStop` closes it done (100%) or
+`failed` (kept, never dropped), and a subagent's tool calls refresh its note; the figures are the stop time minus the start
+time, the calls counted, and the output tokens summed from the agent's transcript, each left out when nothing measured it.
+Also: `--after` looks its anchor up by name whoever runs it, `drop` and `--after` accept a unique prefix, `rename OLD NEW`
+exists, and `now` is the name of the step at work instead of the user's raw message. `standards/00` §10d states the rule.
+Not decided here: the real SubagentStop payload has no documented failure flag, so `failed` is read from `error`, `is_error`
+or a failed `status` in it and an agent that is killed without a stop event stays `running`; no model is shown unless the
+payload names one; changed-file counts from `git status` were left out (one git call per tool call is too costly).

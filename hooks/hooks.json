@@ -94,6 +94,14 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py\" notify PostToolUse"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_status.py\" hook tool"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -130,6 +138,16 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_status.py\" hook prompt"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/podium_status.py\" hook subagent-stop"
           }
         ]
       }

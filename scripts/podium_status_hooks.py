@@ -2,9 +2,12 @@
 lines (rule #9). `podium_status.py hook EVENT` reads the hook payload on stdin and calls `hook` here.
 
     session     a session starts: `now` is "waiting for you"
-    prompt      the user's message: `now` is its first line, and Claude is reminded to analyse it into steps first
+    prompt      the user's message: `now` is the step at work (else "analysing the request", never the raw message), and
+                Claude is reminded to analyse it into steps first
     stop        a turn's end: "waiting for you", or "waiting for background work" while a task or cron runs
-    subagent    a subagent starts: it is told how to write its own steps into this session's box
+    subagent    a subagent starts: its row opens in the box (podium_status_agents.py); the agent writes none itself
+    subagent-stop   a subagent ends: its row is done or failed, with its duration, tool calls and output tokens
+    tool        a tool call returned: a subagent's row counts it (a call of this session itself changes nothing)
     guard       before an edit or a commit: with `steps.enforce` set to block, refused until the box holds steps
 
 A hook never fails a session: a bad payload or an unusable id does nothing. Only `guard` may refuse (exit code 2).
@@ -14,14 +17,18 @@ import os
 import re
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from podium_status import EMPTY, OPEN, StatusError, clip, load, locked, save, valid  # noqa: E402
+from podium_status_agents import agent_name, hooked, start, stop, tick  # noqa: E402
+from podium_status_rows import running_item  # noqa: E402
 
 SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'podium_status.py')
 # What `now` says when a session starts or a turn ends: it waits for the user, or for its own background work.
 WAITING = 'waiting for you'
 WAITING_BACKGROUND = 'waiting for background work'
+ANALYSING = 'analysing the request'        # a user's message has come in and its steps are not written yet
 # The turns a person starts: a system-started turn (a task notification, a wake-up) must not replace the user's task.
 USER_SOURCES = (None, 'user', 'sdk')
 # Where an edit is Claude's own bookkeeping, never code work (standards/13 §8a): its notes and plans, the podium settings
@@ -37,12 +44,13 @@ PROJECT_BOOKKEEPING = ('mode', 'mode-model', 'podium.json', 'adyusuf.json')
 COMMIT = re.compile(r'(?:^|[;&|\n])\s*git(?:\s+(?:-[Cc]\s+\S+|-\S+))*\s+commit(?![-\w])')
 
 
-def hook_text(event, payload):
-    """What `now` becomes for one hook payload, or None to leave the table alone."""
+def hook_text(event, payload, data=None):
+    """What `now` becomes for one hook payload, or None to leave the table alone. A user's message is never echoed: `now`
+    is the name of the step at work in `data`, or "analysing the request" while there is none (user decision 05/11/2026)."""
     if event == 'prompt':
         if payload.get('source') not in USER_SOURCES:
             return None
-        return 'working on: ' + str(payload.get('prompt') or '').strip().split('\n')[0]
+        return running_item(data or EMPTY) or ANALYSING
     if event == 'stop':
         return WAITING_BACKGROUND if payload.get('background_tasks') or payload.get('session_crons') else WAITING
     return WAITING if event == 'session' else None
@@ -59,13 +67,15 @@ def enforce(session):
 
 
 def open_steps(session, agents):
-    """Whether one of `agents` ('' = this session) has a step still to finish, written with `step` (it has a %): a plan
-    left from a finished task does not let the next task's edits through (qa, 02/11/2026). None: the file is unreadable."""
+    """Whether one of `agents` ('' = this session) has a step still to finish, written with `step` (it has a %) or by the
+    hooks (a subagent's own row): a plan left from a finished task does not let the next task's edits through (qa,
+    02/11/2026). None: the file is unreadable."""
     try:
         rows = load(session)['rows']
     except (StatusError, OSError):
         return None
-    return any(row.get('agent', '') in agents and row.get('percent') != '' and row.get('state') in OPEN for row in rows)
+    return any(row.get('agent', '') in agents and (row.get('percent') != '' or hooked(row)) and row.get('state') in OPEN
+               for row in rows)
 
 
 def bookkeeping(path):
@@ -84,16 +94,9 @@ def reminder(session):
             'Status box: standards/00 §1a, §10d.' % (enforce(session), SCRIPT, session))
 
 
-def agent_name(payload):
-    """How a subagent signs its steps: its type and the start of its id, so two of a kind stay apart."""
-    return ('%s %s' % (str(payload.get('agent_type') or 'agent'), str(payload.get('agent_id') or '')[:6])).strip()
-
-
-def subagent_note(session, payload):
-    name = agent_name(payload)
-    return ('podium steps: you are "%s". Write your own steps into the parent\'s Status box before working: python3 "%s" '
-            '--session %s step "<n. step>" "not started" 0 --agent "%s"; keep state and %% current, --blocker "<what>" '
-            'when stuck.' % (name.strip(), SCRIPT, session, name.strip()))
+def subagent_note(name):
+    return ('podium steps: you are "%s". Your row in the parent\'s Status box is written and closed by the hooks, with its '
+            'time, tool calls and output tokens: do not write it, and do not write a %% for it.' % name)
 
 
 def blocked(payload):
@@ -107,7 +110,7 @@ def blocked(payload):
         work = given_path != '' and not bookkeeping(os.path.abspath(given_path))
     if not work or not valid(session):
         return ''
-    # A subagent may go on under its own steps or the session's; it is told to write its own (--agent).
+    # A subagent may go on under its own row (the hooks open it at SubagentStart) or the session's steps.
     name = agent_name(payload) if payload.get('agent_id') else ''
     found = open_steps(session, {'', name})
     if found or enforce(session) != 'block':
@@ -125,6 +128,17 @@ def context(event, text):
     print(json.dumps({'hookSpecificOutput': {'hookEventName': event, 'additionalContext': text}}))
 
 
+def write(session, change):
+    """One read-modify-write of the session's table under the lock; `change(data)` returns the new table. A corrupt file
+    is replaced, as `clear` would."""
+    with locked(session):
+        try:
+            data = load(session)
+        except StatusError:
+            data = dict(EMPTY, rows=[])
+        save(session, change(data))
+
+
 def hook(event, payload_text):
     """Run one hook; returns the exit code (2 only when `guard` refuses). Never raises."""
     try:
@@ -139,19 +153,23 @@ def hook(event, payload_text):
         if not valid(session):
             return 0
         if event == 'subagent':
-            context('SubagentStart', subagent_note(session, payload))
+            context('SubagentStart', subagent_note(agent_name(payload)))
+            write(session, lambda data: start(data, payload, time.time()))
+            return 0
+        if event == 'subagent-stop':
+            write(session, lambda data: stop(data, payload, time.time()))
+            return 0
+        if event == 'tool':
+            if payload.get('agent_id'):          # a call of this session itself needs no write: the hook costs one start-up
+                write(session, lambda data: tick(data, payload, time.time()))
+            return 0
+        if event == 'prompt' and payload.get('source') in USER_SOURCES:
+            write(session, lambda data: dict(data, now=clip(hook_text(event, payload, data)), next=''))
+            context('UserPromptSubmit', reminder(session))
             return 0
         text = hook_text(event, payload)
-        if text is None:
-            return 0
-        with locked(session):
-            try:
-                data = load(session)
-            except StatusError:
-                data = dict(EMPTY, rows=[])          # a corrupt file is replaced, as `clear` would
-            save(session, dict(data, now=clip(text), next=''))
-        if event == 'prompt':
-            context('UserPromptSubmit', reminder(session))
-    except (ValueError, AttributeError, OSError, StatusError):
+        if text is not None:
+            write(session, lambda data: dict(data, now=clip(text), next=''))
+    except Exception:  # noqa: BLE001 - a hook never fails a session, whatever the payload or the file holds
         return 0
     return 0

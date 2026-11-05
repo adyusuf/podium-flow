@@ -176,6 +176,12 @@ test('a state is a short word and its detail; a group runs while a step runs, is
   expect(groupState([row('done'), row('blocked')])).toBe('stuck')
   expect(groupState([row('done'), row('did not run')])).toBe('done')
   expect(groupState([row('done'), row('not started')])).toBe('todo')
+  // A failed step (a subagent that ended in error) is its own state and stays in the open branch, never in Completed.
+  expect(splitState('failed').short).toBe('fail')
+  expect(groupState([row('done'), row('failed')])).toBe('fail')
+  expect(groupState([row('failed'), row('blocked')])).toBe('stuck')
+  expect(groupState([row('failed'), row('running')])).toBe('run')
+  expect(splitSteps([row('failed'), row('done')]).todo.map(one => one.state)).toEqual(['failed'])
   expect(noteOf({ ...row('running: half'), note: 'n', figure: '3/8' })).toBe('half · n · 3/8')
   expect(noteOf({ ...row('done'), percent: '100', figure: '100%' })).toBe('')
 })
