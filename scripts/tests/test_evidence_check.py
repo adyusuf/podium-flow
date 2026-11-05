@@ -4,6 +4,7 @@ import unittest
 
 sys.path.insert(0, os.path.normpath(os.path.join(os.path.dirname(__file__), '..')))
 import importlib.util
+os.environ.setdefault('PODIUM_SETTINGS_SOURCE', 'file')  # a developer's own live panel must not change a result (gate-lib-panel.sh)
 
 spec = importlib.util.spec_from_file_location(
     'evidence_check', os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'evidence-check.py')))

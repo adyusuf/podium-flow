@@ -12,11 +12,12 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+os.environ.setdefault('PODIUM_SETTINGS_SOURCE', 'file')  # a developer's own live panel must not change a result (gate-lib-panel.sh)
 
 SCRIPTS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 HOOK = os.path.join(SCRIPTS, 'md-hook.sh')
 TWINS = os.path.join(SCRIPTS, 'twins.txt')   # the one list of copied scripts, shared with twin-drift.sh
-GATE_LIBS = ('gate-core.sh', 'gate-lib.sh', 'gate-lib-node.sh', 'gate-lib-prod.sh')
+GATE_LIBS = ('gate-core.sh', 'gate-lib.sh', 'gate-lib-panel.sh', 'gate-lib-node.sh', 'gate-lib-prod.sh')
 EXCEEDED = '#!/usr/bin/env bash\necho "CLAUDE.md  ✗ CEILING EXCEEDED (+4 KB)"\nexit 1\n'
 QUIET = '#!/usr/bin/env bash\nexit 0\n'
 
