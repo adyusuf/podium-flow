@@ -82,12 +82,13 @@ class Steps(unittest.TestCase):
             self.assertIn(part, out['additionalContext'])
         self.assertEqual('', self.run_hook('prompt', {'session_id': SESSION, 'prompt': 'x', 'source': 'system'})[0])
 
-    def test_a_subagent_is_told_to_write_its_own_steps_under_its_name(self):
+    def test_a_subagent_is_told_its_row_is_written_by_the_hooks_not_by_itself(self):
         out = json.loads(self.run_hook('subagent', {'session_id': SESSION, 'agent_type': 'qa', 'agent_id': 'a9f3c2d1e0'})[0])
         text = out['hookSpecificOutput']['additionalContext']
         self.assertEqual('SubagentStart', out['hookSpecificOutput']['hookEventName'])
         self.assertIn('you are "qa a9f3c2"', text)
-        self.assertIn('--session abc-123 step "<n. step>" "not started" 0 --agent "qa a9f3c2"', text)
+        self.assertIn('written and closed by the hooks', text)
+        self.assertNotIn('step "<n. step>"', text)
 
     def guard(self, tool, given):
         return self.run_hook('guard', {'session_id': SESSION, 'tool_name': tool, 'tool_input': given})

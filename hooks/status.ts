@@ -77,7 +77,7 @@ export function parseStatus(text: string): StatusData | null {
 /** The short state words (user decision 02/11/2026), so the State column stays narrow: a state is one of these. */
 const SHORT: Record<string, string> = {
   'not started': 'todo', pending: 'todo', running: 'run', 'in progress': 'run', done: 'done', blocked: 'stuck',
-  'did not run': 'skip', skipped: 'skip',
+  'did not run': 'skip', skipped: 'skip', failed: 'fail',
 }
 /** The state of the step at work: the box draws it in bold. */
 const RUNNING = 'run'
@@ -109,11 +109,12 @@ export function donePercent(rows: StatusRow[]): string {
   return given.length === 0 ? '' : `${Math.round(given.reduce((sum, one) => sum + one, 0) / given.length)}%`
 }
 
-/** A group's state: run while one of its steps runs, else stuck while one is blocked, done when all are over, else todo. */
+/** A group's state: run while one of its steps runs, else stuck while one is blocked, else fail while one failed, done when all are over, else todo. */
 export function groupState(rows: StatusRow[]): string {
   const shorts = rows.map(row => splitState(row.state).short)
   if (shorts.includes(RUNNING)) return RUNNING
   if (shorts.includes('stuck')) return 'stuck'
+  if (shorts.includes('fail')) return 'fail'
   return shorts.every(short => short === 'done' || short === 'skip') ? 'done' : 'todo'
 }
 
@@ -134,7 +135,8 @@ export type AgentFolds = { folded: (id: FoldId) => boolean; toggle: (id: FoldId)
 /** A box with no fold state of its own: every agent open, every Completed branch closed (the start state of the pane). */
 const START_FOLDS: AgentFolds = { folded: id => id.endsWith(':done'), toggle: () => () => undefined }
 
-/** The state words of a step that is over; every other step (todo, run, stuck, or a state this box does not know) is still to do. */
+/** The state words of a step that is over; every other step (todo, run, stuck, fail, or a state this box does not know) is still to do:
+ *  a failed step stays in the open branch until someone looks at it (user decision 05/11/2026). */
 const OVER = ['done', 'skip']
 /** A group's steps split into those still to do (the one running among them) and those over, each in the order written. */
 export function splitSteps(rows: StatusRow[]): { todo: StatusRow[]; done: StatusRow[] } {
