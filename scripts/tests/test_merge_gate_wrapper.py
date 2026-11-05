@@ -17,6 +17,7 @@ import os
 import subprocess
 import tempfile
 import unittest
+os.environ.setdefault('PODIUM_SETTINGS_SOURCE', 'file')  # a developer's own live panel must not change a result (gate-lib-panel.sh)
 
 REAL = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'merge-gate.sh'))
 
@@ -81,6 +82,14 @@ class MergeGateWrapper(unittest.TestCase):
         self.assertNotEqual(0, code, 'a closed gate must not exit 0')
         self.assertNotIn('twin-drift.sh ran', self.calls(),
                          'output after a closed gate reads as progress')
+
+    def test_a_gate_the_panel_turned_off_exits_10_and_runs_nothing_after_it(self):
+        # gate-core exits 10 when gates_before_push.<t> = no: allowed, nothing passed (standards/13 §8a).
+        self.stub('gate-core.sh', exit_code=10)
+        self.stub('twin-drift.sh')
+        _, code = self.run_wrapper('dev')
+        self.assertEqual(10, code, 'a waived gate must reach the caller as 10, never 0 or 1')
+        self.assertNotIn('twin-drift.sh ran', self.calls())
 
     def test_drift_is_reported_and_does_not_close_the_gate(self):
         self.stub('gate-core.sh')
