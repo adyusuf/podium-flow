@@ -45,8 +45,8 @@ Types: `feat` `fix` `refactor` `perf` `test` `docs` `chore` `build` `ci` `revert
 
 > **Scope (global rule #25):** the gate below is SHARED — `scripts/gate-core.sh <dev|test|prod>`,
 > a copy of the canonical script committed in every project and called by that project's
-> own `scripts/merge-gate.sh` orchestrator. It is four twin files (`gate-core.sh` plus
-> `gate-lib.sh`, `gate-lib-node.sh`, `gate-lib-prod.sh`, listed in `scripts/twins.txt`): copy them
+> own `scripts/merge-gate.sh` orchestrator. It is five twin files (`gate-core.sh` plus
+> `gate-lib.sh`, `gate-lib-panel.sh`, `gate-lib-node.sh`, `gate-lib-prod.sh`, listed in `scripts/twins.txt`): copy them
 > together, a core without its libraries refuses to run. Everything in it runs at every
 > promotion whose gate the configuration turns on (§8a, `gates_before_push.<t>`), `feature/* → dev` included;
 > **the deferred step is RUNNING e2e**, which belongs to the `prod` gate (#33), and coverage runs where
@@ -198,6 +198,20 @@ Status file, the settings and session layers, `.claude/mode`, the scratchpad.
   (user decision 01/11/2026), so the mode and tests settings that still hold for code written there are changed with
   `/podium:config`. Inside a repository it shows everything, and the class above is Claude's to follow.
 
+**Scripts read the panel too (user decision 06/11/2026).** Every panel value a script acts on (`gates_before_push`,
+`gate_steps`, `coverage_before_push`, `e2e_before_deploy`, `ci_after_push`) is read by the script itself: from the
+**live panel** (`sdlc_settings.py show`, this session's layer included via `CLAUDE_CODE_SESSION_ID`) when the podium
+plugin is installed and enabled on the machine, otherwise from the copy committed in the project,
+`.claude/sdlc-settings.json` (servers, machines without the plugin). **CI always reads the committed copy** (`CI` or
+`GITHUB_ACTIONS` set: a self-hosted runner runs as the user and would otherwise see the live panel), and
+`gates_before_push` does not apply there: it is a setting about pushing, so CI runs its gate. Only an explicit `false`
+turns a check off and only an explicit `true` turns an optional run (e2e) on; a missing or broken source keeps the check
+(fail closed). In the shared gate this is `gate-lib-panel.sh`: `gates_before_push.<t>` = no runs coverage only and
+**exits 10** (allowed by configuration, nothing passed: a caller must not read it as green, stamp it or run its own
+extra steps as if it were); `e2e_before_deploy.prod` = yes runs the suite against the test environment,
+`e2e_before_deploy.test` = yes runs it on dev (`E2E_DEV_WEB_CMD` / `E2E_DEV_MOBILE_CMD`). `PODIUM_SETTINGS_SOURCE=file`
+forces the committed copy (the tests use it).
+
 **Read the panel, then act at once (user decision 01/11/2026).** When a piece of work is done, Claude reads the settings
 afresh (`podium_config.py show --session <id>`, this session's layer included; the panel may have changed since the
 session started) and carries out the merges, gates and pushes below **straight away**: no question, no waiting for a
@@ -218,11 +232,11 @@ the user stops it (interrupts or says stop), on a red gate, or on a step that ne
 | `deploy_after_push.<t>` = yes (`test`, `prod`) | "Deploy test prod" in the panel (until 01/11/2026 "After pushing update"): checkboxes, one or both: the environments a pushed update is deployed to; the plan job of the shared workflow reports the ticked ones (`test,prod`, or `none`) and a project's deploy workflow reads them from `.claude/sdlc-settings.json`. Defaults: test yes, prod no. |
 | `e2e_before_deploy.<t>` = yes (`test`, `prod`) | Before `<t>` is deployed, run the e2e suite (Playwright / Maestro, `11`/`12`) against the environment below it: `e2e_before_deploy.test` runs on `dev` before `test` is deployed, `e2e_before_deploy.prod` runs on `test` before `prod` is deployed. It applies only where the project has an e2e suite and that environment; otherwise the report says "no e2e suite" or "no such environment", which is not a failure. A red run is reported with the failing specs and blocks the promotion to `<t>` (it was asked for, #33). The deploy itself still needs the user's approval (#20, #27). Defaults: both no. |
 
-**The gate reads the settings from the project, so the project's copy is rewritten first.** Before the gate of `<t>`
-runs, `scripts/sdlc_settings.py write --session <id>` (the plugin's copy) writes the panel's settings - this session's
-layer included - into `.claude/sdlc-settings.json`, and a change is committed with the merge. A stale or hand-edited copy
-would otherwise decide `coverage_before_push.<t>` (and CI's `ci_after_push.<t>`) against the panel; `sdlc_settings.py
-check` exits 1 when the two differ.
+**The project's copy is still rewritten first.** Where the plugin is enabled the gate reads the live panel, but CI,
+servers and machines without the plugin read `.claude/sdlc-settings.json`. So before the gate of `<t>` runs,
+`scripts/sdlc_settings.py write --session <id>` (the plugin's copy) writes the panel's settings - this session's layer
+included - into that file, and a change is committed with the merge. A stale or hand-edited copy would otherwise decide
+CI's and the servers' values against the panel; `sdlc_settings.py check` exits 1 when the two differ.
 
 **A red gate blocks** the push of that target and every later one; it is fixed, not waved through (§8, point 5). **A gate set
 to no is not run and is recorded**: the merge commit message ends with one line naming only what was skipped,

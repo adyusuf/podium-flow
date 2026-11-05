@@ -3,10 +3,11 @@
 # ONE list, read by md-hook.sh (a project against the live copy) and twin-drift.sh (every project's
 # origin/dev against this branch). One name per line; '#' starts a comment.
 #
-# gate-core.sh needs its three libraries: it is split so that no file passes 300 lines (rule #9), and a
-# copy without them refuses to run (exit 2). Copy all four together.
+# gate-core.sh needs its four libraries: it is split so that no file passes 300 lines (rule #9), and a
+# copy without them refuses to run (exit 2). Copy all five together.
 gate-core.sh
 gate-lib.sh
+gate-lib-panel.sh
 gate-lib-node.sh
 gate-lib-prod.sh
 audit-triage.py
