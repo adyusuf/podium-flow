@@ -14,7 +14,9 @@ All of them run locally; none opens a network connection.
 | `UserPromptSubmit`, `PostToolUse` (Agent, Bash) | `scripts/podium_config.py notify` | when a setting changed since the session last looked, says so; keeps what it saw in `~/.claude/podium-seen/<session id>` |
 | `SessionStart`, `UserPromptSubmit`, `Stop`, `StopFailure` | `scripts/podium_status.py hook` | keeps every session's Status box alive: a session starts `waiting for you`, your message's first line becomes *Now* (`working on: …`; a system-started turn leaves it), the end of a turn sets `waiting for you` or `waiting for background work`; Claude's rows stay. The mod does the same after an interrupted turn. Writes only `~/.claude/podium-status/<session id>.json`, pruned after 14 days |
 | `UserPromptSubmit` (same hook) | `scripts/podium_status.py hook prompt` | also reminds Claude to analyse the message and write or insert its steps first |
-| `SubagentStart` | `scripts/podium_status.py hook subagent` | tells each subagent how to write its own steps into this session's Status box under its name |
+| `SubagentStart` | `scripts/podium_status.py hook subagent` | opens the subagent's `task` row in this session's Status box (running, no %) and tells the agent not to write it |
+| `SubagentStop` | `scripts/podium_status.py hook subagent-stop` | closes that row as done (100%) or failed, with the measured duration, tool calls and output tokens |
+| `PostToolUse` (every tool) | `scripts/podium_status.py hook tool` | a subagent's tool call refreshes its row's tool count and time; a call of the session itself writes nothing |
 | `PreToolUse` (Edit, Write, NotebookEdit, Bash) | `scripts/podium_status.py hook guard` | with *Plan* on `block`, refuses a code edit or a `git commit` until the Status box holds steps; `~/.claude` and temp files are never refused |
 | `PreToolUse` (Bash) | `scripts/guard-destructive.sh` | refuses the never-do commands (forced push, push to `main`, `--no-verify`, `DROP`/`TRUNCATE`, `rm -rf` on `/` `~` `.` `*`); a push to `prod` is not judged here, it follows `push.prod` in the configuration |
 | `PostToolUse` (Edit, Write), `Stop` | `scripts/md-hook.sh` | checks a touched `CLAUDE.md` against its size budget and for dropped rules, and the copied scripts for drift; warns only |
@@ -62,10 +64,10 @@ boxes refresh after every turn, so a merge, a push or a `/podium:config` change 
 reopening them.
 
 - **Status.** The work's steps (what runs now and next stay in the status file but are not drawn): step · state · % · note, with no heading row (the step column is narrow and wraps). The state is one short word (todo,
-  run, done, stuck, skip), the % sits right after it, the note column holds every other detail (the state's own detail,
+  run, done, stuck, fail, skip), the % sits right after it, the note column holds every other detail (the state's own detail,
   `--note`, an older row's figure), and `-> what blocks it` sits under the step; a running step is bold. Each agent
   (this session first, then every subagent) is an accordion named in bold with its state and %; under it **To do** (what
-  runs and what is next, open) and **Completed** (closed at start). The note is one line that does not wrap (the pane
+  runs and what is next, open) and **Completed** (closed at start; a `fail` row stays in To do until someone looks at it). A subagent's row is written by the hooks (SubagentStart, SubagentStop), never by the agent. The note is one line that does not wrap (the pane
   cannot scroll sideways): a long one is cut at the edge and shows whole in a card while the pointer is on the row. Claude
   writes the steps first, before any work, with `scripts/podium_status.py step`; a background gate or promotion writes
   its own ([`standards/00-working-method.md`](../standards/00-working-method.md) §1a, §10d).

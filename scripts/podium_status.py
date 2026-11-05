@@ -21,7 +21,9 @@ Usage:
                                                              (0-100), what blocks it, who runs it (a subagent; none =
                                                              this session); --after puts a new step after that one,
                                                              else it goes last. Replaced in place.
-    podium_status.py --session ID drop ITEM [--agent NAME]  remove the row named ITEM
+    podium_status.py --session ID drop ITEM [--agent NAME]  remove the step named ITEM (a unique prefix of the name does too)
+    podium_status.py --session ID rename OLD NEW [--agent NAME]
+                                                             give a step a new name, in place (OLD may be a unique prefix)
     podium_status.py --session ID clear                     empty the table (also replaces a corrupt file)
     podium_status.py --session ID show [--json]             print it
     podium_status.py hook EVENT                             the plugin's hooks (stdin: the hook payload), in
@@ -42,23 +44,17 @@ try:
 except ImportError:  # Windows: no advisory lock; one writer at a time is then the caller's duty (documented in §10d).
     fcntl = None
 
+# The rows and what is done to them live in podium_status_rows.py (beside this file); the names are re-exported here.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from podium_status_rows import (CLOSED, CONTROL, FIELDS, MAX_ROWS, MAX_TEXT, OPEN, STATES, STEP_FIELDS,  # noqa: E402,F401
+                                StatusError, clip, drop_row, percent, put_row, rename_row, running_item, same,
+                                step_percent, trim)
+
 KEEP_DAYS = 14
 MAX_ID = 100
-MAX_TEXT = 300
-MAX_ROWS = 50
-FIELDS = ('item', 'state', 'figure', 'waiting')
-# A step's own fields (user decision 02/11/2026); a row written by `row` leaves them empty.
-STEP_FIELDS = ('percent', 'blocker', 'agent', 'note')     # note: what the step's short name leaves out
-STATES = ('not started', 'running', 'done', 'blocked', 'did not run')
-OPEN, CLOSED = STATES[:2] + STATES[3:4], (STATES[2], STATES[4])      # a step still to finish, and one that is over
 EMPTY = {'now': '', 'next': '', 'rows': [], 'updated': ''}
 SESSION_ID = re.compile(r'^[A-Za-z0-9_-]{1,%d}$' % MAX_ID)
 STATUS_NAME = re.compile(r'^[A-Za-z0-9_-]{1,%d}\.json$' % MAX_ID)
-CONTROL = re.compile('[\x00-\x1f\x7f-\x9f]')
-
-
-class StatusError(Exception):
-    """A refusal the command line reports with exit code 2."""
 
 
 def status_dir():
@@ -77,12 +73,6 @@ def status_file(session):
     if not valid(session):
         raise StatusError('not a usable session id: %r' % (session,))
     return os.path.join(status_dir(), session + '.json')
-
-
-def clip(text):
-    """One line of at most MAX_TEXT characters with no control characters: the box draws one line per field."""
-    flat = ' '.join(CONTROL.sub(' ', '' if text is None else str(text)).split())
-    return flat if len(flat) <= MAX_TEXT else flat[:MAX_TEXT - 1] + '…'
 
 
 def is_table(data):
@@ -175,52 +165,6 @@ def prune(now=None, keep_days=KEEP_DAYS):
     return removed
 
 
-def step_percent(row):
-    """A row's percentage; an older writer keeps only `figure`, where `step` also writes it (`45%`), so it is read back."""
-    given = percent(row.get('percent'))
-    return given or (percent(row.get('figure')) if re.match(r'^\d{1,3}%$', str(row.get('figure') or '')) else '')
-
-
-def trim(rows):
-    """At most MAX_ROWS: a finished subagent step goes first, then any subagent step, then a finished step of this
-    session; a step of this session still to finish goes last (qa, 02/11/2026: the plan must not vanish silently)."""
-    rows = list(rows)
-    picks = (lambda row: row['agent'] and row['state'] in CLOSED, lambda row: row['agent'], lambda row: row['state'] in CLOSED,
-             lambda row: True)
-    while len(rows) > MAX_ROWS:
-        rows.pop(next(at for pick in picks for at, row in enumerate(rows) if pick(row)))
-    return rows
-
-
-def percent(value):
-    """How much of a step is done, as '0'..'100', or '' when not given (`45`, `45%`, `45.5` read as 45)."""
-    match = re.match(r'^\s*(\d+(?:\.\d+)?)\s*%?\s*$', '' if value is None else str(value))
-    return str(min(100, int(float(match.group(1))))) if match else ''
-
-
-def same(one, item, agent):
-    """A row is named by its item and who runs it: two agents may each have a step of the same name."""
-    return one.get('item') == item and one.get('agent', '') == agent
-
-
-def put_row(data, item, state, figure, waiting, step=None, after=None):
-    """Add the row, or replace the one of the same name and runner in place; a new row goes after `after` if given."""
-    row = dict({'item': clip(item), 'state': clip(state), 'figure': clip(figure), 'waiting': clip(waiting)},
-               **dict({key: '' for key in STEP_FIELDS}, **(step or {})))
-    rows = [dict(one) for one in data['rows']]
-    at = next((i for i, one in enumerate(rows) if same(one, row['item'], row['agent'])), None)
-    if at is not None:
-        rows[at] = row
-        return dict(data, rows=rows)
-    anchor = next((i for i, one in enumerate(rows) if after is not None and same(one, clip(after), row['agent'])), None)
-    rows.insert(len(rows) if anchor is None else anchor + 1, row)
-    return dict(data, rows=rows)
-
-
-def drop_row(data, item, agent=''):
-    return dict(data, rows=[one for one in data['rows'] if not same(one, clip(item), clip(agent))])
-
-
 def render(data):
     lines = []
     if data['now']:
@@ -251,6 +195,10 @@ def change(args):
             data = put_row(data, args.item, args.state, figure, step['blocker'], step, args.after)
         elif args.action == 'drop':
             data = drop_row(data, args.item, args.agent)
+        elif args.action == 'rename':
+            data = rename_row(data, args.old, args.new, args.agent)
+        if args.action in ('step', 'drop', 'rename') and running_item(data):
+            data = dict(data, now=clip(running_item(data)))      # `now` is the name of the step at work, never a raw message
         save(args.session, data)
 
 
@@ -280,6 +228,10 @@ def main(argv=None):
     drop = sub.add_parser('drop')
     drop.add_argument('item')
     drop.add_argument('--agent', default='')
+    rename = sub.add_parser('rename')
+    for name in ('old', 'new'):
+        rename.add_argument(name)
+    rename.add_argument('--agent', default='')
     sub.add_parser('clear')
     sub.add_parser('show').add_argument('--json', action='store_true')
     args = parser.parse_args(argv)
