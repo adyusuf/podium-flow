@@ -146,9 +146,10 @@ class RootPluginTest(unittest.TestCase):
         self.assertIn('panels', own_names())
         self.assertIn('podium_config.py', read('commands', 'panels.md'))
 
-    def test_hook_events_are_exactly_the_seven(self):
+    def test_hook_events_are_exactly_the_eight(self):
         self.assertEqual(sorted(normalised_hooks()),
-                         ['PostToolUse', 'PreToolUse', 'SessionStart', 'Stop', 'StopFailure', 'SubagentStart', 'UserPromptSubmit'])
+                         ['PostToolUse', 'PreToolUse', 'SessionStart', 'Stop', 'StopFailure', 'SubagentStart', 'SubagentStop',
+                          'UserPromptSubmit'])
 
     def test_rules_parts_one_to_four_and_the_configuration_on_session_start_and_nothing_else(self):
         rules = [f'{RULES_CTX} session {n} 4' for n in range(1, 5)]
@@ -157,7 +158,7 @@ class RootPluginTest(unittest.TestCase):
         self.assertEqual(commands_of('SessionStart'), [(None, rules)])
 
     def test_rules_parts_one_to_four_on_subagent_start(self):
-        subagent_steps = f'python3 "{ROOT}/scripts/podium_status.py" hook subagent'   # a subagent writes its own steps
+        subagent_steps = f'python3 "{ROOT}/scripts/podium_status.py" hook subagent'   # the subagent's row opens in the box
         self.assertEqual(commands_of('SubagentStart'), [(None, [f'{RULES_CTX} subagent {n} 4' for n in range(1, 5)] + [subagent_steps])])
 
     def test_the_guard_runs_before_a_bash_call_and_nothing_else_does(self):
@@ -170,12 +171,18 @@ class RootPluginTest(unittest.TestCase):
         size_hook = [f'bash "{ROOT}/scripts/md-hook.sh"']
         notify = lambda event: [f'python3 "{ROOT}/scripts/podium_config.py" notify {event}']  # noqa: E731
         # After a task boundary (an agent call, a shell command) and before each prompt, a changed setting is announced.
-        self.assertEqual(commands_of('PostToolUse'), [('Edit|Write', size_hook), ('Agent|Bash', notify('PostToolUse'))])
+        status_tool = f'python3 "{ROOT}/scripts/podium_status.py" hook tool'      # a subagent's row counts its tool calls (05/11/2026)
+        self.assertEqual(commands_of('PostToolUse'),
+                         [('Edit|Write', size_hook), ('Agent|Bash', notify('PostToolUse')), (None, [status_tool])])
         # Every session's Status box: a message sets what runs now, the end of a turn says it waits (02/11/2026).
         status = lambda event: f'python3 "{ROOT}/scripts/podium_status.py" hook {event}'  # noqa: E731
         self.assertEqual(commands_of('UserPromptSubmit'), [(None, notify('UserPromptSubmit') + [status('prompt')])])
         self.assertEqual(commands_of('Stop'), [(None, size_hook + [status('stop')])])
         self.assertEqual(commands_of('StopFailure'), [(None, [status('stop')])])     # an API error ends the turn too
+
+    def test_the_subagent_row_is_closed_by_a_hook_when_the_agent_stops(self):
+        stop = f'python3 "{ROOT}/scripts/podium_status.py" hook subagent-stop'
+        self.assertEqual(commands_of('SubagentStop'), [(None, [stop])])
 
     def test_every_hook_is_a_command_hook(self):
         types = {kind for groups in normalised_hooks().values() for _, hooks in groups for kind, _ in hooks}

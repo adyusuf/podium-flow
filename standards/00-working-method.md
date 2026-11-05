@@ -25,7 +25,7 @@ message until it is done. A one-question/one-answer exchange gets no list.
   order: each with a short name, its state (not started · running · done · blocked · did not run), how much of it is done
   (%), what blocks it (`--blocker`) and any details (`--note`); the box shows the state as one short word (todo · run ·
   done · stuck · skip), the % beside it and every detail in a last column. A request that arrives mid-work is analysed the same way and its steps go in where they belong (`--after`).
-  A subagent writes its own steps under its name (`--agent`); the box shows each agent as an accordion (To do open, Completed closed) with its %. The setting
+  A subagent's row is written by the hooks, never by the agent (§10d); the box shows each agent as an accordion (To do open, Completed closed). The setting
   `steps.enforce` decides how hard: `block` (default) refuses a code edit or a commit until the box holds steps,
   `remind` only reminds on each message. Claude's own bookkeeping in `~/.claude` and temp files are never blocked.
 - **Open choices are decision tasks:** what cannot be decided from the request, the code
@@ -368,7 +368,7 @@ deliverable.
   work goes on, and it is cleared only when the work is done.
 - **Claude writes it at every state change**, with `scripts/podium_status.py --session <id>` (the installed plugin's
   copy): `now` (what runs now), `next` (what runs next), `step ITEM STATE PERCENT [--blocker] [--agent] [--after]` (one
-  step of the work, §1a, replaced by its item and runner), `drop`, `clear` when the work is done (`clear` also replaces a
+  step of the work, §1a, replaced by its item and runner), `drop`, `rename`, `clear` when the work is done (`clear` also replaces a
   corrupt file); `row ITEM STATE FIGURE WAITING` still writes an older row. The session id is the one the plugin's
   session-start context names ("this session is <id>"). A background run (a gate, a promotion) writes its own steps the
   same way, so the box moves while Claude waits; writers take a lock, so neither loses the other's rows (no lock on
@@ -377,8 +377,15 @@ deliverable.
   exists it is an estimate and the step's name or blocker says so. A blocked step keeps its % and names its reason
   (`--blocker`), which the box shows as `-> reason`. The reply table (§10) is unchanged: measured figures with their
   signal, and a blocked row there states the reason, not a percentage.
+- **A subagent's row is written by the hooks (user decision 05/11/2026): the subagent row is written by the hook, never
+  by the agent or the orchestrator, and a percentage is only ever measured.** `SubagentStart` opens an `--agent`-labelled
+  `task` step (running, no %); each tool call of the agent refreshes its note (tool calls, time); `SubagentStop` makes it
+  `done` (100%) or `failed` (a failed row stays, never dropped) with the measured duration, tool calls and output
+  tokens, and closes the agent's other open steps. A figure with no signal is left out (`podium_status_agents.py`).
+  `drop` and `--after` take an exact step name or a unique prefix, `rename OLD NEW` renames in place, and `now` is the name
+  of the step at work, never the user's raw message.
 - **Every session, automatically (user decision 02/11/2026):** the plugin's hooks (`podium_status.py hook`) write
-  *Now*: `waiting for you` when a session starts, the first line of each message the user sends (a system-started turn
+  *Now*: `waiting for you` when a session starts, the name of the step at work, or `analysing the request` (a system-started turn
   leaves it), and at each turn's end `waiting for you`, or `waiting for background work` while a background task or a
   session cron runs; an API error (`StopFailure`) and an interrupt (the pane, on `turn.complete`) end a turn too. The
   session-start context names the script and this session's id, and Claude adds `next` and the rows as above. On

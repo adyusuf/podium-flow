@@ -53,9 +53,9 @@ class StatusTable(unittest.TestCase):
         self.run_hook('prompt', {'session_id': SESSION, 'prompt': 'promote dev', 'source': 'user'})
         for source in ('system', 'loop_wakeup', 'schedule_wakeup'):
             self.run_hook('prompt', {'session_id': SESSION, 'prompt': '<task-notification>', 'source': source})
-        self.assertEqual('working on: promote dev', self.table()['now'])
+        self.assertEqual('analysing the request', self.table()['now'])        # the raw message is never echoed
         self.run_hook('prompt', {'session_id': SESSION, 'prompt': 'from the sdk', 'source': 'sdk'})
-        self.assertEqual('working on: from the sdk', self.table()['now'])
+        self.assertEqual('analysing the request', self.table()['now'])
 
     def test_a_turn_that_leaves_background_work_running_waits_for_it_not_for_the_user(self):
         self.run_hook('stop', {'session_id': SESSION, 'background_tasks': [{'id': 'b1', 'status': 'running'}]})
@@ -69,7 +69,7 @@ class StatusTable(unittest.TestCase):
         env = dict(self.env, PYTHONIOENCODING='cp1252')
         _, err, code = self.run_hook('prompt', {'session_id': SESSION, 'prompt': 'ara Şişman ❌'}, env=env)
         self.assertEqual((0, ''), (code, err))
-        self.assertEqual('working on: ara Şişman ❌', self.table()['now'])
+        self.assertEqual('analysing the request', self.table()['now'])
         done = subprocess.run([sys.executable, SCRIPT, 'hook', 'stop'], env=self.env, capture_output=True, stdin=subprocess.DEVNULL)
         self.assertEqual((0, b''), (done.returncode, done.stderr))
 
@@ -80,7 +80,7 @@ class StatusTable(unittest.TestCase):
         self.assertEqual((0, ''), (code, err))
         self.assertIn('analyse it', json.loads(out)['hookSpecificOutput']['additionalContext'])   # the steps reminder
         data = self.table()
-        self.assertEqual(('working on: add tabs', ''), (data['now'], data['next']))
+        self.assertEqual(('gate', ''), (data['now'], data['next']))       # the running row's name, never the message
         self.assertEqual(['gate'], [row['item'] for row in data['rows']])        # Claude's rows stay
         self.run_hook('stop', {'session_id': SESSION})
         self.assertEqual(('waiting for you', ['gate']), (self.table()['now'], [row['item'] for row in self.table()['rows']]))
