@@ -18,9 +18,10 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+os.environ.setdefault('PODIUM_SETTINGS_SOURCE', 'file')  # a developer's own live panel must not change a result (gate-lib-panel.sh)
 
 SCRIPTS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-FILES = ('gate-core.sh', 'gate-lib.sh', 'gate-lib-node.sh', 'gate-lib-prod.sh')
+FILES = ('gate-core.sh', 'gate-lib.sh', 'gate-lib-panel.sh', 'gate-lib-node.sh', 'gate-lib-prod.sh')
 ANSI = re.compile(r'\x1b\[[0-9;]*m')
 
 

@@ -106,8 +106,10 @@ it. The canonical copy lives here; every project commits a copy, because a
 project's gate cannot depend on a path outside its repository (CI runners do not
 have the configuration checked out). `twin-drift.sh` and `md-hook.sh` catch a copy that drifted.
 
-The core sources three libraries beside it, `gate-lib.sh` (counters, helpers, stack detection, the verdict),
-`gate-lib-node.sh` (the Node steps) and `gate-lib-prod.sh` (the test-deploy check and e2e, both only on request); they
+The core sources four libraries beside it, `gate-lib.sh` (counters, helpers, stack detection, the verdict),
+`gate-lib-panel.sh` (where the panel's values come from: the live panel when the podium plugin is enabled, else - and
+always in CI - `.claude/sdlc-settings.json`; `gates_before_push.<t>` = no runs coverage only and exits 10), `gate-lib-node.sh` (the Node steps) and `gate-lib-prod.sh` (the test-deploy check and
+e2e, both only on request); they
 were split out so no file passes 300 lines (#9) and are copied with it.
 
 `gate-core.sh <target> --list` prints the steps that WOULD run and the command
@@ -181,7 +183,7 @@ Not everything here is meant to be copied, and some copied files must be edited.
 
 | File | What to do | Note |
 |---|---|---|
-| `gate-core.sh` + `gate-lib.sh`, `gate-lib-node.sh`, `gate-lib-prod.sh` | **Copy all four as is** | The core sources the three libraries from beside itself. Configure it through `scripts/merge-gate.conf`, never by editing the copy. |
+| `gate-core.sh` + `gate-lib.sh`, `gate-lib-panel.sh`, `gate-lib-node.sh`, `gate-lib-prod.sh` | **Copy all five as is** | The core sources the four libraries from beside itself. Configure it through `scripts/merge-gate.conf`, never by editing the copy. |
 | `merge-gate.sh` | **Write your own** | The project's orchestrator: pull, merge, push, and a call to `gate-core.sh`. This repository ships no template for it. |
 | `merge-gate.conf` | **Create, values are yours** | The commands, `TEST_VERSION_URL`, `ACCEPTED_GAPS` with a written reason. The values shown in `gate-core.sh`'s header are examples, not defaults to keep. |
 | `md-size-gate.sh`, `md-rule-gate.py`, `md-split.py`, `audit-triage.py` | **Copy as is** | `audit-triage.tsv` is yours and starts absent: no file, no waiver. |

@@ -11,7 +11,12 @@ set -uo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 target="${1:-dev}"
 
-bash "$ROOT/scripts/gate-core.sh" "$target" || exit 1
+core_rc=0
+bash "$ROOT/scripts/gate-core.sh" "$target" || core_rc=$?
+# 10: the panel turned the gate off (gates_before_push.<t> = no) - the push is allowed, nothing passed, and this
+# wrapper's own steps do not run either (standards/13 §8a). Any other non-zero is a closed gate.
+[ "$core_rc" = 10 ] && exit 10
+[ "$core_rc" = 0 ] || exit 1
 
 # ── This repository's own extra step ─────────────────────────────────────────
 # Being the canonical set carries one duty no project has: keeping the copies in
