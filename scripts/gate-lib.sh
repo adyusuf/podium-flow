@@ -125,10 +125,10 @@ gate_coverage() {
   local setting; setting="$(coverage_setting)"
   if [ "$setting" = "no" ]; then
     # Not a pass and not a gap: the user turned it off. Reported on every run, never counted as passed.
-    printf '  \033[33m-\033[0m WAIVED: coverage (coverage_before_push.%s = no in %s)\n' "$TARGET" "$SDLC_SETTINGS_FILE"
+    printf '  \033[33m-\033[0m WAIVED: coverage (coverage_before_push.%s = no in %s)\n' "$TARGET" "${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE}"
     WAIVED+=("coverage"); return 0
   fi
-  [ "$setting" = "unreadable" ] && warn "$SDLC_SETTINGS_FILE could not be read - coverage runs (fail closed)"
+  [ "$setting" = "unreadable" ] && warn "${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE} could not be read - coverage runs (fail closed)"
   # RUN_SHOW: a green coverage step prints the figures it measured (rule #15: a figure is read, not assumed).
   if [ -n "${COVERAGE_CMD:-}" ]; then RUN_SHOW=1 run "coverage" bash -c "$COVERAGE_CMD"
   elif [ -x scripts/coverage.sh ]; then RUN_SHOW=1 run "coverage" bash scripts/coverage.sh
@@ -159,7 +159,7 @@ gate_steps_off() {
   [ "$GATE_STEPS_READ" = 0 ] || return 0
   GATE_STEPS_READ=1
   [ -f "$SDLC_SETTINGS_FILE" ] || return 0
-  have python3 || { warn "python3 is missing: $SDLC_SETTINGS_FILE not read - every gate step runs (fail closed)"; return 0; }
+  have python3 || { warn "python3 is missing: ${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE} not read - every gate step runs (fail closed)"; return 0; }
   # Only well-formed ids come back (qa 02/11/2026): a key such as `*` would otherwise glob over the files in the project.
   GATE_STEPS_OFF="$(python3 -c 'import json, re, sys
 try:
@@ -171,12 +171,12 @@ except Exception:
 print(" ".join(sorted(i for i, t in steps.items()
                      if re.fullmatch("[a-z0-9_]+", i) and isinstance(t, dict) and t.get(sys.argv[2]) is False)))' \
     "$SDLC_SETTINGS_FILE" "$TARGET" 2>/dev/null)" || {
-    GATE_STEPS_OFF=""; warn "$SDLC_SETTINGS_FILE could not be read - every gate step runs (fail closed)"; }
+    GATE_STEPS_OFF=""; warn "${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE} could not be read - every gate step runs (fail closed)"; }
   # A locked step runs whatever the file says: a pull request that commits it off changes nothing, and the gate says so.
   local id kept=""
   for id in $GATE_STEPS_OFF; do
     if printf '%s\n' "$GATE_STEPS" | awk -F'|' -v id="$id" '$1 == id && $4 == "locked" { found = 1 } END { exit !found }'; then
-      warn "gate_steps.$id.$TARGET = no in $SDLC_SETTINGS_FILE was IGNORED: $id is locked and always runs (rule #19)"
+      warn "gate_steps.$id.$TARGET = no in ${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE} was IGNORED: $id is locked and always runs (rule #19)"
     else kept="$kept $id"; fi
   done
   GATE_STEPS_OFF="${kept# }"
@@ -188,7 +188,7 @@ gate_step() {
   local heading; heading="$(printf '%s\n' "$GATE_STEPS" | awk -F'|' -v id="$1" '$1 == id { print $3 }')"
   say "${heading:-$1}"
   step_on "$1" && return 0
-  printf '  \033[33m-\033[0m WAIVED: %s (gate_steps.%s.%s = no in %s)\n' "$1" "$1" "$TARGET" "$SDLC_SETTINGS_FILE"
+  printf '  \033[33m-\033[0m WAIVED: %s (gate_steps.%s.%s = no in %s)\n' "$1" "$1" "$TARGET" "${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE}"
   WAIVED+=("$1"); return 1
 }
 
@@ -232,6 +232,7 @@ gate_e2e_specs() {
 
 # ── The verdict ──────────────────────────────────────────────────────────────
 gate_result() {
+  [ -n "${PANEL_LIVE_FILE:-}" ] && rm -f "$PANEL_LIVE_FILE"   # the live panel's copy (gate-lib-panel.sh)
   printf '\n\033[1m── result ──\033[0m\n'
   # A listing runs nothing, so nothing "passed": the count is what WOULD run (--list).
   if [ "$LIST_ONLY" = 1 ]; then printf '  would run: %d\n' "${#PASS[@]}"; else printf '  passed  : %d\n' "${#PASS[@]}"; fi
@@ -265,13 +266,18 @@ gate_result() {
     exit 0
   fi
   # Only coverage ran, so this is not the gate's green: it says what was not run.
+  if [ "${COVERAGE_ONLY:-0}" = 1 ] && [ "${GATE_OFF_BY_PANEL:-0}" = 1 ]; then
+    printf '  - WAIVED the gate (gates_before_push.%s = no; the merge commit must carry Gate-Waived)\n' "$TARGET"
+  fi
+  # Exit 10 when the gate turned itself off (gates_before_push.<t> = no): allowed, but not a pass a caller may stamp.
+  local off_exit=0; [ "${GATE_OFF_BY_PANEL:-0}" = 1 ] && off_exit=10
   if [ "${COVERAGE_ONLY:-0}" = 1 ] && [ "${#WAIVED[@]}" -gt 0 ]; then
     printf '\n\033[33mCOVERAGE WAIVED\033[0m — coverage_before_push.%s is no: nothing ran, nothing passed. The push is allowed by configuration.\n' "$TARGET"
-    exit 0
+    exit "$off_exit"
   fi
   if [ "${COVERAGE_ONLY:-0}" = 1 ]; then
     printf '\n\033[32mCOVERAGE GREEN\033[0m — the coverage step passed. The rest of the %s gate did NOT run (turned off by configuration).\n' "$TARGET"
-    exit 0
+    exit "$off_exit"
   fi
   if [ "${#ACCEPTED[@]}" -gt 0 ] || [ "${#WAIVED[@]}" -gt 0 ]; then
     printf '\n\033[32mGATE GREEN\033[0m (with %d accepted gap(s), %d step(s) waived by configuration: %s) — %s promotion is allowed.\n' \

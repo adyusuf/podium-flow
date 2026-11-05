@@ -14,9 +14,10 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+os.environ.setdefault('PODIUM_SETTINGS_SOURCE', 'file')  # a developer's own live panel must not change a result (gate-lib-panel.sh)
 
 SCRIPTS = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-FILES = ('gate-core.sh', 'gate-lib.sh', 'gate-lib-node.sh', 'gate-lib-prod.sh', 'md-size-gate.sh', 'md-rule-gate.py')
+FILES = ('gate-core.sh', 'gate-lib.sh', 'gate-lib-panel.sh', 'gate-lib-node.sh', 'gate-lib-prod.sh', 'md-size-gate.sh', 'md-rule-gate.py')
 ANSI = re.compile(r'\x1b\[[0-9;]*m')
 # Every step resolves to a command, so the listing has nothing to skip.
 CONF = 'COVERAGE_CMD="true"\nSAST_CMD="true"\nBACKCOMPAT_CMD="true"\n'
