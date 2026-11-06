@@ -52,7 +52,7 @@ from podium_status_rows import (CLOSED, CONTROL, FIELDS, MAX_ROWS, MAX_TEXT, OPE
 
 KEEP_DAYS = 14
 MAX_ID = 100
-EMPTY = {'now': '', 'next': '', 'rows': [], 'updated': ''}
+EMPTY = {'now': '', 'next': '', 'rows': [], 'updated': '', 'budget': ''}
 SESSION_ID = re.compile(r'^[A-Za-z0-9_-]{1,%d}$' % MAX_ID)
 STATUS_NAME = re.compile(r'^[A-Za-z0-9_-]{1,%d}\.json$' % MAX_ID)
 
@@ -84,7 +84,7 @@ def normalise(data):
     rows = [dict({key: clip(row.get(key)) for key in FIELDS + STEP_FIELDS}, percent=step_percent(row))
             for row in data.get('rows', []) if isinstance(row, dict)]
     return {'now': clip(data.get('now')), 'next': clip(data.get('next')), 'rows': trim(rows),
-            'updated': clip(data.get('updated'))}
+            'updated': clip(data.get('updated')), 'budget': clip(data.get('budget'))}
 
 
 def load(session):
@@ -166,7 +166,7 @@ def prune(now=None, keep_days=KEEP_DAYS):
 
 
 def render(data):
-    lines = []
+    lines = ['budget: ' + data['budget']] if data.get('budget') else []
     if data['now']:
         lines.append('now:  ' + data['now'])
     if data['next']:
@@ -177,7 +177,7 @@ def render(data):
             lines.append(' | '.join([row['agent'] or 'session', row['item'], row['state'], done, row['blocker'], row['note']]).rstrip(' |'))
         else:
             lines.append(' | '.join(row.get(key, '') for key in FIELDS))
-    return '\n'.join(lines) if lines else 'nothing running'
+    return '\n'.join(lines) if len(lines) > (1 if data.get('budget') else 0) else '\n'.join(lines + ['nothing running'])
 
 
 def change(args):
