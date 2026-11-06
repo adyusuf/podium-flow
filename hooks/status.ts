@@ -6,7 +6,8 @@ import { helpCard, hoverable, INDENT } from './controls'
 
 /** A step (user decision 02/11/2026): `percent` done ('' when not given), `blocker`, and `agent` ('' = this session). */
 type StatusRow = { item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string; note: string }
-export type StatusData = { now: string; next: string; rows: StatusRow[]; updated: string }
+/** `budget` (user decision 06/11/2026): this session's measured spend against the panel's budget, one line; shown, never a stop. */
+export type StatusData = { now: string; next: string; rows: StatusRow[]; updated: string; budget: string }
 
 /** The same caps as scripts/podium_status.py: the file is read as untrusted text, so a foreign file cannot flood the box. */
 const MAX_ROWS = 50
@@ -71,7 +72,7 @@ export function parseStatus(text: string): StatusData | null {
       percent: /^\d{1,3}$/.test(clean(row.percent)) ? clean(row.percent) : '', blocker: clean(row.blocker), agent: clean(row.agent),
       note: clean(row.note),
     }))
-  return { now: clean(one.now), next: clean(one.next), rows, updated: clean(one.updated) }
+  return { now: clean(one.now), next: clean(one.next), rows, updated: clean(one.updated), budget: clean(one.budget) }
 }
 
 /** The short state words (user decision 02/11/2026), so the State column stays narrow: a state is one of these. */
@@ -153,7 +154,9 @@ export function splitSteps(rows: StatusRow[]): { todo: StatusRow[]; done: Status
  */
 export function statusBody(ui: Ui, data: StatusData | null, folds: AgentFolds = START_FOLDS) {
   const { h } = ui
-  if (!busy(data)) return h(ui.Text, { dimColor: true }, 'nothing running')
+  // The spend line comes first, whether or not a step is open: the user follows the budget here (06/11/2026).
+  const spend = data && data.budget ? h(ui.Text, { dimColor: true }, `budget: ${data.budget}`) : null
+  if (!busy(data)) return spend ? h(ui.Box, { flexDirection: 'column' }, spend, h(ui.Text, { dimColor: true }, 'nothing running')) : h(ui.Text, { dimColor: true }, 'nothing running')
   const fields = (row: StatusRow) => [row.item, splitState(row.state).short, row.percent === '' ? '' : `${row.percent}%`, noteOf(row)]
   const blocker = (row: StatusRow) => (PLACEHOLDERS.includes(row.blocker || row.waiting) ? '' : `-> ${row.blocker || row.waiting}`)
   // No heading row (user decision 04/11/2026): the columns are step · state · % · note, in that order, and need no names.
@@ -188,5 +191,5 @@ export function statusBody(ui: Ui, data: StatusData | null, folds: AgentFolds = 
       folds.folded(id) ? null : [branch(name, 'todo', todo), branch(name, 'done', done)])
   }
   return h(ui.Box, { flexDirection: 'column' },
-    stepGroups(data.rows).map(accordion))
+    spend, stepGroups(data.rows).map(accordion))
 }

@@ -7,7 +7,7 @@ import collections, json, os, re
 
 PRICES = {'claude-fable-5-1': (10, 50, .025), 'claude-opus-5': (5, 25, .10),
           'claude-opus-4-8': (5, 25, .10), 'claude-sonnet-5': (2, 10, .10),
-          'claude-haiku-4-5': (1, 5, .10)}
+          'claude-haiku-5': (1, 5, .10), 'claude-haiku-4-5': (1, 5, .10)}
 
 def price(model):
     for key, value in PRICES.items():
