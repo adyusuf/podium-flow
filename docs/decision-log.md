@@ -2233,3 +2233,18 @@ exists, and `now` is the name of the step at work instead of the user's raw mess
 Not decided here: the real SubagentStop payload has no documented failure flag, so `failed` is read from `error`, `is_error`
 or a failed `status` in it and an agent that is killed without a stop event stays `running`; no model is shown unless the
 payload names one; changed-file counts from `git status` were left out (one git call per tool call is too costly).
+
+## §20 — The money budget stops nothing; the Status box shows the spend (06/11/2026, user decision)
+
+**Decision.** *"session'ın para olarak bütçesine takılma … bütçeyi panelde durum alanına yaz takip oradan olsun."* No
+money figure halts, gates or questions work any more: the autonomous run's $100 ceiling and its 2x-headroom rule
+(`modes/autonomous-run.md` item 2 and two stop conditions) and mode E's cost question are removed. The spend is shown
+instead: the Status box's first line, `budget:`, written by the hooks at every user message, turn end and subagent stop
+(`scripts/podium_budget.py`), set against the new panel setting `budget.session_usd` (none/25/50/100/200/500/1000,
+default 100).
+**Why.** The ceiling stopped long runs on a list-price proxy, not on anything the user was charged; the user wants to
+follow the figure, not be stopped by it.
+**Measured.** On the session that made the decision the line read `$116.51 spent of $100 (117%) — over the budget,
+shown only: work goes on`. Tests: `scripts/tests/test_podium_budget.py` (9; mutants that drop the subagents or the field
+fail), `hooks/status.test.ts` (the line is drawn first).
+

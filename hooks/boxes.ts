@@ -87,6 +87,8 @@ export const ROWS: Row[] = [
   { label: 'Replies', key: 'reply.length' },
   // `Plan` since 02/11/2026 (was `Steps`, which now names the gate's steps under Gates); the key stays (rule #4).
   { label: 'Plan', key: 'steps.enforce' },
+  // Shown against the measured spend in Status; it never stops work (user decision 06/11/2026).
+  { label: 'Budget', key: 'budget.session_usd', names: { none: 'none' } },
   { label: 'Pod', items: [{ key: 'pod.connect', name: 'on' }] },
   { label: 'Format', key: 'pod.message_format' },
   { label: 'Tests', items: [{ key: 'write.unit_tests', name: 'unit' }, { key: 'write.e2e', name: 'e2e' }] },
