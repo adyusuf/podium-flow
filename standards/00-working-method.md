@@ -363,6 +363,10 @@ Where the `podium` pane runs, the table is ALSO kept in the session's status fil
 first box) shows it. It does not replace the table in the reply, at any reply length (§5a); the reply table stays the
 deliverable.
 
+- **The budget line (user decision 06/11/2026):** the box's first line is `budget:` — this session's spend, MEASURED
+  by the hooks at every user message, turn end and subagent stop (`scripts/podium_budget.py`: the session's and its
+  subagents' transcripts, tokens × API list price, a proxy, not a bill) against the panel's `budget.session_usd`
+  (`none` = the spend alone). It is where the budget is followed; it never stops or gates work, in any mode or run.
 - **Every task, not only a long run (user decision 01/11/2026):** from the first step of any task with more than one step
   to its end, the box shows what runs now, what runs next and one row per piece; it is never left empty or stale while
   work goes on, and it is cleared only when the work is done.

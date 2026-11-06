@@ -124,6 +124,21 @@ def blocked(payload):
             % (SCRIPT, session, sign))
 
 
+def spend(session, payload):
+    """This session's measured spend line (user decision 06/11/2026: shown, never a stop), '' when nothing was measured.
+    Read BEFORE the status lock is taken (qa 06/11/2026): parsing a long transcript must not hold up a step's write."""
+    try:
+        import podium_budget
+        return podium_budget.status_line(session, str(payload.get('transcript_path') or ''))
+    except Exception:  # noqa: BLE001 - a hook never fails a session over a figure
+        return ''
+
+
+def budget(data, text):
+    """The table with `text` in `budget`; an empty one leaves the last figure as it was."""
+    return dict(data, budget=clip(text)) if text else data
+
+
 def context(event, text):
     print(json.dumps({'hookSpecificOutput': {'hookEventName': event, 'additionalContext': text}}))
 
@@ -157,19 +172,22 @@ def hook(event, payload_text):
             write(session, lambda data: start(data, payload, time.time()))
             return 0
         if event == 'subagent-stop':
-            write(session, lambda data: stop(data, payload, time.time()))
+            line = spend(session, payload)
+            write(session, lambda data: budget(stop(data, payload, time.time()), line))
             return 0
         if event == 'tool':
             if payload.get('agent_id'):          # a call of this session itself needs no write: the hook costs one start-up
                 write(session, lambda data: tick(data, payload, time.time()))
             return 0
         if event == 'prompt' and payload.get('source') in USER_SOURCES:
-            write(session, lambda data: dict(data, now=clip(hook_text(event, payload, data)), next=''))
+            line = spend(session, payload)
+            write(session, lambda data: budget(dict(data, now=clip(hook_text(event, payload, data)), next=''), line))
             context('UserPromptSubmit', reminder(session))
             return 0
         text = hook_text(event, payload)
         if text is not None:
-            write(session, lambda data: dict(data, now=clip(text), next=''))
+            line = spend(session, payload)
+            write(session, lambda data: budget(dict(data, now=clip(text), next=''), line))
     except Exception:  # noqa: BLE001 - a hook never fails a session, whatever the payload or the file holds
         return 0
     return 0

@@ -38,7 +38,7 @@ test('the status file is read as text: only strings are kept, anything else is n
   expect(parseStatus('[1, 2]')).toBe(null)
   expect(parseStatus('null')).toBe(null)
   const odd = parseStatus(JSON.stringify({ now: 5, rows: [{ item: 'a', state: 1 }, 'x', null] }))
-  expect(odd).toEqual({ now: '', next: '', updated: '', rows: [{ item: 'a', state: '', figure: '', waiting: '', percent: '', blocker: '', agent: '', note: '' }] })
+  expect(odd).toEqual({ now: '', next: '', updated: '', budget: '', rows: [{ item: 'a', state: '', figure: '', waiting: '', percent: '', blocker: '', agent: '', note: '' }] })
   // A percentage is digits only; anything else reads as not given.
   expect(parseStatus(JSON.stringify({ rows: [{ item: 'a', percent: '45' }, { item: 'b', percent: '45%' }, { item: 'c', percent: 7 }] }))!.rows.map(row => row.percent)).toEqual(['45', '', ''])
 })
@@ -184,4 +184,15 @@ test('a state is a short word and its detail; a group runs while a step runs, is
   expect(splitSteps([row('failed'), row('done')]).todo.map(one => one.state)).toEqual(['failed'])
   expect(noteOf({ ...row('running: half'), note: 'n', figure: '3/8' })).toBe('half · n · 3/8')
   expect(noteOf({ ...row('done'), percent: '100', figure: '100%' })).toBe('')
+})
+
+test('the budget line is drawn first, with or without a step, and read as untrusted text', () => {
+  const withSteps = parseStatus(JSON.stringify({ budget: '$12.00 spent of $100 (12%)\u001b[31m', rows: [{ item: 'a', state: 'running' }] }))
+  expect(withSteps?.budget).toBe('$12.00 spent of $100 (12%) [31m')
+  const drawn = statusBody(ui, withSteps) as Node
+  expect((drawn.children[0] as Node).children[0]).toBe('budget: $12.00 spent of $100 (12%) [31m')
+  const idle = statusBody(ui, parseStatus(JSON.stringify({ budget: '$1.00 spent · no budget set', rows: [] }))) as Node
+  expect(JSON.stringify(idle)).toContain('budget: $1.00 spent · no budget set')
+  expect(JSON.stringify(idle)).toContain('nothing running')
+  expect(JSON.stringify(statusBody(ui, parseStatus(JSON.stringify({ rows: [] }))))).toContain('nothing running')
 })

@@ -7,6 +7,9 @@
   "steps": {
     "enforce": "block"
   },
+  "budget": {
+    "session_usd": "100"
+  },
   "pod": {
     "connect": false,
     "message_format": "short"
