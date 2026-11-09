@@ -78,7 +78,7 @@ reopening them.
   start; the chosen tab is at full strength (in brackets in the terminal), and the pane remembers it. Under the tabs, one
   row per setting: the label, then that tab's options. (The screenshot is older: it shows the two as columns.)
   - *Mode* A–E (rule #27) and *Model\**, the model that replaces Opus in the roles marked `*` in Agents.
-  - *Replies* (`short`, `normal`, `long`; default `short`): how much Claude writes in a reply
+  - *Replies* (`short`, `normal`; default `short`; `long` retired 09/11/2026, read as `normal`): how much Claude writes in a reply
     ([`standards/00-working-method.md`](../standards/00-working-method.md) §5a).
   - *Plan* (`steps.enforce`: shown `force`, stored `block`, and `remind`; default `block`; labelled *Steps* until 02/11/2026): every task is split into steps in Status first; `force` refuses a
     code edit or a commit until the steps exist, `remind` only reminds on each message.
