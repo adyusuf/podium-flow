@@ -2248,6 +2248,23 @@ follow the figure, not be stopped by it.
 shown only: work goes on`. Tests: `scripts/tests/test_podium_budget.py` (9; mutants that drop the subagents or the field
 fail), `hooks/status.test.ts` (the line is drawn first).
 
+## adyusuf/claude-code-standards is retired; podium-flow is the only repository and folder (09/11/2026, user decision)
+
+The name `claude-code-standards` goes everywhere: the GitHub repository `adyusuf/claude-code-standards` is **deleted**
+and the local folder `~/ClaudeCode/claude-code-standards` is **deleted** (its one commit found nowhere else, the parked
+board WIP `56c1f45`, is kept as a local branch and a git-ignored patch in `.claude/parked/` of the podium-flow checkout;
+its git-ignored `docs/project-nicknames.tsv` was copied there first);
+`adyusuf/podium-flow` (`~/ClaudeCode/podium-flow`) is the one place the rule set lives. Nothing was lost: before the
+delete every non-merge commit on the old `dev`, `test`, `prod` and the local branches had a same-subject commit in
+podium-flow. Projects that pointed at the old repository were moved first: the CI callers of insurance, BTTakvim,
+ChatUxer and ocrai call `adyusuf/podium-flow/.github/workflows/sdlc.yml` pinned at `cb59be4` (was
+`claude-code-standards@8123117`; that workflow fetched gate-core from the old repository, `cb59be4` is the first commit
+that fetches it from podium-flow, its only other change reads `deploy_after_push` in both shapes), and bitreka's case is
+`podium-flow` (slug, link, title; the old case URL has no redirect). An install still made from the old repository keeps its local copy, and
+`scripts/plugin-setup.py` still moves it (it reads the installed folders, not GitHub). Earlier entries of this log, the
+legacy test's docstring and the step-statistics folder list keep the old name, because they record what was true then
+or must still match old paths.
+
 ## The pane outside a repository, Pod message, force, the budget list and the (i) (09/11/2026, user decisions)
 
 **Decision.** Outside a git repository Settings shows *Mode*, *Model\**, *Replies*, *Plan*, *Budget*, *Pod* and *Pod
@@ -2266,4 +2283,3 @@ running push or deploy, a pod connection, a cloud-to-local runner fallback). Tod
 the `notify` hook on the next message or Bash/Agent call, and `pod.*` is stored only; that work is planned separately.
 **Measured.** `deno test hooks/*.test.ts`: 92 passed, 2 failed — the 2 fail on `dev` too (`status.test.ts` uses `.not`,
 which the test shim lacks). `pytest scripts/tests`: the 3 tests that pinned the old budget now pass.
-
