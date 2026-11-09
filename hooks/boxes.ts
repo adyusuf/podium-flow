@@ -135,7 +135,9 @@ function settingLines(ui: Ui, schema: Spec[], press: Press, steps: StepsFold): S
     draw: (scope, layer) => {
       const value = String(layer.values[key])
       const held = legacy.includes(value) && !options.some(one => one.key === value) ? [{ key: value, name: value }] : []
-      return choices(ui, scope, key, [...options, ...held], value, press)
+      // Pressing the held value changes nothing: `set` refuses a legacy value, so it would only raise an error.
+      const quiet: Press = (pressed, wanted, at) => { if (!held.some(one => one.key === wanted)) press(pressed, wanted, at) }
+      return choices(ui, scope, key, [...options, ...held], value, quiet)
     },
   })
   for (const row of ROWS) {

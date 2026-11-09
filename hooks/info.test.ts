@@ -35,6 +35,13 @@ test('a budget a file written before holds (100) is drawn as one more option, ch
   expect(all(old, 'Button').filter(node => String(node.props.key).startsWith('session/budget')).map(words))
     .toEqual(['none', '200', '500', '1000', '[100]'])
   expect(chosen(old)).toContain('[100]')
+  // Pressing the held 100 sends nothing (set would refuse it); pressing an offered one still writes it.
+  const pressed: string[] = []
+  const live = settingsBody(ui, data('100'), '', [], (key, value) => { pressed.push(`${key}=${value}`) })
+  const button = (name: string) => all(live, 'Button').find(node => node.props.key === `session/budget.session_usd=${name}`)!
+  button('100').props.onPress()
+  button('500').props.onPress()
+  expect(pressed).toEqual(['budget.session_usd=500'])
   const now = settingsBody(ui, data('500'), '', [], () => undefined)
   expect(all(now, 'Button').filter(node => String(node.props.key).startsWith('session/budget')).map(words))
     .toEqual(['none', '200', '[500]', '1000'])
