@@ -36,6 +36,23 @@ export const ROW_HELP: Record<string, string> = {
   'E2E': 'Run the e2e suite before deploying to that environment.',
 }
 
+/** The Status box's labels (user decision 09/11/2026: every label of the pane has an (i) and a card). */
+export const STATUS_HELP = {
+  budget: 'What this session has spent so far (tokens x API list price) against the Budget setting. Information only: work never stops on it.',
+  session: 'This session\'s steps, written before the work starts, with their state, measured % and notes.',
+  subagent: 'One subagent\'s steps, written by the hooks when it starts and stops; its name is its role.',
+  todo: 'Steps still to do: the running one in bold, then what comes next. A failed step stays here until someone looks at it.',
+  done: 'Steps that are finished or skipped. Closed at start; the arrow opens it.',
+}
+
+/** A Promotion stage line's card, after the branch's own words. */
+export const STAGE_HELP: Record<string, string> = {
+  dev: 'dev: where finished work is merged first.',
+  test: 'test: what is promoted from dev for the test environment.',
+  prod: 'prod: what is promoted from test for production.',
+}
+export const STAGE_TAIL = 'The commit origin holds, and how many local commits are not pushed yet; under it, any gate waived on the commits that came in.'
+
 /** Every gate step row's card, after the step's own heading from the gate (gate-lib.sh), so no step is named here. */
 export const STEP_HELP = 'a step of the shared gate. Unticked, it does not run on that branch; the gate reports it as waived and the merge names it in Gate-Waived, never as passed.'
 

@@ -388,11 +388,14 @@ test('Promotion waits, shows an error, and lists each stage with its waived gate
       { branch: 'test', origin: 'bbb2222', unpushed: 2, waived: ['abc1234 gates (neden: configuration)'] },
     ],
   })
-  const lines = all(body, 'Text').map(words)
+  // Each stage line carries its (i); its card is a hidden row right after it (user decision 09/11/2026).
+  const lines = all(body, 'Text').filter(node => node.props.color !== 'inverseText').map(words)
   expect(lines).toEqual([
-    'dev   origin aaa1111  pushed', 'no waived gate on the way in',
-    'test  origin bbb2222  2 not pushed', 'waived abc1234 gates (neden: configuration)',
+    'dev   origin aaa1111  pushed', '(i)', 'no waived gate on the way in',
+    'test  origin bbb2222  2 not pushed', '(i)', 'waived abc1234 gates (neden: configuration)',
   ])
+  const cards = all(body, 'Text').filter(node => node.props.color === 'inverseText').map(words)
+  expect(cards.length === 2 && cards[0]!.startsWith('dev: ') && cards[1]!.startsWith('test: ')).toBe(true)
 })
 
 test('"After pushing update:" is a checkbox line of test and prod, each ticked on its own', () => {

@@ -53,12 +53,13 @@ went to. Never edit the JSON files by hand when the tool can do it.
 |---|---|---|
 | `mode` | A-E | The operating mode (`modes/README.md`). A per-session choice (`$S/mode`) or a project `.claude/mode` beats it. |
 | `mode_model` | keep, sonnet, haiku, fable | What the Opus-defined agents run on (`keep` = as defined). Same override order as `mode`. |
-| `steps.enforce` | block, remind | Steps first (default block): every task is split into steps in the Status box before work; `block` refuses a code edit or a commit until they exist, `remind` only reminds. `standards/00-working-method.md` §1a. |
+| `steps.enforce` | block, remind | *Plan* in the pane, which shows `block` as `force`; `force` may be given and is stored as `block`. Steps first (default block): every task is split into steps in the Status box before work; `block` refuses a code edit or a commit until they exist, `remind` only reminds. `standards/00-working-method.md` §1a. |
 | `reply.length` | short, normal, long | How much Claude writes in a reply (default short); what each level holds: `standards/00-working-method.md` §5a. A red test, a skipped step and what the rules put in a reply (the long-run table, the #28 block) stay at every length. |
 | `agents.<role>.enabled` | auto, on, off | One of the 14 roles: `auto` follows the mode's set, `on` adds it, `off` removes it (mode A runs none). |
 | `agents.<role>.model` | default, opus, sonnet, haiku, fable | The model that one agent runs on; `default` follows its definition and the mode's Opus override. |
 | `pod.connect` | yes/no | "Connect to pod" (default no). A stored setting only: nothing in this plugin connects to anything or sends a message because of it (user decision 20/10/2026). |
-| `pod.message_format` | short, full | "Message format" (default short). Stored only, like `pod.connect`. |
+| `budget.session_usd` | none, 200, 500, 1000 | *Budget* (default 200): the Status box's spend line is set against it; it never stops work (user decision 06/11/2026). A file holding the older 25, 50 or 100 is still read and shown; `set` refuses them (09/11/2026). |
+| `pod.message_format` | short, full | *Pod message* in the pane (was "Format", 09/11/2026); "Message format" (default short). Stored only, like `pod.connect`. |
 | `write.unit_tests` | yes/no | Write unit tests when the code is done (#32). |
 | `write.e2e` | yes/no | Write e2e specs (optional to run, #33). |
 | `merge.dev` `merge.test` `merge.prod` | yes/no | Merge finished code into that branch (#26, #34). |

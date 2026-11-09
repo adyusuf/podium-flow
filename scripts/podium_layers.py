@@ -90,8 +90,10 @@ def nest(flat):
     return tree
 
 
-def check(key, value):
-    """The value as the schema wants it, or ConfigError (exit 2)."""
+def check(key, value, legacy=False):
+    """The value as the schema wants it, or ConfigError (exit 2). `legacy`: also accept a value a file written before may
+    hold (the spec's `legacy` list) - only when a file is READ; `set` and `apply` refuse it (qa 09/11/2026). An input
+    alias (the spec's `aliases`, e.g. `force` for the stored `block`) is stored as the value it names."""
     spec = SPECS.get(key)
     if spec is None:
         raise ConfigError("unknown setting '%s' (see: podium_config.py schema)" % key)
@@ -105,7 +107,8 @@ def check(key, value):
             return False
         raise ConfigError("'%s' is a yes/no setting, got %r" % (key, value))
     text = str(value).strip()
-    for option in spec['options'] + spec.get('legacy', []):   # a legacy value is read, never offered (rule #4)
+    text = spec.get('aliases', {}).get(text.lower(), text)
+    for option in spec['options'] + (spec.get('legacy', []) if legacy else []):   # a legacy value is read, never offered (rule #4)
         if text.lower() == option.lower():
             return option
     raise ConfigError("'%s' must be one of %s, got %r" % (key, '/'.join(spec['options']), value))
@@ -139,9 +142,9 @@ def read_layer(path, keep_unknown=False):
                 # the layer still counts; refusing the whole file would throw away the user's other settings. Any other
                 # bad value still makes the layer a problem, as for every key.
                 with contextlib.suppress(LockedError):
-                    values[key] = check(key, value)
+                    values[key] = check(key, value, legacy=True)
                 continue
-            values[key] = check(key, value)
+            values[key] = check(key, value, legacy=True)
         return values, None
     except (OSError, ValueError, ConfigError) as error:
         return {}, '%s: %s' % (path, error)

@@ -86,7 +86,8 @@ SCHEMA = (
     [dict(_enum('mode', 'Working mode', MODES), group='Session'),
      dict(_enum('mode_model', 'Model that replaces Opus in the agents', MODELS), group='Session'),
      dict(_enum('reply.length', 'Reply length', REPLY_LENGTHS), group='Session'),
-     dict(_enum('steps.enforce', 'Steps first', STEP_ENFORCEMENT), group='Session'),
+     # The pane shows `force` for `block` (user decision 09/11/2026); `force` is accepted as input and stored as `block`.
+     dict(_enum('steps.enforce', 'Steps first', STEP_ENFORCEMENT), group='Session', aliases={'force': 'block'}),
      # Shown in the Status box against the measured spend; it never stops work (user decision 06/11/2026).
      dict(_enum('budget.session_usd', 'Session budget in US dollars (shown in Status, never a stop)', BUDGETS),
           group='Session', legacy=list(LEGACY_BUDGETS)),

@@ -75,9 +75,29 @@ class Budget(unittest.TestCase):
         self.assertEqual(('none', '200', '500', '1000'), podium_budget.BUDGETS)
         self.assertEqual(list(podium_budget.LEGACY_BUDGETS), row[0]['legacy'])
         import podium_layers
-        self.assertEqual('100', podium_layers.check('budget.session_usd', '100'))
-        with self.assertRaises(podium_layers.ConfigError):
-            podium_layers.check('budget.session_usd', '300')
+        # A file is read with legacy values; `set` and `apply` (check without legacy) refuse them (qa 09/11/2026).
+        self.assertEqual('100', podium_layers.check('budget.session_usd', '100', legacy=True))
+        for value in ('25', '100', '300'):
+            with self.assertRaises(podium_layers.ConfigError):
+                podium_layers.check('budget.session_usd', value)
+        self.assertEqual('none', podium_layers.check('budget.session_usd', 'NONE'))
+        # Plan shows force for block: force is accepted and stored as block.
+        self.assertEqual('block', podium_layers.check('steps.enforce', 'force'))
+        self.assertEqual('block', podium_layers.check('steps.enforce', 'Force'))
+
+    def test_a_file_holding_an_old_budget_still_reads_and_set_refuses_it(self):
+        import tempfile
+        import podium_layers
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, 'layer.json')
+            with open(path, 'w', encoding='utf-8') as handle:
+                json.dump({'budget': {'session_usd': '25'}, 'reply': {'length': 'long'}}, handle)
+            values, problem = podium_layers.read_layer(path)
+            self.assertEqual((None, '25', 'long'), (problem, values['budget.session_usd'], values['reply.length']))
+            run = subprocess.run([sys.executable, os.path.join(os.path.dirname(SCRIPT), 'podium_config.py'), 'set',
+                                  'budget.session_usd', '25', '--session', 'qa-old-budget'],
+                                 env=self.env, capture_output=True, text=True)
+            self.assertEqual(2, run.returncode, run.stderr)
 
     def hook(self, event, payload):
         subprocess.run([sys.executable, SCRIPT, 'hook', event], env=self.env, capture_output=True,

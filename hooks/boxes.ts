@@ -10,7 +10,7 @@
 import { enabledFor, settingGroups } from './choose'
 import { explained, helpCard, INDENT, INFO_CELLS, label, line, option, WARN } from './controls'
 import { GATE_STEP_PREFIX, stepLines, stepsArrow, stepsWidth, type StepsFold } from './gatesteps'
-import { COLUMN_HELP, ROW_HELP, SECTION_HELP } from './help'
+import { COLUMN_HELP, ROW_HELP, SECTION_HELP, STAGE_HELP, STAGE_TAIL } from './help'
 import { NO_CODE_ROWS, ROWS, type Item } from './rows'
 import type { Ui } from './controls'
 
@@ -21,7 +21,9 @@ export { NO_CODE_ROWS, ROW_LABELS, ROWS } from './rows'
 export type Scope = 'session' | 'saved'
 export type Press = (key: string, value: string, scope?: Scope) => void
 
-type Spec = { key: string; type: 'bool' | 'enum'; label: string; group: string; options?: string[]; step?: string; heading?: string; locked?: boolean }
+type Spec = {
+  key: string; type: 'bool' | 'enum'; label: string; group: string; options?: string[]; legacy?: string[]; step?: string; heading?: string; locked?: boolean
+}
 type AgentRow = {
   role: string; defined: string; runs_on: string; default_model?: string; active: boolean; in_mode: boolean; enabled: string; model: string
   description?: string
@@ -126,9 +128,15 @@ function settingLines(ui: Ui, schema: Spec[], press: Press, steps: StepsFold): S
   const has = new Set(shown.map(spec => spec.key))
   const covered = new Set<string>()
   const lines: SettingLine[] = []
-  const radios = (text: string, key: string, options: Item[]): SettingLine => ({
+  // A value a file written before may hold (`legacy`, never offered) is drawn as one more option, chosen, while the
+  // layer holds it, so the row never shows no value (qa 09/11/2026: a stored budget of 100).
+  const radios = (text: string, key: string, options: Item[], legacy: string[] = []): SettingLine => ({
     label: text, names: options.map(one => one.name),
-    draw: (scope, layer) => choices(ui, scope, key, options, String(layer.values[key]), press),
+    draw: (scope, layer) => {
+      const value = String(layer.values[key])
+      const held = legacy.includes(value) && !options.some(one => one.key === value) ? [{ key: value, name: value }] : []
+      return choices(ui, scope, key, [...options, ...held], value, press)
+    },
   })
   for (const row of ROWS) {
     if ('items' in row) {
@@ -148,7 +156,7 @@ function settingLines(ui: Ui, schema: Spec[], press: Press, steps: StepsFold): S
     const spec = shown.find(one => one.key === row.key)
     if (!spec) continue
     covered.add(row.key)
-    lines.push(radios(row.label, row.key, (spec.options ?? []).map(option => ({ key: option, name: row.names?.[option] ?? option }))))
+    lines.push(radios(row.label, row.key, (spec.options ?? []).map(option => ({ key: option, name: row.names?.[option] ?? option })), spec.legacy))
   }
   // A setting no row names (a newer plugin than this pane) must not vanish from view.
   for (const spec of shown.filter(one => !covered.has(one.key) && !one.key.startsWith(GATE_STEP_PREFIX))) {
@@ -256,6 +264,9 @@ export function agentsBody(ui: Ui, data: SettingsData | null, press: Press) {
   )
 }
 
+/** A stage line's card: the branch's own words, then what the line shows. */
+const stageCard = (branch: string) => `${STAGE_HELP[branch] ?? `${branch}:`} ${STAGE_TAIL}`
+
 export function promotionBody(ui: Ui, data: PromotionData | null) {
   const { h } = ui
   if (!data) return h(ui.Text, { dimColor: true }, 'Reading the branches…')
@@ -265,7 +276,8 @@ export function promotionBody(ui: Ui, data: PromotionData | null) {
     { flexDirection: 'column' },
     data.stages.map(stage =>
       h(ui.Box, { flexDirection: 'column', marginBottom: 1 },
-        h(ui.Text, { bold: true }, `${stage.branch.padEnd(5)} origin ${stage.origin}${stage.unpushed > 0 ? `  ${stage.unpushed} not pushed` : '  pushed'}`),
+        explained(ui, `stage-${stage.branch}`, h(ui.Text, { bold: true }, `${stage.branch.padEnd(5)} origin ${stage.origin}${stage.unpushed > 0 ? `  ${stage.unpushed} not pushed` : '  pushed'}`), stageCard(stage.branch)),
+        helpCard(ui, `stage-${stage.branch}`, stageCard(stage.branch)),
         h(ui.Box, { flexDirection: 'column', marginLeft: INDENT },
           stage.waived.length === 0
             ? h(ui.Text, { dimColor: true }, 'no waived gate on the way in')
