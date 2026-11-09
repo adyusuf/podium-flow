@@ -210,7 +210,7 @@ function click($: EngineInterface, key: string, value: string, scope: Scope) {
 }
 
 const onStart: Hook<'session.start'> = async ($, e, next) => {
-  await $.command.register({ name: 'podium:panels', description: 'Open the podium status, settings, agents and promotion boxes' })
+  await $.command.register({ name: 'podium:panels', description: 'Open the podium status, settings, agents and promotion boxes', immediate: true })
   void $.ui.open({ id: BOXES, title: TITLE })
   await safely($, refreshSettings($))
   await safely($, refreshPromotion($))
