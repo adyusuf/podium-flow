@@ -15,8 +15,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import step_stats_transcripts as transcripts  # noqa: E402
 
-BUDGETS = ('none', '25', '50', '100', '200', '500', '1000')
-DEFAULT_BUDGET = '100'
+BUDGETS = ('none', '200', '500', '1000')     # user decision 09/11/2026
+LEGACY_BUDGETS = ('25', '50', '100')          # still shown as set, from a file written before then (rule #4)
+DEFAULT_BUDGET = '200'
 
 
 def transcript_paths(path):
@@ -46,7 +47,7 @@ def budget_setting(session):
         value = podium_layers.load(session=session)[0].get('budget.session_usd', (DEFAULT_BUDGET, ''))[0]
     except Exception:  # noqa: BLE001 - a hook never fails on the settings; it shows the default budget
         return DEFAULT_BUDGET
-    return value if value in BUDGETS else DEFAULT_BUDGET
+    return value if value in BUDGETS + LEGACY_BUDGETS else DEFAULT_BUDGET
 
 
 def line(amount, budget):

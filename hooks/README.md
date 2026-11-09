@@ -47,7 +47,7 @@ What the mod runs and reads:
 It opens no network connection. The code is split so the drawing can be tested without the engine: `boxes.ts` (Settings,
 Agents, Promotion), `controls.ts` (the shared icons, options, aligned lines and hover cards), `help.ts` (what the hover
 cards say), `gatesteps.ts` (the gate's step rows under Gates), `status.ts` (Status), `choose.ts` (pure decisions), `notices.ts` (chat lines); `register.tsx` is the
-engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (91 tests).
+engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (94 tests).
 
 ## The four boxes
 
@@ -57,9 +57,11 @@ The screenshot is of 01/11/2026. The left two-thirds are the app's session list 
 Each box folds by the arrow before its bold title (`▾` open, `▸` folded); Agents and Promotion start folded. The header
 is the arrow and the title alone, with nothing beside it (the screenshot is older and still shows a summary there).
 Resting the pointer on a box title, a Settings tab (*Session*, *System*), a Settings label, an Agents role or a Status
-label or heading opens a card under it that explains it; a role's card is its agent file's description. In a session
-whose folder is in no git repository, no code work happens: the pane shows only Status and Settings, and Settings only
-*Replies* ([`standards/13-pr-and-review.md`](../standards/13-pr-and-review.md) §8a). The
+label or heading opens a card under it that explains it; a role's card is its agent file's description. Every label that
+has a card carries an (i) after it (a circled i on the desktop, `(i)` in the terminal), and the pointer on either opens
+it (user decision 09/11/2026). In a session whose folder is in no git repository, no code work happens: the pane shows
+only Status and Settings, and Settings only *Mode*, *Model\**, *Replies*, *Plan*, *Budget*, *Pod* and *Pod message*
+(user decision 09/11/2026; was *Replies* alone; [`standards/13-pr-and-review.md`](../standards/13-pr-and-review.md) §8a). The
 boxes refresh after every turn, so a merge, a push or a `/podium:config` change shows without
 reopening them.
 
@@ -76,11 +78,13 @@ reopening them.
   start; the chosen tab is at full strength (in brackets in the terminal), and the pane remembers it. Under the tabs, one
   row per setting: the label, then that tab's options. (The screenshot is older: it shows the two as columns.)
   - *Mode* A–E (rule #27) and *Model\**, the model that replaces Opus in the roles marked `*` in Agents.
-  - *Replies* (`short`, `normal`, `long`; default `short`): how much Claude writes in a reply
+  - *Replies* (`short`, `normal`; default `short`; `long` retired 09/11/2026, read as `normal`): how much Claude writes in a reply
     ([`standards/00-working-method.md`](../standards/00-working-method.md) §5a).
-  - *Plan* (`steps.enforce`: `block`, `remind`; default `block`; labelled *Steps* until 02/11/2026): every task is split into steps in Status first; `block` refuses a
+  - *Plan* (`steps.enforce`: shown `force`, stored `block`, and `remind`; default `block`; labelled *Steps* until 02/11/2026): every task is split into steps in Status first; `force` refuses a
     code edit or a commit until the steps exist, `remind` only reminds on each message.
-  - *Pod* and *Format* are stored only; nothing acts on them yet.
+  - *Budget* (`none`, `200`, `500`, `1000`; default `200`; user decision 09/11/2026): the Status box's spend line is set
+    against it, it never stops work. A file holding the older `25`, `50` or `100` is still read; the pane offers none of them.
+  - *Pod* and *Pod message* (labelled *Format* until 09/11/2026) are stored only; nothing acts on them yet.
   - *Tests* (`unit`, `e2e`): whether Claude writes unit tests and e2e specs.
   - *Merge*, *Push*, *Gates*, *Coverage* and *CI* (wait for CI after the push), per target. Rule #34 follows them
     instead of asking: when a piece of work is done Claude reads them afresh and merges and pushes at once

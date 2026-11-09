@@ -47,13 +47,15 @@ test('the body shows the agents (not now and next), its To do branch and step ·
   const texts = (body: unknown) => shown(body).map(words)
   // An older row: its state has no short word, so the whole state goes to the note with the measured figure.
   expect(texts(statusBody(ui, parseStatus(FILE)))).toEqual([
-    'this session', 'todo', 'To do', '(2)', 'dev', '', '', 'pushed · 4a45bda (promote.log)', 'prod', '', '', 'gate running · coverage step (gate-prod.log)', '-> promote.sh'])
+    // Every label carries its (i): the agent, the branch, and a step row with a note (user decision 09/11/2026).
+    'this session', '(i)', 'todo', 'To do', '(i)', '(2)', 'dev', '', '', 'pushed · 4a45bda (promote.log)', '(i)', 'prod', '', '',
+    'gate running · coverage step (gate-prod.log)', '(i)', '-> promote.sh'])
   const steps = statusBody(ui, parseStatus(JSON.stringify({ rows: [
     { item: '1. data', state: 'done', percent: '100' },
     { item: '2. pane', state: 'running: 3 of 8 files', percent: '40', blocker: 'qa review', note: 'tabs first' }] })))
   // The running step is in To do, the finished one in Completed (closed at start, so its row is not drawn).
-  expect(texts(steps)).toEqual(['this session', 'run · 70%', 'To do', '(1)', '2. pane', 'run', '40%',
-    '3 of 8 files · tabs first', '-> qa review', 'Completed', '(1)'])
+  expect(texts(steps)).toEqual(['this session', '(i)', 'run · 70%', 'To do', '(i)', '(1)', '2. pane', 'run', '40%',
+    '3 of 8 files · tabs first', '(i)', '-> qa review', 'Completed', '(i)', '(1)'])
   expect(shown(steps).filter(node => node.props.bold).map(words)).toEqual(['this session', 'To do', '2. pane', 'run', '40%',
     '3 of 8 files · tabs first', 'Completed'])
   expect(all(steps, 'Box').filter(node => node.props.marginLeft === 2).map(words)).toContain('-> qa review')
@@ -190,7 +192,7 @@ test('the budget line is drawn first, with or without a step, and read as untrus
   const withSteps = parseStatus(JSON.stringify({ budget: '$12.00 spent of $100 (12%)\u001b[31m', rows: [{ item: 'a', state: 'running' }] }))
   expect(withSteps?.budget).toBe('$12.00 spent of $100 (12%) [31m')
   const drawn = statusBody(ui, withSteps) as Node
-  expect((drawn.children[0] as Node).children[0]).toBe('budget: $12.00 spent of $100 (12%) [31m')
+  expect(shown(drawn).map(words).slice(0, 2)).toEqual(['budget: $12.00 spent of $100 (12%) [31m', '(i)'])
   const idle = statusBody(ui, parseStatus(JSON.stringify({ budget: '$1.00 spent · no budget set', rows: [] }))) as Node
   expect(JSON.stringify(idle)).toContain('budget: $1.00 spent · no budget set')
   expect(JSON.stringify(idle)).toContain('nothing running')
