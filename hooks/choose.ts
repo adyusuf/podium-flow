@@ -1,15 +1,6 @@
 // Pure decisions of the boxes, kept apart from the drawing so they can be tested without an engine.
 
 /**
- * The slash command that opens the boxes. `immediate`: typed while a turn runs, it runs at once beside the turn instead of
- * stopping it (user decision 09/11/2026: opening the panels stopped the session's work). Its hook only opens the pane and
- * rereads files, so it assumes nothing about the turn.
- */
-export const PANELS_COMMAND = {
-  name: 'podium:panels', description: 'Open the podium status, settings, agents and promotion boxes', immediate: true,
-} as const
-
-/**
  * The folder the plugin manager says `id` is installed in, from the text of installed_plugins.json ('' when it
  * names none). Not the newest folder in the cache: a replaced version is marked and then becomes the newest.
  */

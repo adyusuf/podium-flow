@@ -2300,10 +2300,16 @@ reply.length LONG` stores `normal`.
 ## `/podium:panels` runs beside a running turn (09/11/2026, user decision)
 
 **Decision.** Opening the panels must not stop the session's work. The mod registers `/podium:panels` with `immediate:
-true` (`PANELS_COMMAND` in `hooks/choose.ts`): typed while a turn runs, the engine runs its `command.run` hook at once beside
-the turn instead of holding it for the turn's end, which the desktop did by stopping the turn. The hook only opens the
-pane and rereads the settings, branches and status files, so it assumes nothing about the turn (the engine's condition
-for `immediate`). A client without mods still reads `commands/panels.md` as a prompt, which waits like any message.
-**Measured.** `hooks/choose.test.ts` pins `immediate`; `claude plugin validate .` passes. Not verified live in the
-desktop: that needs the plugin update after promotion.
+true` (a literal spec in `hooks/register.tsx`, so `claude plugin validate` still sees that the hook answers its own
+command): typed while a turn runs, the engine runs its `command.run` hook at once beside the turn instead of holding it for
+the turn's end. The hook only opens the pane and rereads the settings, branches and status files, so it assumes nothing
+about the turn (the engine's condition for `immediate`). A client without mods still reads `commands/panels.md` as a
+prompt, which waits like any message.
+**Not verified (a hypothesis until checked live).** That holding the command is what stopped the turn in the desktop, and
+which `podium:panels` the engine resolves when both the registered command and `commands/panels.md` exist. The live check
+after the plugin update: start a turn that runs `sleep 60`, type `/podium:panels`; the turn must go on and the boxes open.
+**Measured.** `scripts/tests/test_plugin_layout.py` pins `immediate: true` in the registration; `claude plugin validate .`
+reports `answers its own command: command.run{command=podium:panels}`.
+**Open (qa, out of scope).** `refreshSettings` is not serialised like `refreshStatus`: an immediate run can now overlap the
+turn-end refresh (the same race a box click already has); its own branch.
 

@@ -1,8 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 
 import {
-  countOf, enabledFor, installPathOf, isWanted, newestLiveDir, overrideNote, PANELS_COMMAND, parseDiscovery, plannedStages, refSet,
-  scriptDir, settingGroups, waivedLines, waivedRange,
+  countOf, enabledFor, installPathOf, isWanted, newestLiveDir, overrideNote, parseDiscovery, plannedStages, refSet, scriptDir,
+  settingGroups, waivedLines, waivedRange,
 } from './choose'
 
 const ID = 'podium@podium-marketplace'
@@ -121,9 +121,4 @@ test('an empty, malformed or foreign discovery output names nothing', () => {
   expect(parseDiscovery('null')).toEqual(none)
   expect(parseDiscovery('{"record": 5, "cache": "x"}')).toEqual(none)
   expect(parseDiscovery('{"cache": [["live"], [1, 2], "live /x", ["live", "/ok"]]}')).toEqual({ record: '', listing: 'live /ok' })
-})
-
-test('/podium:panels runs at once beside a running turn instead of stopping it', () => {
-  expect(PANELS_COMMAND.name).toBe('podium:panels')
-  expect(PANELS_COMMAND.immediate).toBe(true)
 })
