@@ -61,8 +61,8 @@ test('a card is a hidden row of its label hover group, readable in either theme,
   expect([card.props.position, card.props.top, card.props.width]).toEqual([undefined, undefined, undefined])
   expect([card.props.backgroundColor, all(card, 'Text')[0]!.props.color]).toEqual(['text', 'inverseText'])
   expect(words(card)).toBe(SECTION_HELP.settings)
-  // The Settings card says the settings are for code work, and what a task with no code still uses.
-  expect(['for code in a project', 'no code uses only Replies and Status'].every(part => SECTION_HELP.settings.includes(part))).toBe(true)
+  // The Settings card says the settings are for code work, and that outside a repository only some rows show.
+  expect(['for code in a project', 'Outside a repository only the rows for work without code show'].every(part => SECTION_HELP.settings.includes(part))).toBe(true)
 })
 
 test('a box title card sits right after the header, before the body, folded or open', () => {
@@ -71,7 +71,8 @@ test('a box title card sits right after the header, before the body, folded or o
       const box = section(ui, id, id, folded, () => undefined, 'BODY') as Node
       const kids = flat(box.children)
       expect(isCard(kids[1])).toBe(true)
-      expect(labelOf(box, kids[1] as Node)).toBe(id)
+      // The hover group is the title and its (i) (user decision 09/11/2026).
+      expect(labelOf(box, kids[1] as Node)).toBe(`${id}(i)`)
     }
   }
 })
@@ -80,9 +81,9 @@ test('each Settings card follows its own label line; the System card only when S
   const body = settingsBody(ui, data({ schema: SCHEMA, values: {} }), '', [], () => undefined)
   const pairs = placed(body)
   // Every row's card follows the line that starts with its own label.
-  for (const label of ROW_LABELS) expect(pairs.some(([owner, before]) => owner === label && before.startsWith(label))).toBe(true)
+  for (const label of ROW_LABELS) expect(pairs.some(([owner, before]) => owner === `${label}(i)` && before.startsWith(label))).toBe(true)
   // The column cards follow the heading line.
-  expect(pairs.filter(([owner]) => owner.includes('Session') || owner.includes('System')).map(([, before]) => before.startsWith('[Session]System'))).toEqual([true, true])
+  expect(pairs.filter(([owner]) => owner.includes('Session') || owner.includes('System')).map(([, before]) => before.startsWith('[Session](i)System(i)'))).toEqual([true, true])
   const bare = settingsBody(ui, data({ schema: SCHEMA, values: {}, saved: undefined }), '', [], () => undefined)
   expect(all(bare, 'Box').filter(isCard).some(card => scope(card) === 'podium-help-column-System')).toBe(false)
 })
@@ -91,6 +92,6 @@ test('an Agents role card is its file description, right after the role line; no
   const agent = (role: string, description?: string) =>
     ({ role, defined: 'sonnet', runs_on: 'sonnet', active: true, in_mode: true, enabled: 'auto', model: 'default', description })
   const body = agentsBody(ui, data({ agents: [agent('qa', 'Reviews a change.'), agent('analyst'), agent('doc-writer', 'Writes docs.')] }), () => undefined)
-  expect(placed(body)).toEqual([['[qa]', '[qa]opus[sonnet]haikufable'], ['[doc]', '[doc]opus[sonnet]haikufable']])
+  expect(placed(body)).toEqual([['[qa](i)', '[qa](i)opus[sonnet]haikufable'], ['[doc](i)', '[doc](i)opus[sonnet]haikufable']])
   expect(all(body, 'Box').filter(isCard).map(words)).toEqual(['Reviews a change.', 'Writes docs.'])
 })

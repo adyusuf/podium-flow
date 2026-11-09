@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { INFO_CELLS } from './controls'
 import { agentsBody, FOLDED_AT_START, headWidth, isFolded, nextFold, promotionBody, SECTIONS, section, settingsBody } from './boxes'
 
 // A recording factory: an element is { type, props, children }, so the tests read what the boxes would draw.
@@ -21,12 +22,13 @@ function words(node: unknown): string {
   if (typeof node !== 'object' || node === null) return ''
   return flat((node as Node).children).map(words).join('')
 }
-// What a person reads on one line, in order: each Button and each Text outside one, an icon as ● ○ ☑ ☐.
+// What a person reads on one line, in order: each Button and each Text outside one, an icon as ● ○ ☑ ☐, the (i) as ⓘ.
 function reads(node: unknown): string[] {
   if (typeof node !== 'object' || node === null) return typeof node === 'string' && node !== '' ? [node] : []
   const one = node as Node
   if (one.type === 'Button' || one.type === 'Text') return [words(one)]
   if (one.type === 'Svg') {
+    if (one.props.alt === 'more information') return ['ⓘ']
     const on = String(one.props.alt).endsWith(', chosen')
     return [String(one.props.source).includes('<circle') ? (on ? '●' : '○') : (on ? '☑' : '☐')]
   }
@@ -87,7 +89,7 @@ test('Settings shows one tab at a time: Session at start, System when chosen; a 
   const tabs = (folded: boolean) => ({ folded, toggle: () => { pressed += 1 } })
   const tab = (body: unknown, name: string) => all(body, 'Button').find(node => node.props.key === `tab-${name}`)!
   const session = settingsBody(ui, data(), '', [], () => undefined, tabs(true))
-  expect(rows(session)).toEqual(['[Session] System', 'Mode A [B] C', 'Model* opus [sonnet]', 'Push test [prod]'])
+  expect(rows(session)).toEqual(['[Session] (i) System (i)', 'Mode (i) A [B] C', 'Model* (i) opus [sonnet]', 'Push (i) test [prod]'])
   expect(all(session, 'Button').some(node => String(node.props.key).startsWith('saved/'))).toBe(false)
   expect([tab(session, 'Session').props.dimColor, tab(session, 'System').props.dimColor]).toEqual([false, true])
   tab(session, 'Session').props.onPress()          // the chosen tab: nothing
@@ -95,15 +97,15 @@ test('Settings shows one tab at a time: Session at start, System when chosen; a 
   tab(session, 'System').props.onPress()
   expect(pressed).toBe(1)
   const system = settingsBody(ui, data(), '', [], () => undefined, tabs(false))
-  expect(rows(system)).toEqual(['Session [System]', 'Mode A B [C]', 'Model* [opus] sonnet', 'Push test prod'])
+  expect(rows(system)).toEqual(['Session (i) [System] (i)', 'Mode (i) A B [C]', 'Model* (i) [opus] sonnet', 'Push (i) test prod'])
   expect(all(system, 'Button').some(node => String(node.props.key).startsWith('session/'))).toBe(false)
   // On the desktop a tab has a radio icon like every other choice, the chosen one filled and named as chosen.
   const desk = settingsBody(desktop, data(), '', [], () => undefined, tabs(true))
-  expect(rows(desk)[0]).toBe('● Session ○ System')
-  expect(all(desk, 'Svg').slice(0, 2).map(node => node.props.alt)).toEqual(['Session, chosen', 'System'])
+  expect(rows(desk)[0]).toBe('● Session ⓘ ○ System ⓘ')
+  expect(all(desk, 'Svg').slice(0, 4).map(node => node.props.alt)).toEqual(['Session, chosen', 'more information', 'System', 'more information'])
   // Without saved defaults there is no System tab, whatever the state says.
   const bare = settingsBody(ui, data({ saved: undefined }), '', [], () => undefined, tabs(false))
-  expect(rows(bare)[0]).toBe('[Session]')
+  expect(rows(bare)[0]).toBe('[Session] (i)')
   expect(all(bare, 'Button').some(node => node.props.key === 'tab-System')).toBe(false)
 })
 
@@ -114,7 +116,8 @@ test('an unfolded section shows its body under a header that is the arrow and th
   expect(header.props.key).toBe('fold-settings')
   // The title is a bold Text beside the arrow, not inside the Button, where the desktop would drop the bold.
   expect(words(header)).toBe('▾')
-  expect(reads(all(box, 'Box').find(node => node.props.flexDirection === 'row'))).toEqual(['▾', 'Settings'])
+  // The title carries its (i) (user decision 09/11/2026); the pointer on either opens the box's card.
+  expect(reads(all(box, 'Box').find(node => node.props.flexDirection === 'row'))).toEqual(['▾', 'Settings', '(i)'])
   expect(all(box, 'Text').find(node => words(node) === 'Settings')!.props.bold).toBe(true)
   expect([box, ...all(box, 'Box')].some(node => flat(node.children).includes('BODY'))).toBe(true)
 })
@@ -123,7 +126,7 @@ test('a folded section keeps only its header: nothing beside the title, no body'
   const box = section(ui, 'agents', 'Agents', true, () => undefined, 'BODY') as Node
   // What is drawn: the arrow and the title; the only other Text is the hidden hover card's.
   const shown = (node: Node): boolean => node.props.display !== 'none' && flat(node.children).every(child => typeof child !== 'object' || child === null || shown(child as Node))
-  expect(all(box, 'Text').filter(node => node.props.color !== 'inverseText').map(words)).toEqual(['Agents'])
+  expect(all(box, 'Text').filter(node => node.props.color !== 'inverseText').map(words)).toEqual(['Agents', '(i)'])
   expect(all(box, 'Box').filter(node => node.props.display === 'none').length).toBe(1)
   expect(shown(box)).toBe(false)
   expect([box, ...all(box, 'Box')].some(node => flat(node.children).includes('BODY'))).toBe(false)
@@ -144,7 +147,7 @@ test('Settings waits, and says why when the script could not be read', () => {
 test('Settings is one table under its tab: a label and the options; with no tab state, the Session tab', () => {
   const body = settingsBody(ui, data(), '', ['a layer is unreadable'], () => undefined)
   expect(all(body, 'Text').filter(node => node.props.bold).map(words)).toEqual(['Mode', 'Model*', 'Push'])
-  expect(rows(body)).toEqual(['[Session] System', 'Mode A [B] C', 'Model* opus [sonnet]', 'Push test [prod]'])
+  expect(rows(body)).toEqual(['[Session] (i) System (i)', 'Mode (i) A [B] C', 'Model* (i) opus [sonnet]', 'Push (i) test [prod]'])
   expect(words(all(body, 'Text').find(node => node.props.color === '#E07B00'))).toBe('! a layer is unreadable')
 })
 
@@ -157,7 +160,7 @@ test('Main model shows keep as opus, because Opus agents then run on the model t
 test('the System tab is left out until the saved defaults are read', () => {
   const body = settingsBody(ui, data({ saved: undefined }), '', [], () => undefined)
   expect(all(body, 'Text').filter(node => node.props.bold).map(words)).toEqual(['Mode', 'Model*', 'Push'])
-  expect(rows(body)).toEqual(['[Session]', 'Mode A [B] C', 'Model* opus [sonnet]', 'Push test [prod]'])
+  expect(rows(body)).toEqual(['[Session] (i)', 'Mode (i) A [B] C', 'Model* (i) opus [sonnet]', 'Push (i) test [prod]'])
 })
 
 test('a problem is shown in red above the blocks', () => {
@@ -230,10 +233,10 @@ test('a role whose file says opus carries a star, the same as Model*, which repl
   expect(rows(body)).toEqual(['[qa*] opus [sonnet] haiku fable', 'architect* (off)', '[developer] opus sonnet haiku fable', '[doc] opus sonnet [haiku] fable'])
   // The star counts in the role column's width, so the radios of a starred longest name line up with the rest.
   const widths = (one: unknown) => all(one, 'Box').filter(node => node.props.minWidth !== undefined).map(node => node.props.minWidth)
-  const longest = agentsBody(ui, data({ agents: [agent('security', { active: true, defined: 'opus' }), agent('qa', { active: true, in_mode: true })] }), () => undefined)
-  expect(rows(longest)[0]).toBe('[security*] opus [sonnet] haiku fable (added)')
+  const longest = agentsBody(ui, data({ agents: [agent('observability', { active: true, defined: 'opus' }), agent('qa', { active: true, in_mode: true })] }), () => undefined)
+  expect(rows(longest)[0]).toBe('[observability*] opus [sonnet] haiku fable (added)')
   // The (added) mark sits after the radios, so it does not widen the column.
-  expect(widths(longest)).toEqual(['security*'.length + 3, 'security*'.length + 3])
+  expect(widths(longest)).toEqual([INFO_CELLS + 'observability*'.length + 3, INFO_CELLS + 'observability*'.length + 3])
 })
 
 test('the radio of the model the role runs on is chosen, pinned or not', () => {
@@ -309,30 +312,30 @@ test('options line up: Settings and Agents share one head column, so their optio
   // Agents: the same head column on every row; the model radios follow it.
   const agents = widths(agentsBody(ui, data(), () => undefined))
   expect(agents).toEqual([headWidth(data()), headWidth(data()), headWidth(data())])
-  expect(headWidth(data())).toBe('security'.length + 3)
+  expect(headWidth(data())).toBe(INFO_CELLS + 'Pod message'.length + 2)
 })
 
 test('the shared head column is the longest label, or the longest name of a role that is on; an off role does not widen it', () => {
   const on = (role: string, extra: Record<string, unknown> = {}) => agent(role, { active: true, in_mode: true, ...extra })
-  // Short names that are on: the Settings labels decide ("Coverage" and a gap).
-  expect(headWidth(data({ agents: [on('qa'), on('analyst')] }))).toBe('Coverage'.length + 2)
+  // Every head carries its (i), INFO_CELLS wide. Short names that are on: the Settings labels decide ("Pod message" and a gap).
+  expect(headWidth(data({ agents: [on('qa'), on('analyst')] }))).toBe(INFO_CELLS + 'Pod message'.length + 2)
   // A longer name that is on, star counted: it decides, for Settings too.
-  expect(headWidth(data({ agents: [on('architect', { defined: 'opus' }), on('qa')] }))).toBe('architect*'.length + 3)
+  expect(headWidth(data({ agents: [on('architect', { defined: 'opus' }), on('qa')] }))).toBe(INFO_CELLS + 'architect*'.length + 3)
   // A long name that is off has no radios after it, so it does not count.
-  expect(headWidth(data({ agents: [on('qa'), agent('observability', { in_mode: true })] }))).toBe('Coverage'.length + 2)
+  expect(headWidth(data({ agents: [on('qa'), agent('observability', { in_mode: true })] }))).toBe(INFO_CELLS + 'Pod message'.length + 2)
   // An added role: its (added) mark is drawn after the radios and does not count.
-  expect(headWidth(data({ agents: [on('qa'), agent('observability', { active: true })] }))).toBe('observability'.length + 3)
+  expect(headWidth(data({ agents: [on('qa'), agent('observability', { active: true })] }))).toBe(INFO_CELLS + 'observability'.length + 3)
   // Mode A runs no role: the labels decide.
-  expect(headWidth(data({ values: { mode: 'A', mode_model: 'keep' }, agents: [agent('observability')] }))).toBe('Coverage'.length + 2)
+  expect(headWidth(data({ values: { mode: 'A', mode_model: 'keep' }, agents: [agent('observability')] }))).toBe(INFO_CELLS + 'Pod message'.length + 2)
   // Settings uses it: its label column moves with the Agents column.
   const wide = data({ agents: [on('architect', { defined: 'opus' })] })
   const first = all(settingsBody(ui, wide, '', [], () => undefined), 'Box').find(node => node.props.minWidth !== undefined)!
-  expect(first.props.minWidth).toBe('architect*'.length + 3)
+  expect(first.props.minWidth).toBe(INFO_CELLS + 'architect*'.length + 3)
 })
 
 test('on a surface with Svg each option has a radio or checkbox icon and no brackets', () => {
   expect(rows(settingsBody(desktop, data({ saved: undefined }), '', [], () => undefined))).toEqual([
-    '● Session', 'Mode ○ A ● B ○ C', 'Model* ○ opus ● sonnet', 'Push ☐ test ☑ prod',
+    '● Session ⓘ', 'Mode ⓘ ○ A ● B ○ C', 'Model* ⓘ ○ opus ● sonnet', 'Push ⓘ ☐ test ☑ prod',
   ])
   const icons = all(settingsBody(desktop, data({ saved: undefined }), '', [], () => undefined), 'Svg')
   expect(icons.every(node => String(node.props.source).startsWith('<svg') && node.props.width === 12 && node.props.height === 12)).toBe(true)
@@ -402,8 +405,8 @@ test('"After pushing update:" is a checkbox line of test and prod, each ticked o
   const values = { mode: 'B', mode_model: 'sonnet', 'deploy_after_push.test': true, 'deploy_after_push.prod': false }
   const record = (key: string, value: string, scope?: string) => { calls.push([key, value, String(scope)]) }
   const bodies = [true, false].map(folded => settingsBody(ui, data({ schema, values }), '', [], record, { folded, toggle: () => undefined }))
-  expect(rows(bodies[0])).toContain('Deploy [test] prod')
-  expect(rows(bodies[1])).toContain('Deploy test prod')
+  expect(rows(bodies[0])).toContain('Deploy (i) [test] prod')
+  expect(rows(bodies[1])).toContain('Deploy (i) test prod')
   bodies.forEach(body => all(body, 'Button').filter(node => String(node.props.key).includes('deploy_after_push.')).forEach(node => node.props.onPress()))
   // Each tab draws the two boxes (the session's, then the saved defaults', where neither is ticked): each press asks
   // for the opposite of its own tab's value.
@@ -419,7 +422,7 @@ test('Replies sits under Model* and offers short, normal and long; a press write
   const calls: string[][] = []
   const body = settingsBody(ui, data({ schema, values: { mode: 'B', mode_model: 'sonnet', 'reply.length': 'short', 'pod.message_format': 'short' }, saved: undefined }), '', [],
     (key, value) => { calls.push([key, value]) })
-  expect(rows(body).slice(0, 5)).toEqual(['[Session]', 'Mode A [B] C', 'Model* opus [sonnet]', 'Replies [short] normal long', 'Format [short] full'])
+  expect(rows(body).slice(0, 5)).toEqual(['[Session] (i)', 'Mode (i) A [B] C', 'Model* (i) opus [sonnet]', 'Replies (i) [short] normal long', 'Pod message (i) [short] full'])
   all(body, 'Button').find(node => node.props.key === 'session/reply.length=long')!.props.onPress()
   expect(calls).toEqual([['reply.length', 'long']])
 })
@@ -436,9 +439,9 @@ test('labels are short with no trailing colon, and Runner shows cloud/local whil
   const values = { mode: 'B', mode_model: 'sonnet', 'ci.runner': 'self-hosted', 'pod.connect': true, 'write.unit_tests': true, 'write.e2e': false }
   const body = settingsBody(ui, data({ schema, values, saved: undefined }), '', [], (key, value) => { calls.push([key, value]) })
   const lines = rows(body)
-  expect(lines).toContain('Runner cloud [local]')
-  expect(lines).toContain('Pod [on]')
-  expect(lines).toContain('Tests [unit] e2e')
+  expect(lines).toContain('Runner (i) cloud [local]')
+  expect(lines).toContain('Pod (i) [on]')
+  expect(lines).toContain('Tests (i) [unit] e2e')
   expect(lines.filter(text => text.split(' ')[0].endsWith(':'))).toEqual([])
   all(body, 'Button').find(node => node.props.key === 'session/ci.runner=hosted')!.props.onPress()
   expect(calls).toEqual([['ci.runner', 'hosted']])

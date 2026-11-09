@@ -105,7 +105,7 @@ def check(key, value):
             return False
         raise ConfigError("'%s' is a yes/no setting, got %r" % (key, value))
     text = str(value).strip()
-    for option in spec['options']:
+    for option in spec['options'] + spec.get('legacy', []):   # a legacy value is read, never offered (rule #4)
         if text.lower() == option.lower():
             return option
     raise ConfigError("'%s' must be one of %s, got %r" % (key, '/'.join(spec['options']), value))

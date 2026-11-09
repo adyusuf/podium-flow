@@ -37,7 +37,9 @@ AGENTS_DIR = os.path.join(ROOT, 'agents')
 
 
 POD_FORMATS = ('short', 'full')
-BUDGETS = ('none', '25', '50', '100', '200', '500', '1000')   # the same list as podium_budget.BUDGETS (a test pins it)
+BUDGETS = ('none', '200', '500', '1000')   # the same list as podium_budget.BUDGETS (a test pins it); user decision 09/11/2026
+# Budgets a file written before 09/11/2026 may hold: still read (rule #4), never offered in the pane.
+LEGACY_BUDGETS = ('25', '50', '100')
 REPLY_LENGTHS = ('short', 'normal', 'long')       # how much Claude writes in a reply (standards/00 §5a)
 STEP_ENFORCEMENT = ('block', 'remind')            # steps first: refuse a code edit until the Status box holds steps, or remind
 DEPLOY_ENVS = ('test', 'prod')                    # which environment a push is deployed to
@@ -87,7 +89,7 @@ SCHEMA = (
      dict(_enum('steps.enforce', 'Steps first', STEP_ENFORCEMENT), group='Session'),
      # Shown in the Status box against the measured spend; it never stops work (user decision 06/11/2026).
      dict(_enum('budget.session_usd', 'Session budget in US dollars (shown in Status, never a stop)', BUDGETS),
-          group='Session'),
+          group='Session', legacy=list(LEGACY_BUDGETS)),
      dict(_bool('pod.connect', 'Connect to pod'), group='Pod'),
      dict(_enum('pod.message_format', 'Message format', POD_FORMATS), group='Pod'),
      dict(_bool('write.unit_tests', 'Write unit tests'), group='Writing'),

@@ -5,7 +5,7 @@
 /** The boxes, by section id. */
 export const SECTION_HELP: Record<string, string> = {
   status: 'What this session is doing now, what comes next, and one row per piece with its measured figure.',
-  settings: 'What Claude follows instead of asking, for code in a project. A task with no code uses only Replies and Status.',
+  settings: 'What Claude follows instead of asking, for code in a project. Outside a repository only the rows for work without code show.',
   agents: 'Every role, ticked when it runs, with the model it runs on. Tick or untick one for this session.',
   promotion: 'Where dev, test and prod stand on origin, and any gate waived on the commits waiting to come in.',
 }
@@ -22,9 +22,9 @@ export const ROW_HELP: Record<string, string> = {
   'Model*': 'The model the roles marked * in Agents run on instead of Opus. opus keeps them on Opus.',
   'Replies': 'How much Claude writes: short, normal or long. Red tests and skipped steps are said at every length.',
   'Budget': 'US dollars for this session, shown in Status against the measured spend (list price). Never a stop: work goes on past it.',
-  'Plan': 'Every task is split into steps in Status first. block: no code edit or commit until the steps exist. remind: only a reminder.',
+  'Plan': 'Every task is split into steps in Status first. force: no code edit or commit until the steps exist. remind: only a reminder.',
   'Pod': 'Connect to a pod. Stored only; nothing acts on it yet.',
-  'Format': 'The pod message format. Stored only; nothing acts on it yet.',
+  'Pod message': 'The pod message format. Stored only; nothing acts on it yet.',
   'Tests': 'Whether Claude writes unit tests and e2e specs for its changes.',
   'Merge': 'Which branches Claude merges finished work into, without asking.',
   'Push': 'Which branches Claude pushes after merging, without asking.',

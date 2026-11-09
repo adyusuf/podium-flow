@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { INFO_CELLS } from './controls'
 import { FOLDED_AT_START, headWidth, isFolded, ROW_LABELS, settingsBody, settingsFolds } from './boxes'
 import { gatedTargets, gateSteps, pressStep, STEP_INDENT, stepOn, stepsWidth } from './gatesteps'
 import { LOCKED_STEP_HELP, ROW_HELP, STEP_HELP } from './help'
@@ -68,8 +69,8 @@ test('a step runs unless it is unticked; only targets whose gate is on get a box
 test('open, the steps sit right under Gates, one step in, with no label of their own, a box per target whose gate is on', () => {
   const drawn = lines(settingsBody(ui, data({ 'gate_steps.sast.prod': false }), '', [], none, OPEN))
   const at = drawn.findIndex(([, text]) => text.startsWith('Gates'))
-  expect(drawn[at]![1].startsWith('Gates▾')).toBe(true)
-  expect(drawn.slice(at + 1, at + 3)).toEqual([[STEP_INDENT, 'lint[test][prod]'], [STEP_INDENT, 'SAST[test]prod']])
+  expect(drawn[at]![1].startsWith('Gates(i)▾')).toBe(true)
+  expect(drawn.slice(at + 1, at + 3)).toEqual([[STEP_INDENT, 'lint(i)[test][prod]'], [STEP_INDENT, 'SAST(i)[test]prod']])
   expect(drawn[at + 3]![1].startsWith('Coverage')).toBe(true)
   expect(drawn.some(([, text]) => text === 'steps')).toBe(false)
 })
@@ -80,7 +81,7 @@ test('the accordion starts closed: an arrow beside Gates, no step rows, and the 
   let toggled = 0
   const body = settingsBody(ui, data(), '', [], none, { folded: true, toggle: none, steps: { folded: true, toggle: () => { toggled += 1 } } })
   const texts = lines(body).map(([, text]) => text)
-  expect(texts.find(text => text.startsWith('Gates'))!.startsWith('Gates▸')).toBe(true)
+  expect(texts.find(text => text.startsWith('Gates'))!.startsWith('Gates(i)▸')).toBe(true)
   expect(texts.some(text => text.startsWith('lint') || text.startsWith('SAST'))).toBe(false)
   all(body, 'Button').find(one => one.props.key === 'fold-steps')!.props.onPress()
   expect(toggled).toBe(1)
@@ -101,7 +102,7 @@ test('with no gate on there is no arrow and no step row, even open; the System t
   expect(lines(body).some(([, text]) => text.startsWith('lint'))).toBe(false)
   expect(all(body, 'Button').some(one => one.props.key === 'fold-steps')).toBe(false)
   const system = settingsBody(ui, data(off, values({ 'gates_before_push.dev': true })), '', [], none, SYSTEM)
-  expect(lines(system).map(([, text]) => text).filter(text => text.startsWith('lint'))).toEqual(['lint[dev][test][prod]'])
+  expect(lines(system).map(([, text]) => text).filter(text => text.startsWith('lint'))).toEqual(['lint(i)[dev][test][prod]'])
 })
 
 test('a press on the Session tab is kept for this session and saved as the default; on System, saved only', () => {
@@ -119,7 +120,7 @@ test('a press on the Session tab is kept for this session and saved as the defau
 test('the head column is wide enough for an indented step name', () => {
   expect(stepsWidth(SCHEMA)).toBe(STEP_INDENT + 'lint'.length + 2)
   const long = [{ key: 'gate_steps.x.dev', step: 'a-very-long-name' }]
-  expect(headWidth({ schema: long, values: {}, sources: {}, agents: [] } as never)).toBe(STEP_INDENT + 'a-very-long-name'.length + 2)
+  expect(headWidth({ schema: long, values: {}, sources: {}, agents: [] } as never)).toBe(INFO_CELLS + STEP_INDENT + 'a-very-long-name'.length + 2)
 })
 
 test('the step rows have hover cards: the heading from the gate, then what unticking does; Gates names the arrow', () => {
@@ -137,7 +138,7 @@ test('a locked step (the secret scan, SAST) is drawn ticked whatever the value, 
   const locked = [...SCHEMA, ...step('secrets', 'secrets', 'secret scan').map(spec => ({ ...spec, locked: true }))]
   const pressed: string[] = []
   const body = settingsBody(ui, { ...data({ 'gate_steps.secrets.test': false }), schema: locked }, '', [], (key: string) => pressed.push(key), OPEN)
-  expect(lines(body).map(([, text]) => text).filter(text => text.startsWith('secrets'))).toEqual(['secrets[test][prod]'])
+  expect(lines(body).map(([, text]) => text).filter(text => text.startsWith('secrets'))).toEqual(['secrets(i)[test][prod]'])
   for (const one of all(body, 'Button').filter(button => String(button.props.key).includes('gate_steps.secrets'))) one.props.onPress()
   expect(pressed).toEqual([])
   const cards = all(body, 'Box').filter(node => node.props.display === 'none').map(words)

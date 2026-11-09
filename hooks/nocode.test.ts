@@ -1,9 +1,10 @@
 import { expect, test } from 'claude-code/testing'
 
-import { outsideRepository, paneFor, SECTIONS, settingsBody } from './boxes'
+import { NO_CODE_ROWS, outsideRepository, paneFor, ROW_LABELS, ROWS, SECTIONS, settingsBody } from './boxes'
 
-// Outside a git repository no code work happens, so the pane shows only Status and Settings, and Settings only Replies
-// (user decision 01/11/2026; standards/13 §8a). A recording factory lets the tests read what would be drawn.
+// Outside a git repository no code work happens, so the pane shows only Status and Settings, and Settings only the rows
+// for work without code: Mode, Model*, Replies, Plan, Budget, Pod, Pod message (user decisions 01/11/2026 and 09/11/2026;
+// standards/13 §8a). A recording factory lets the tests read what would be drawn.
 type Node = { type: unknown; props: Record<string, any>; children: unknown[] }
 const h = (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]): Node => ({ type, props: props ?? {}, children })
 const ui = { h, Box: 'Box', Text: 'Text', Button: 'Button' }
@@ -45,11 +46,19 @@ test('only the engine saying "no repository" (null) counts as outside; an unknow
   expect(outsideRepository({ root: '/r', remote: null, internal: false })).toBe(false)
 })
 
-test('with no code work, Settings shows only Replies and says why; with code work, every row as before', () => {
+test('with no code work, Settings shows only the no-code rows and says why; with code work, every row as before', () => {
   const none = settingsBody(ui, data, '', [], () => undefined, undefined, false)
-  expect(labels(none)).toEqual(['Replies'])
-  expect(all(none, 'Text').find(node => node.props.dimColor)!.children).toEqual(['No repository here: only Replies shows. Change the rest with /podium:config.'])
+  expect(labels(none)).toEqual(['Mode', 'Replies'])
+  expect(all(none, 'Text').find(node => node.props.dimColor)!.children).toEqual(['No repository here: only the rows for work without code show. Change the rest with /podium:config.'])
   const code = settingsBody(ui, data, '', [], () => undefined)
   expect(labels(code)).toEqual(['Mode', 'Replies', 'Push'])
   expect(all(code, 'Text').some(node => words(node).startsWith('No repository here'))).toBe(false)
+})
+
+test('the no-code rows are the ones the user chose, each a real row; Plan says force for the stored block', () => {
+  expect(NO_CODE_ROWS).toEqual(['Mode', 'Model*', 'Replies', 'Plan', 'Budget', 'Pod', 'Pod message'])
+  expect(NO_CODE_ROWS.every(label => ROW_LABELS.includes(label))).toBe(true)
+  const plan = ROWS.find(row => row.label === 'Plan')!
+  expect('names' in plan ? plan.names : undefined).toEqual({ block: 'force' })
+  expect(ROW_LABELS.includes('Format')).toBe(false)
 })

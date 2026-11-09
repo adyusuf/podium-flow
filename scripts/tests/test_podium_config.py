@@ -22,7 +22,7 @@ _spec.loader.exec_module(cfg)
 
 # The maintainer's list of 17/10/2026, key by key.
 EXPECTED = {
-    'mode': 'C', 'mode_model': 'sonnet', 'reply.length': 'short', 'steps.enforce': 'block', 'budget.session_usd': '100', 'pod.connect': False, 'pod.message_format': 'short',
+    'mode': 'C', 'mode_model': 'sonnet', 'reply.length': 'short', 'steps.enforce': 'block', 'budget.session_usd': '200', 'pod.connect': False, 'pod.message_format': 'short',
     'write.unit_tests': True, 'write.e2e': True,
     'merge.dev': True, 'merge.test': True, 'merge.prod': True,
     'push.dev': True, 'push.test': True, 'push.prod': True,

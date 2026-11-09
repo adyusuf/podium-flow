@@ -8,12 +8,14 @@
 // where it does not (terminal) the chosen one is drawn `[in brackets]` (underline was tried first: the desktop draws a Button
 // as a native button and drops a Text's underline inside it); a box's body and a block's lines start one step in.
 import { enabledFor, settingGroups } from './choose'
-import { helpCard, hoverable, INDENT, label, line, option, WARN } from './controls'
+import { explained, helpCard, INDENT, INFO_CELLS, label, line, option, WARN } from './controls'
 import { GATE_STEP_PREFIX, stepLines, stepsArrow, stepsWidth, type StepsFold } from './gatesteps'
 import { COLUMN_HELP, ROW_HELP, SECTION_HELP } from './help'
+import { NO_CODE_ROWS, ROWS, type Item } from './rows'
 import type { Ui } from './controls'
 
 export type { Factory, Ui } from './controls'
+export { NO_CODE_ROWS, ROW_LABELS, ROWS } from './rows'
 
 /** `session`: this session only; `saved`: the saved defaults every new session starts from (the user's file). */
 export type Scope = 'session' | 'saved'
@@ -34,7 +36,7 @@ export type SectionId = (typeof SECTIONS)[number]
 
 /**
  * What the pane shows. Outside a git repository the session is taken as no-code work: only Status and Settings, and
- * Settings only Replies (user decision 01/11/2026; standards/13 §8a). Until the folder is read, and inside a repository,
+ * Settings only the rows of NO_CODE_ROWS (user decisions 01/11/2026 and 09/11/2026; standards/13 §8a). Until the folder is read, and inside a repository,
  * everything shows; a git failure that is not "outside" leaves `outside` unset, so it hides nothing.
  */
 export function paneFor(promotion: PromotionData | null): { sections: SectionId[]; codeWork: boolean } {
@@ -44,8 +46,6 @@ export function paneFor(promotion: PromotionData | null): { sections: SectionId[
 
 /** Whether the session's folder is outside every git repository: the engine's `session.repo()` answers null. */
 export const outsideRepository = (repo: unknown) => repo === null
-/** The one setting a task with no code uses. */
-const NO_CODE_ROWS = ['Replies']
 
 /**
  * What starts folded, so the pane opens as a short card and not as one long list: two boxes, `claude`, which keeps
@@ -69,42 +69,11 @@ export const settingsFolds = (fold: Record<string, boolean>, toggle: (id: FoldId
 
 /** The radio group of an agent's model. */
 const AGENT_MODELS = ['opus', 'sonnet', 'haiku', 'fable']
-const TARGETS = ['dev', 'test', 'prod']
 /** The names the Agents box shows; the role (agent file, settings key) keeps its own name. */
 const ROLE_NAMES: Record<string, string> = {
   'product-manager': 'product', 'test-writer': 'tester', 'doc-writer': 'doc', 'coverage-auditor': 'coverage', 'e2e-writer': 'e2e',
 }
 
-type Item = { key: string; name: string }
-type Row = { label: string; items: Item[] } | { label: string; key: string; names?: Record<string, string> }
-const targets = (prefix: string, names = TARGETS): Item[] => names.map(name => ({ key: `${prefix}.${name}`, name }))
-
-/** The lines of a settings block, in order. A setting the schema has and no row names is still drawn (see `block`). */
-export const ROWS: Row[] = [
-  { label: 'Mode', key: 'mode' },
-  // The star ties it to the Agents rows it acts on: the roles whose file says opus carry the same star.
-  { label: 'Model*', key: 'mode_model', names: { keep: 'opus' } },
-  { label: 'Replies', key: 'reply.length' },
-  // `Plan` since 02/11/2026 (was `Steps`, which now names the gate's steps under Gates); the key stays (rule #4).
-  { label: 'Plan', key: 'steps.enforce' },
-  // Shown against the measured spend in Status; it never stops work (user decision 06/11/2026).
-  { label: 'Budget', key: 'budget.session_usd', names: { none: 'none' } },
-  { label: 'Pod', items: [{ key: 'pod.connect', name: 'on' }] },
-  { label: 'Format', key: 'pod.message_format' },
-  { label: 'Tests', items: [{ key: 'write.unit_tests', name: 'unit' }, { key: 'write.e2e', name: 'e2e' }] },
-  { label: 'Merge', items: targets('merge') },
-  { label: 'Push', items: targets('push') },
-  { label: 'Gates', items: targets('gates_before_push') },
-  { label: 'Coverage', items: targets('coverage_before_push') },
-  { label: 'CI', items: targets('ci_after_push') },
-  // Display names only: the stored values stay `hosted` / `self-hosted`, which CI and sdlc_settings.py read.
-  { label: 'Runner', key: 'ci.runner', names: { hosted: 'cloud', 'self-hosted': 'local' } },
-  { label: 'Deploy', items: targets('deploy_after_push', ['test', 'prod']) },
-  { label: 'E2E', items: targets('e2e_before_deploy', ['test', 'prod']) },
-]
-
-/** The labels of the Settings rows, in order; every one has a hover card text in help.ts. */
-export const ROW_LABELS = ROWS.map(row => row.label)
 
 /** The width of the label column of a settings block, in cells: the longest label and a gap. */
 const LABEL_WIDTH = Math.max(...ROWS.map(row => row.label.length)) + 2
@@ -124,7 +93,8 @@ function agentMark(agent: AgentRow, mode: string) {
  * that is off has no radios after it, so its name does not widen the column.
  */
 export function headWidth(data: SettingsData) {
-  return Math.max(LABEL_WIDTH, stepsWidth(data.schema), ...data.agents.filter(agent => agent.active).map(agent => agentName(agent).length + 3))
+  // Every head carries its (i) after it (user decision 09/11/2026), so the column is that much wider.
+  return INFO_CELLS + Math.max(LABEL_WIDTH, stepsWidth(data.schema), ...data.agents.filter(agent => agent.active).map(agent => agentName(agent).length + 3))
 }
 
 /** The options of one setting, the chosen one marked. */
@@ -202,7 +172,7 @@ export function section(ui: Ui, id: SectionId, title: string, folded: boolean, t
     { flexDirection: 'column', borderStyle: 'round', paddingX: 1, marginBottom: 1 },
     h(ui.Box, { flexDirection: 'row', columnGap: 1 },
       h(ui.Button, { key: `fold-${id}`, plain: true, onPress: toggle }, folded ? '▸' : '▾'),
-      hoverable(ui, `section-${id}`, h(ui.Text, { bold: true }, title))),
+      explained(ui, `section-${id}`, h(ui.Text, { bold: true }, title), SECTION_HELP[id])),
     helpCard(ui, `section-${id}`, SECTION_HELP[id]),
     folded ? null : h(ui.Box, { flexDirection: 'column', marginLeft: INDENT }, body),
   )
@@ -222,17 +192,21 @@ function table(ui: Ui, data: SettingsData, press: Press, tabs: ColumnFold, codeW
   const lines = settingLines(ui, data.schema, press, tabs.steps ?? { folded: true, toggle: () => undefined })
     .filter(one => (codeWork || NO_CODE_ROWS.includes(one.label)) && (one.shown?.(layer) ?? true))
   // A tab is drawn as every other choice of the pane: a radio icon on the desktop, brackets in the terminal.
-  const tab = (name: 'Session' | 'System', chosen: boolean) => hoverable(ui, `column-${name}`,
-    option(ui, `tab-${name}`, name, 'radio', chosen, () => { if (!chosen) tabs.toggle() }))
+  const tab = (name: 'Session' | 'System', chosen: boolean) => explained(ui, `column-${name}`,
+    option(ui, `tab-${name}`, name, 'radio', chosen, () => { if (!chosen) tabs.toggle() }), COLUMN_HELP[name])
   // Each card is a hidden row right after its label's line.
   return h(ui.Box, { flexDirection: 'column' },
     line(ui, null, [h(ui.Box, { flexDirection: 'row', columnGap: 1 }, tab('Session', !system), data.saved ? tab('System', system) : null)], head),
     helpCard(ui, 'column-Session', COLUMN_HELP.Session),
     data.saved ? helpCard(ui, 'column-System', COLUMN_HELP.System) : null,
-    lines.flatMap(one => [
-      line(ui, h(ui.Box, { flexDirection: 'row', columnGap: 1 }, hoverable(ui, `row-${one.id ?? one.label}`, label(ui, one.label, one.indent)),
-        one.after?.(layer) ?? null), [one.draw(scope, layer)], head),
-      helpCard(ui, `row-${one.id ?? one.label}`, one.help ?? ROW_HELP[one.label])]))
+    lines.flatMap(one => {
+      const card = one.help ?? ROW_HELP[one.label]
+      return [
+        line(ui, h(ui.Box, { flexDirection: 'row', columnGap: 1 },
+          explained(ui, `row-${one.id ?? one.label}`, label(ui, one.label, one.indent), one.label === '' ? undefined : card),
+          one.after?.(layer) ?? null), [one.draw(scope, layer)], head),
+        helpCard(ui, `row-${one.id ?? one.label}`, card)]
+    }))
 }
 
 /** The Session tab, for a caller that keeps no tab state. */
@@ -247,7 +221,7 @@ export function settingsBody(ui: Ui, data: SettingsData | null, problem: string,
     { flexDirection: 'column' },
     problem !== '' ? h(ui.Text, { color: 'red' }, problem) : null,
     problems.map(line => h(ui.Text, { color: WARN }, `! ${line}`)),
-    codeWork ? null : h(ui.Text, { dimColor: true }, 'No repository here: only Replies shows. Change the rest with /podium:config.'),
+    codeWork ? null : h(ui.Text, { dimColor: true }, 'No repository here: only the rows for work without code show. Change the rest with /podium:config.'),
     table(ui, data, press, claude, codeWork),
   )
 }
@@ -277,7 +251,7 @@ export function agentsBody(ui: Ui, data: SettingsData | null, press: Press) {
     mode === 'A' ? h(ui.Text, { dimColor: true }, 'mode A runs no agents') : null,
     // A role's card is its agent file's description, a hidden row right after its line.
     data.agents.flatMap(agent => [
-      line(ui, hoverable(ui, `agent-${agent.role}`, role(agent)), [[...(agent.active ? models(agent) : []), mark(agent)]], width),
+      line(ui, explained(ui, `agent-${agent.role}`, role(agent), agent.description), [[...(agent.active ? models(agent) : []), mark(agent)]], width),
       helpCard(ui, `agent-${agent.role}`, agent.description)]),
   )
 }

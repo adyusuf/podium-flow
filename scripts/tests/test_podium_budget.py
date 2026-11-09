@@ -71,6 +71,13 @@ class Budget(unittest.TestCase):
         row = [one for one in podium_schema.SCHEMA if one['key'] == 'budget.session_usd']
         self.assertEqual(1, len(row))
         self.assertIn(podium_budget.DEFAULT_BUDGET, row[0]['options'])
+        # User decision 09/11/2026: none, 200, 500, 1000 are offered; an older file's 25/50/100 is still read (rule #4).
+        self.assertEqual(('none', '200', '500', '1000'), podium_budget.BUDGETS)
+        self.assertEqual(list(podium_budget.LEGACY_BUDGETS), row[0]['legacy'])
+        import podium_layers
+        self.assertEqual('100', podium_layers.check('budget.session_usd', '100'))
+        with self.assertRaises(podium_layers.ConfigError):
+            podium_layers.check('budget.session_usd', '300')
 
     def hook(self, event, payload):
         subprocess.run([sys.executable, SCRIPT, 'hook', event], env=self.env, capture_output=True,
@@ -82,10 +89,10 @@ class Budget(unittest.TestCase):
 
     def test_the_end_of_a_turn_writes_it_and_show_prints_it_first(self):
         self.hook('stop', {'session_id': SESSION, 'transcript_path': self.transcript})
-        self.assertEqual('$15.00 spent of $100 (15%) · measured: tokens × API list price',
+        self.assertEqual('$15.00 spent of $200 (8%) · measured: tokens × API list price',     # the default, $200
                          json.loads(self.show('--json'))['budget'])
         text = self.show()
-        self.assertTrue(text.startswith('budget: $15.00 spent of $100'), text)
+        self.assertTrue(text.startswith('budget: $15.00 spent of $200'), text)
 
     def test_a_table_with_only_the_budget_still_says_nothing_runs(self):
         import podium_status

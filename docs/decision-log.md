@@ -2248,3 +2248,20 @@ follow the figure, not be stopped by it.
 shown only: work goes on`. Tests: `scripts/tests/test_podium_budget.py` (9; mutants that drop the subagents or the field
 fail), `hooks/status.test.ts` (the line is drawn first).
 
+## The pane outside a repository, Pod message, force, the budget list and the (i) (09/11/2026, user decisions)
+
+**Decision.** Outside a git repository Settings shows *Mode*, *Model\**, *Replies*, *Plan*, *Budget*, *Pod* and *Pod
+message* and nothing else (was *Replies* alone; `NO_CODE_ROWS` in `hooks/rows.ts`). *Format* is labelled *Pod message*.
+*Plan* shows `force` for the stored `block` (the value stays, rule #4). *Budget* offers `none`, `200`, `500`, `1000`
+(default `200`, was `100`); `25`, `50` and `100` written before stay readable as `legacy` values of the schema, never
+offered. Every label with a card (box titles, the Session/System tabs, every Settings row and gate step, every Agents role
+with a description) carries an (i), and the pointer on the label or the (i) opens its English card; the head column is
+`INFO_CELLS` (4) wider for it.
+**Why.** The user wants the settings that also act on work without code to be reachable outside a repository, and to see
+at a glance that a label explains itself.
+**Not done here.** The same message asks that every setting act on the running session at once (a job queue, stopping a
+running push or deploy, a pod connection, a cloud-to-local runner fallback). Today a change reaches Claude only through
+the `notify` hook on the next message or Bash/Agent call, and `pod.*` is stored only; that work is planned separately.
+**Measured.** `deno test hooks/*.test.ts`: 92 passed, 2 failed — the 2 fail on `dev` too (`status.test.ts` uses `.not`,
+which the test shim lacks). `pytest scripts/tests`: the 3 tests that pinned the old budget now pass.
+
