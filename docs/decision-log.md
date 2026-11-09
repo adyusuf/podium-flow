@@ -2283,3 +2283,16 @@ running push or deploy, a pod connection, a cloud-to-local runner fallback). Tod
 the `notify` hook on the next message or Bash/Agent call, and `pod.*` is stored only; that work is planned separately.
 **Measured.** `deno test hooks/*.test.ts`: 92 passed, 2 failed — the 2 fail on `dev` too (`status.test.ts` uses `.not`,
 which the test shim lacks). `pytest scripts/tests`: the 3 tests that pinned the old budget now pass.
+
+## Reply length: short and normal; `long` is retired, `short` folds long detail away (09/11/2026, user decision)
+
+**Decision.** `reply.length` offers `short` and `normal`; `long` is not needed. `normal` is unchanged. `short` states the
+important points first and, plainly, what the user must do or decide, with no long back-and-forth; anything long
+(evidence, per-step detail, logs, long tables, the end-of-turn completeness block) goes inside a collapsed
+`<details><summary>…</summary>…</details>` section instead of being left out. What the rules put in a reply at every length
+is unchanged (`standards/00` §5a). The entry of 01/11/2026 above records the three-length setting as it was then.
+**Moving (rule #4).** A user, project or session file that still says `long`, and a `set reply.length long`, land on
+`normal` through the schema's `aliases` (`scripts/podium_schema.py`, applied in `podium_layers.check`), so the rest of
+such a file still counts: before, `long` would have failed the check and thrown away the whole layer.
+**Measured.** `scripts/tests/test_podium_config.py`: a file holding `long` and `mode: B` reads as `normal` and `B`; `set
+reply.length LONG` stores `normal`.

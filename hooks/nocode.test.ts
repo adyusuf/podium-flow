@@ -27,7 +27,7 @@ const labels = (body: unknown) => all(body, 'Text').filter(node => node.props.bo
 
 const enumSpec = (key: string, label: string, options: string[]) => ({ key, type: 'enum' as const, label, group: 'Session', options })
 const data = {
-  schema: [enumSpec('mode', 'Working mode', ['A', 'B']), enumSpec('reply.length', 'Reply length', ['short', 'normal', 'long']),
+  schema: [enumSpec('mode', 'Working mode', ['A', 'B']), enumSpec('reply.length', 'Reply length', ['short', 'normal']),
     { key: 'push.prod', type: 'bool' as const, label: 'Push prod', group: 'Push' }],
   values: { mode: 'B', 'reply.length': 'short', 'push.prod': true }, sources: {}, agents: [],
 }

@@ -20,7 +20,7 @@ export const COLUMN_HELP: Record<string, string> = {
 export const ROW_HELP: Record<string, string> = {
   'Mode': 'How many agents work: A none, B three helpers, C the full team with qa review, D wide team, E fan-out.',
   'Model*': 'The model the roles marked * in Agents run on instead of Opus. opus keeps them on Opus.',
-  'Replies': 'How much Claude writes: short, normal or long. Red tests and skipped steps are said at every length.',
+  'Replies': 'How much Claude writes: short (key points, long detail folded away) or normal. Red tests and skipped steps are said at both.',
   'Budget': 'US dollars for this session, shown in Status against the measured spend (list price). Never a stop: work goes on past it.',
   'Plan': 'Every task is split into steps in Status first. force: no code edit or commit until the steps exist. remind: only a reminder.',
   'Pod': 'Connect to a pod. Stored only; nothing acts on it yet.',

@@ -38,7 +38,7 @@ const TARGETS = ['dev', 'test', 'prod']
 const step = (id: string, name: string, heading: string) => TARGETS.map(target =>
   ({ key: `gate_steps.${id}.${target}`, type: 'bool' as const, label: `Gate step ${name} on ${target}`, group: 'Gate steps', step: name, heading }))
 const SCHEMA = [
-  { key: 'reply.length', type: 'enum' as const, label: 'Reply length', group: 'Session', options: ['short', 'long'] },
+  { key: 'reply.length', type: 'enum' as const, label: 'Reply length', group: 'Session', options: ['short', 'normal'] },
   ...TARGETS.map(target => ({ key: `gates_before_push.${target}`, type: 'bool' as const, label: `Gates ${target}`, group: 'Gates' })),
   ...TARGETS.map(target => ({ key: `coverage_before_push.${target}`, type: 'bool' as const, label: `Coverage ${target}`, group: 'Coverage' })),
   ...step('lint', 'lint', 'formatter / linter'), ...step('sast', 'SAST', 'SAST'),

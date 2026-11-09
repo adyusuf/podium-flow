@@ -62,12 +62,12 @@ def render(effective, problems):
 # What each reply length asks of Claude, printed at session start (standards/00-working-method.md §5a). Whatever the
 # length, a red test, a skipped step, an open finding and what waits on the user are said: shorter, never left out.
 REPLY_MEANING = {
-    'short': 'write a few sentences: what changed, what is not done or not verified, what waits on the user; no extra '
-             'tables, recaps or lists of checks unless asked. Still said at every length: a red test, a skipped step, an '
-             'open finding, the long-run table, the #28 handoff line and end-of-turn block, the #24 deferred list, the '
-             '#27 agent count and cost (standards/00 §5a)',
+    'short': 'the important points first and, said plainly, what the user must do or decide; no long back-and-forth. '
+             'Anything long (evidence, per-step detail, logs, long tables, the end-of-turn completeness block) goes '
+             'inside a collapsed <details><summary>...</summary>...</details> section, never left out. Still said at every '
+             'length: a red test, a skipped step, an open finding, what waits on the user, the long-run table, the #28 '
+             'handoff line and end-of-turn block, the #24 deferred list, the #27 agent count and cost (standards/00 §5a)',
     'normal': 'the result and the reasoning that matters, short lists where they help (standards/00 §5a)',
-    'long': 'a full report: every step with its evidence and figures, tables where they help (standards/00 §5a)',
 }
 
 

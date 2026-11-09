@@ -132,7 +132,7 @@ in a row — and every time something real was.
 - If tests are red, show the output. Do not hide an error.
 - No long prose; bullet points, with file paths as clickable links.
 
-### 5a. Reply length is a setting: short, normal, long (user decision 01/11/2026)
+### 5a. Reply length is a setting: short, normal (user decisions 01/11/2026 and 09/11/2026)
 
 How much Claude writes follows `reply.length` (`/podium:config`, the *Replies* row in the pane; default **short**). The
 session-start context names the effective value. Before every reply Claude writes at the effective length: the value
@@ -141,12 +141,15 @@ in the session-start block, or in the latest change notice. A change applies fro
 
 | Length | A reply holds |
 |---|---|
-| `short` (default) | A few sentences: what changed, what is not done or not verified, what waits on the user. No extra tables, recaps, lists of checks run or agent narratives unless the user asks. |
+| `short` (default) | The important points first and, said plainly, what the user must do or decide; no long back-and-forth. Anything long (evidence, per-step detail, logs, long tables, the end-of-turn completeness block) goes inside a collapsed `<details><summary>…</summary>…</details>` section instead of being left out. |
 | `normal` | The result and the reasoning that matters; short lists where they help. |
-| `long` | A full report: every step with its evidence and figures, tables where they help. |
+
+`long` was retired on 09/11/2026 (user decision): a file or a `set` that still says `long` is read as `normal`, so the
+rest of that settings file still counts (rule #4).
 
 ⚠️ **Length never hides a fact, and never drops what a rule requires.** At every length a red test, a skipped step, an
-unverified claim, an open finding and what waits on the user are said (#15), at `short` in one line each. What the
+unverified claim, an open finding and what waits on the user are said (#15), at `short` in one line each, outside any
+collapsed section. What the
 global rules put in a reply stays at every length: the long-run table (`CLAUDE.md` STATUS REPORTING, §10), the
 per-handoff line and the end-of-turn completeness block (#28), the list of what was knowingly deferred (#24), and the
 agent count and cost (#27). `short` shortens the prose around them, not them.

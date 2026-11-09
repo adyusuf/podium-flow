@@ -419,15 +419,15 @@ test('"After pushing update:" is a checkbox line of test and prod, each ticked o
   ])
 })
 
-test('Replies sits under Model* and offers short, normal and long; a press writes the level', () => {
+test('Replies sits under Model* and offers short and normal; a press writes the level', () => {
   const schema = [...SCHEMA, { key: 'pod.message_format', type: 'enum' as const, label: 'Message format', group: 'Pod', options: ['short', 'full'] },
-    { key: 'reply.length', type: 'enum' as const, label: 'Reply length', group: 'Session', options: ['short', 'normal', 'long'] }]
+    { key: 'reply.length', type: 'enum' as const, label: 'Reply length', group: 'Session', options: ['short', 'normal'] }]
   const calls: string[][] = []
   const body = settingsBody(ui, data({ schema, values: { mode: 'B', mode_model: 'sonnet', 'reply.length': 'short', 'pod.message_format': 'short' }, saved: undefined }), '', [],
     (key, value) => { calls.push([key, value]) })
-  expect(rows(body).slice(0, 5)).toEqual(['[Session] (i)', 'Mode (i) A [B] C', 'Model* (i) opus [sonnet]', 'Replies (i) [short] normal long', 'Pod message (i) [short] full'])
-  all(body, 'Button').find(node => node.props.key === 'session/reply.length=long')!.props.onPress()
-  expect(calls).toEqual([['reply.length', 'long']])
+  expect(rows(body).slice(0, 5)).toEqual(['[Session] (i)', 'Mode (i) A [B] C', 'Model* (i) opus [sonnet]', 'Replies (i) [short] normal', 'Pod message (i) [short] full'])
+  all(body, 'Button').find(node => node.props.key === 'session/reply.length=normal')!.props.onPress()
+  expect(calls).toEqual([['reply.length', 'normal']])
 })
 
 test('labels are short with no trailing colon, and Runner shows cloud/local while pressing writes the stored value', () => {

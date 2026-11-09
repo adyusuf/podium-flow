@@ -93,7 +93,7 @@ class Budget(unittest.TestCase):
             with open(path, 'w', encoding='utf-8') as handle:
                 json.dump({'budget': {'session_usd': '25'}, 'reply': {'length': 'long'}}, handle)
             values, problem = podium_layers.read_layer(path)
-            self.assertEqual((None, '25', 'long'), (problem, values['budget.session_usd'], values['reply.length']))
+            self.assertEqual((None, '25', 'normal'), (problem, values['budget.session_usd'], values['reply.length']))   # long -> normal
             run = subprocess.run([sys.executable, os.path.join(os.path.dirname(SCRIPT), 'podium_config.py'), 'set',
                                   'budget.session_usd', '25', '--session', 'qa-old-budget'],
                                  env=self.env, capture_output=True, text=True)
