@@ -5,7 +5,7 @@ import {
   type FoldId, type Scope, type SectionId,
 } from './boxes'
 import {
-  countOf, DISCOVER_PY, IS_FILE_PY, overrideNote, parseDiscovery, plannedStages, refSet, scriptDir, waivedLines, waivedRange,
+  countOf, DISCOVER_PY, IS_FILE_PY, overrideNote, PANELS_COMMAND, parseDiscovery, plannedStages, refSet, scriptDir, waivedLines, waivedRange,
 } from './choose'
 import { operationWarnings, warnings } from './notices'
 import { parseStatus, statusBody, statusDir, statusScript, statusStep, type StatusProbe } from './status'
@@ -210,7 +210,7 @@ function click($: EngineInterface, key: string, value: string, scope: Scope) {
 }
 
 const onStart: Hook<'session.start'> = async ($, e, next) => {
-  await $.command.register({ name: 'podium:panels', description: 'Open the podium status, settings, agents and promotion boxes' })
+  await $.command.register(PANELS_COMMAND)
   void $.ui.open({ id: BOXES, title: TITLE })
   await safely($, refreshSettings($))
   await safely($, refreshPromotion($))
@@ -290,7 +290,7 @@ const onRender: Hook<'ui.render'> = async ($, e) => {
 
 export const register: Register = on => {
   on('session.start', onStart)
-  on('command.run', { command: 'podium:panels' }, onPanels)
+  on('command.run', { command: PANELS_COMMAND.name }, onPanels)
   on('turn.complete', onTurnComplete)
   on('tool.call', { tool: 'Bash' }, onShell)
   on('tool.call', { tool: 'PowerShell' }, onShell)

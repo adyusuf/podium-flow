@@ -2296,3 +2296,14 @@ is unchanged (`standards/00` §5a). The entry of 01/11/2026 above records the th
 such a file still counts: before, `long` would have failed the check and thrown away the whole layer.
 **Measured.** `scripts/tests/test_podium_config.py`: a file holding `long` and `mode: B` reads as `normal` and `B`; `set
 reply.length LONG` stores `normal`.
+
+## `/podium:panels` runs beside a running turn (09/11/2026, user decision)
+
+**Decision.** Opening the panels must not stop the session's work. The mod registers `/podium:panels` with `immediate:
+true` (`PANELS_COMMAND` in `hooks/choose.ts`): typed while a turn runs, the engine runs its `command.run` hook at once beside
+the turn instead of holding it for the turn's end, which the desktop did by stopping the turn. The hook only opens the
+pane and rereads the settings, branches and status files, so it assumes nothing about the turn (the engine's condition
+for `immediate`). A client without mods still reads `commands/panels.md` as a prompt, which waits like any message.
+**Measured.** `hooks/choose.test.ts` pins `immediate`; `claude plugin validate .` passes. Not verified live in the
+desktop: that needs the plugin update after promotion.
+

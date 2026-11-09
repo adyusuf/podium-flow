@@ -24,7 +24,8 @@ All of them run locally; none opens a network connection.
 ## The mod (`register.tsx`)
 
 `hooks.json` also lists `register.tsx` under `modules`: a Claude Code mod that opens one pane, titled `podium`, in the
-right-hand rail of the desktop app when a session starts, and answers `/podium:panels`. In a client that does not load
+right-hand rail of the desktop app when a session starts, and answers `/podium:panels`. The command is `immediate`:
+typed while a turn runs, it opens the boxes beside the turn and does not stop it (09/11/2026). In a client that does not load
 mods, the command prints the same settings as a table instead ([`commands/panels.md`](../commands/panels.md)).
 
 What the mod runs and reads:
@@ -47,7 +48,7 @@ What the mod runs and reads:
 It opens no network connection. The code is split so the drawing can be tested without the engine: `boxes.ts` (Settings,
 Agents, Promotion), `controls.ts` (the shared icons, options, aligned lines and hover cards), `help.ts` (what the hover
 cards say), `gatesteps.ts` (the gate's step rows under Gates), `status.ts` (Status), `choose.ts` (pure decisions), `notices.ts` (chat lines); `register.tsx` is the
-engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (94 tests).
+engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (97 tests).
 
 ## The four boxes
 
