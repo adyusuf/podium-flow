@@ -36,8 +36,8 @@ Then open a new session (or `/reload-plugins`). The script's flags (`--check`, `
 finds `claude` when it is not on `PATH`: [`scripts/README.md`](scripts/README.md) (`plugin-setup.py`). Prerequisites,
 Windows included: [`SETUP.md`](SETUP.md) §1 and §6.
 
-**Moving from `adyusuf`.** Until 02/11/2026 this plugin was `adyusuf`, installed from `adyusuf/claude-code-standards`. The
-installer above moves such an install: it installs `podium` in the same scope and branch, then removes the old plugin
+**Moving from `adyusuf`.** Until 02/11/2026 this plugin was `adyusuf`, installed from `adyusuf/claude-code-standards`
+(deleted on 09/11/2026; this repository holds its whole history). The installer above moves such an install: it installs `podium` in the same scope and branch, then removes the old plugin
 (its data kept), keeps a disabled one disabled and points a `CLAUDE_CODE_PLUGIN_DIRS` at the new folder. The old
 marketplace link stays for sessions still running; remove it later with `/plugin marketplace remove adyusuf-marketplace`.
 Your settings move by themselves: `~/.claude/adyusuf.json` and the `ADYUSUF_*` variables are still read.

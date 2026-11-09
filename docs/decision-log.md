@@ -2248,3 +2248,17 @@ follow the figure, not be stopped by it.
 shown only: work goes on`. Tests: `scripts/tests/test_podium_budget.py` (9; mutants that drop the subagents or the field
 fail), `hooks/status.test.ts` (the line is drawn first).
 
+## adyusuf/claude-code-standards is retired; podium-flow is the only repository and folder (09/11/2026, user decision)
+
+The name `claude-code-standards` goes everywhere: the GitHub repository `adyusuf/claude-code-standards` is **deleted**
+and the local folder `~/ClaudeCode/claude-code-standards` is moved aside to `~/ClaudeCode/claude-code-standards-old`;
+`adyusuf/podium-flow` (`~/ClaudeCode/podium-flow`) is the one place the rule set lives. Nothing was lost: before the
+delete every non-merge commit on the old `dev`, `test`, `prod` and the local branches had a same-subject commit in
+podium-flow. Projects that pointed at the old repository were moved first: the CI callers of insurance, BTTakvim,
+ChatUxer and ocrai call `adyusuf/podium-flow/.github/workflows/sdlc.yml` pinned at `cb59be4` (was
+`claude-code-standards@8123117`; that workflow fetched gate-core from the old repository, `cb59be4` is the first commit
+that fetches it from podium-flow, its only other change reads `deploy_after_push` in both shapes), and bitreka's case is
+`podium-flow` (slug, link, title; the old case URL has no redirect). An install still made from the old repository keeps its local copy, and
+`scripts/plugin-setup.py` still moves it (it reads the installed folders, not GitHub). Earlier entries of this log, the
+legacy test's docstring and the step-statistics folder list keep the old name, because they record what was true then
+or must still match old paths.
