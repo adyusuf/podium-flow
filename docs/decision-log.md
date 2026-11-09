@@ -2251,7 +2251,9 @@ fail), `hooks/status.test.ts` (the line is drawn first).
 ## adyusuf/claude-code-standards is retired; podium-flow is the only repository and folder (09/11/2026, user decision)
 
 The name `claude-code-standards` goes everywhere: the GitHub repository `adyusuf/claude-code-standards` is **deleted**
-and the local folder `~/ClaudeCode/claude-code-standards` is moved aside to `~/ClaudeCode/claude-code-standards-old`;
+and the local folder `~/ClaudeCode/claude-code-standards` is **deleted** (its one commit found nowhere else, the parked
+board WIP `56c1f45`, is kept as a local branch and a git-ignored patch in `.claude/parked/` of the podium-flow checkout;
+its git-ignored `docs/project-nicknames.tsv` was copied there first);
 `adyusuf/podium-flow` (`~/ClaudeCode/podium-flow`) is the one place the rule set lives. Nothing was lost: before the
 delete every non-merge commit on the old `dev`, `test`, `prod` and the local branches had a same-subject commit in
 podium-flow. Projects that pointed at the old repository were moved first: the CI callers of insurance, BTTakvim,
