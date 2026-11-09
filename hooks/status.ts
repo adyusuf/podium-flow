@@ -2,7 +2,8 @@
 // `standards/00-working-method.md` §10 asks for in a reply during a long run. Engine-free like boxes.ts, so a test hands in
 // a recording factory. The file is written by scripts/podium_status.py; register.tsx reads it and hands its text here.
 import type { FoldId, Ui } from './boxes'
-import { helpCard, hoverable, INDENT } from './controls'
+import { explained, helpCard, INDENT } from './controls'
+import { STATUS_HELP } from './help'
 
 /** A step (user decision 02/11/2026): `percent` done ('' when not given), `blocker`, and `agent` ('' = this session). */
 type StatusRow = { item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string; note: string }
@@ -155,7 +156,10 @@ export function splitSteps(rows: StatusRow[]): { todo: StatusRow[]; done: Status
 export function statusBody(ui: Ui, data: StatusData | null, folds: AgentFolds = START_FOLDS) {
   const { h } = ui
   // The spend line comes first, whether or not a step is open: the user follows the budget here (06/11/2026).
-  const spend = data && data.budget ? h(ui.Text, { dimColor: true }, `budget: ${data.budget}`) : null
+  const spend = data && data.budget
+    ? [explained(ui, 'status-budget', h(ui.Text, { dimColor: true }, `budget: ${data.budget}`), STATUS_HELP.budget),
+        helpCard(ui, 'status-budget', STATUS_HELP.budget)]
+    : null
   if (!busy(data)) return spend ? h(ui.Box, { flexDirection: 'column' }, spend, h(ui.Text, { dimColor: true }, 'nothing running')) : h(ui.Text, { dimColor: true }, 'nothing running')
   const fields = (row: StatusRow) => [row.item, splitState(row.state).short, row.percent === '' ? '' : `${row.percent}%`, noteOf(row)]
   const blocker = (row: StatusRow) => (PLACEHOLDERS.includes(row.blocker || row.waiting) ? '' : `-> ${row.blocker || row.waiting}`)
@@ -172,22 +176,28 @@ export function statusBody(ui: Ui, data: StatusData | null, folds: AgentFolds = 
     const id = `note-${agent}-${row.item}`
     return [
       // The row shows one line of its note; while the pointer is on the row, a card shows the whole of it.
-      noteOf(row) === '' ? cells : hoverable(ui, id, cells),
+      // A note has its (i) after the row (user decision 09/11/2026); the pointer on either shows the whole note.
+      noteOf(row) === '' ? cells : explained(ui, id, cells, noteOf(row)),
       helpCard(ui, id, noteOf(row)),
       blocker(row) === '' ? null : h(ui.Box, { marginLeft: 2 }, h(ui.Text, { dimColor: true }, blocker(row)))]
   })
   const branch = (agent: string, kind: 'todo' | 'done', rows: StatusRow[]) => {
     const id: FoldId = `agent:${agent}:${kind}`
     return rows.length === 0 ? null : h(ui.Box, { flexDirection: 'column', marginLeft: INDENT },
-      fold(id, [h(ui.Text, { bold: true }, kind === 'todo' ? 'To do' : 'Completed'), h(ui.Text, { dimColor: true }, `(${rows.length})`)]),
+      fold(id, [explained(ui, `status-${agent}-${kind}`, h(ui.Text, { bold: true }, kind === 'todo' ? 'To do' : 'Completed'), STATUS_HELP[kind]),
+        h(ui.Text, { dimColor: true }, `(${rows.length})`)]),
+      helpCard(ui, `status-${agent}-${kind}`, STATUS_HELP[kind]),
       folds.folded(id) ? null : h(ui.Box, { flexDirection: 'column', marginLeft: INDENT }, stepRows(agent, rows)))
   }
   const accordion = (group: { agent: string; rows: StatusRow[] }) => {
     const name = group.agent || 'this session'
+    const card = group.agent ? STATUS_HELP.subagent : STATUS_HELP.session
     const id: FoldId = `agent:${name}`
     const { todo, done } = splitSteps(group.rows)
     return h(ui.Box, { flexDirection: 'column', marginTop: 1 },
-      fold(id, [h(ui.Text, { bold: true }, name), h(ui.Text, { dimColor: true }, [groupState(group.rows), donePercent(group.rows)].filter(Boolean).join(' · '))]),
+      fold(id, [explained(ui, `status-agent-${name}`, h(ui.Text, { bold: true }, name), card),
+        h(ui.Text, { dimColor: true }, [groupState(group.rows), donePercent(group.rows)].filter(Boolean).join(' · '))]),
+      helpCard(ui, `status-agent-${name}`, card),
       folds.folded(id) ? null : [branch(name, 'todo', todo), branch(name, 'done', done)])
   }
   return h(ui.Box, { flexDirection: 'column' },
