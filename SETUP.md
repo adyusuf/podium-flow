@@ -178,8 +178,8 @@ A step that reports NOT RUN is a missing tool from §1, not a pass.
 
 ## 6. Installing the rule set: the `podium` plugin
 
-> **Renamed on 02/11/2026.** The plugin was `adyusuf@adyusuf-marketplace` from `adyusuf/claude-code-standards`; it is now
-> `podium@podium-marketplace` from `adyusuf/podium-flow`. `scripts/plugin-setup.py` moves an old install (README, *Moving
+> **Renamed on 02/11/2026.** The plugin was `adyusuf@adyusuf-marketplace` from `adyusuf/claude-code-standards` (deleted
+> on 09/11/2026); it is now `podium@podium-marketplace` from `adyusuf/podium-flow`. `scripts/plugin-setup.py` moves an old install (README, *Moving
 > from adyusuf*); by hand: `/plugin marketplace add adyusuf/podium-flow#prod`, `/plugin install podium@podium-marketplace`,
 > `/plugin uninstall adyusuf@adyusuf-marketplace`, and a `CLAUDE_CODE_PLUGIN_DIRS` naming `adyusuf-marketplace` must name
 > `podium-marketplace`. Open new sessions afterwards.
