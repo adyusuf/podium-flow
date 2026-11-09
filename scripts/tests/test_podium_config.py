@@ -22,7 +22,7 @@ _spec.loader.exec_module(cfg)
 
 # The maintainer's list of 17/10/2026, key by key.
 EXPECTED = {
-    'mode': 'C', 'mode_model': 'sonnet', 'reply.length': 'short', 'steps.enforce': 'block', 'budget.session_usd': '100', 'pod.connect': False, 'pod.message_format': 'short',
+    'mode': 'C', 'mode_model': 'sonnet', 'reply.length': 'short', 'steps.enforce': 'block', 'budget.session_usd': '200', 'pod.connect': False, 'pod.message_format': 'short',
     'write.unit_tests': True, 'write.e2e': True,
     'merge.dev': True, 'merge.test': True, 'merge.prod': True,
     'push.dev': True, 'push.test': True, 'push.prod': True,
@@ -326,8 +326,8 @@ class RetiredKeys(Tool):
     def test_the_context_says_how_long_a_reply_is_and_what_that_level_asks(self):
         # Shipped default: short, with what short asks; every level points at the standard that defines it.
         out, _, _ = self.run_tool('context')
-        self.assertIn('  replies: short - write a few sentences: what changed, what is not done or not verified', out)
-        for level in ('normal', 'long'):
+        self.assertIn('  replies: short - the important points first and, said plainly, what the user must do or decide', out)
+        for level in ('normal',):
             self.run_tool('set', 'reply.length', level)
             out, _, _ = self.run_tool('context')
             self.assertIn('  replies: %s - %s' % (level, cfg.REPLY_MEANING[level]), out)
@@ -339,6 +339,24 @@ class RetiredKeys(Tool):
         self.assertEqual('Session', cfg.SPECS['reply.length']['group'])
         _, err, code = self.run_tool('set', 'reply.length', 'huge')
         self.assertNotEqual(0, code)
+        # Short folds long detail away instead of dropping it (user decision 09/11/2026).
+        self.assertIn('<details>', cfg.REPLY_MEANING['short'])
+        self.assertIn('what the user must do or decide', cfg.REPLY_MEANING['short'])
+
+    def test_long_is_retired_and_lands_on_normal_without_losing_the_layer(self):
+        # A user file written before 09/11/2026 still says long: it reads as normal and the file's other keys count.
+        self.assertEqual(('short', 'normal'), cfg.REPLY_LENGTHS)
+        with open(self.user, 'w', encoding='utf-8') as handle:
+            json.dump({'reply': {'length': 'long'}, 'mode': 'B'}, handle)
+        out, _, code = self.run_tool('get', 'reply.length')
+        self.assertEqual((0, 'normal'), (code, out.strip()))
+        out, _, _ = self.run_tool('get', 'mode')
+        self.assertEqual('B', out.strip())
+        # `set` that still says long lands on normal too.
+        _, _, code = self.run_tool('set', 'reply.length', 'LONG')
+        self.assertEqual(0, code)
+        out, _, _ = self.run_tool('get', 'reply.length')
+        self.assertEqual('normal', out.strip())
 
     def test_the_old_ci_before_merge_and_e2e_after_deploy_keys_are_retired_and_skipped(self):
         for group in ('ci_before_merge', 'e2e_after_deploy'):

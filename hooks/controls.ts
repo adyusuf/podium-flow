@@ -24,6 +24,11 @@ const ICONS = {
   },
 }
 type Kind = keyof typeof ICONS
+/** The (i) beside a label that has a card (user decision 09/11/2026): a circled i on the desktop, `(i)` in the terminal. */
+const INFO_ICON = svg(`<circle cx="6" cy="6" r="5.2" fill="none" stroke="${ICON_OFF}" stroke-width="1.1"/>` +
+  `<circle cx="6" cy="3.6" r="0.85" fill="${ICON_OFF}"/><rect x="5.4" y="5.2" width="1.2" height="3.8" rx="0.4" fill="${ICON_OFF}"/>`)
+/** The cells the (i) and its gap take after a label: the terminal's `(i)` and one gap (the desktop icon is narrower). */
+export const INFO_CELLS = 4
 
 /**
  * One line: its head (a label, a role) in a column of `width` cells, then one column of parts per layer, side by side.
@@ -65,6 +70,17 @@ const helpScope = (id: string) => `podium-help-${id}`.slice(0, 64)
 
 /** A label the pointer can rest on: while it does, the card of the same `id` shows (user decision 01/11/2026). */
 export const hoverable = (ui: Ui, id: string, child: unknown) => ui.h(ui.Box, { hover: { scope: helpScope(id) } }, child)
+
+/** The (i) a label with a card carries, so the user sees there is one; null when there is no card text. */
+export function info(ui: Ui, text: string | undefined) {
+  if (!text) return null
+  if (!ui.Svg) return ui.h(ui.Text, { dimColor: true }, '(i)')
+  return ui.h(ui.Svg, { source: INFO_ICON, alt: 'more information', width: 12, height: 12 })
+}
+
+/** A label, its (i) and the hover group that opens its card: the pointer on either shows it (user decision 09/11/2026). */
+export const explained = (ui: Ui, id: string, child: unknown, text: string | undefined) =>
+  hoverable(ui, id, text ? ui.h(ui.Box, { flexDirection: 'row', columnGap: 1, alignItems: 'center' }, child, info(ui, text)) : child)
 
 /**
  * The card a label opens while the pointer rests on it: a hidden row drawn right after the label's line, so it opens in

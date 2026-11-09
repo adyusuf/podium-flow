@@ -8,7 +8,7 @@
     "enforce": "block"
   },
   "budget": {
-    "session_usd": "100"
+    "session_usd": "200"
   },
   "pod": {
     "connect": false,

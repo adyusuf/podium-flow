@@ -194,9 +194,10 @@ Status file, the settings and session layers, `.claude/mode`, the scratchpad.
   files, every setting applies from that point (#26 first: fetch `dev`, branch).
 - Code written outside any repository is still code work for #8 (tests) and the mode's review; only the repository
   steps have nothing to act on.
-- The pane cannot see the task, only the folder: outside every git repository it shows only Status and *Replies*
-  (user decision 01/11/2026), so the mode and tests settings that still hold for code written there are changed with
-  `/podium:config`. Inside a repository it shows everything, and the class above is Claude's to follow.
+- The pane cannot see the task, only the folder: outside every git repository it shows only Status and, in Settings,
+  *Mode*, *Model\**, *Replies*, *Plan*, *Budget*, *Pod* and *Pod message* (user decisions 01/11/2026 and 09/11/2026), so
+  the tests settings that still hold for code written there are changed with `/podium:config`. Inside a repository it
+  shows everything, and the class above is Claude's to follow.
 
 **Scripts read the panel too (user decision 06/11/2026).** Every panel value a script acts on (`gates_before_push`,
 `gate_steps`, `coverage_before_push`, `e2e_before_deploy`, `ci_after_push`) is read by the script itself: from the

@@ -71,6 +71,33 @@ class Budget(unittest.TestCase):
         row = [one for one in podium_schema.SCHEMA if one['key'] == 'budget.session_usd']
         self.assertEqual(1, len(row))
         self.assertIn(podium_budget.DEFAULT_BUDGET, row[0]['options'])
+        # User decision 09/11/2026: none, 200, 500, 1000 are offered; an older file's 25/50/100 is still read (rule #4).
+        self.assertEqual(('none', '200', '500', '1000'), podium_budget.BUDGETS)
+        self.assertEqual(list(podium_budget.LEGACY_BUDGETS), row[0]['legacy'])
+        import podium_layers
+        # A file is read with legacy values; `set` and `apply` (check without legacy) refuse them (qa 09/11/2026).
+        self.assertEqual('100', podium_layers.check('budget.session_usd', '100', legacy=True))
+        for value in ('25', '100', '300'):
+            with self.assertRaises(podium_layers.ConfigError):
+                podium_layers.check('budget.session_usd', value)
+        self.assertEqual('none', podium_layers.check('budget.session_usd', 'NONE'))
+        # Plan shows force for block: force is accepted and stored as block.
+        self.assertEqual('block', podium_layers.check('steps.enforce', 'force'))
+        self.assertEqual('block', podium_layers.check('steps.enforce', 'Force'))
+
+    def test_a_file_holding_an_old_budget_still_reads_and_set_refuses_it(self):
+        import tempfile
+        import podium_layers
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, 'layer.json')
+            with open(path, 'w', encoding='utf-8') as handle:
+                json.dump({'budget': {'session_usd': '25'}, 'reply': {'length': 'long'}}, handle)
+            values, problem = podium_layers.read_layer(path)
+            self.assertEqual((None, '25', 'normal'), (problem, values['budget.session_usd'], values['reply.length']))   # long -> normal
+            run = subprocess.run([sys.executable, os.path.join(os.path.dirname(SCRIPT), 'podium_config.py'), 'set',
+                                  'budget.session_usd', '25', '--session', 'qa-old-budget'],
+                                 env=self.env, capture_output=True, text=True)
+            self.assertEqual(2, run.returncode, run.stderr)
 
     def hook(self, event, payload):
         subprocess.run([sys.executable, SCRIPT, 'hook', event], env=self.env, capture_output=True,
@@ -82,10 +109,10 @@ class Budget(unittest.TestCase):
 
     def test_the_end_of_a_turn_writes_it_and_show_prints_it_first(self):
         self.hook('stop', {'session_id': SESSION, 'transcript_path': self.transcript})
-        self.assertEqual('$15.00 spent of $100 (15%) · measured: tokens × API list price',
+        self.assertEqual('$15.00 spent of $200 (8%) · measured: tokens × API list price',     # the default, $200
                          json.loads(self.show('--json'))['budget'])
         text = self.show()
-        self.assertTrue(text.startswith('budget: $15.00 spent of $100'), text)
+        self.assertTrue(text.startswith('budget: $15.00 spent of $200'), text)
 
     def test_a_table_with_only_the_budget_still_says_nothing_runs(self):
         import podium_status

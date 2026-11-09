@@ -5,7 +5,7 @@
 /** The boxes, by section id. */
 export const SECTION_HELP: Record<string, string> = {
   status: 'What this session is doing now, what comes next, and one row per piece with its measured figure.',
-  settings: 'What Claude follows instead of asking, for code in a project. A task with no code uses only Replies and Status.',
+  settings: 'What Claude follows instead of asking, for code in a project. Outside a repository only the rows for work without code show.',
   agents: 'Every role, ticked when it runs, with the model it runs on. Tick or untick one for this session.',
   promotion: 'Where dev, test and prod stand on origin, and any gate waived on the commits waiting to come in.',
 }
@@ -20,11 +20,11 @@ export const COLUMN_HELP: Record<string, string> = {
 export const ROW_HELP: Record<string, string> = {
   'Mode': 'How many agents work: A none, B three helpers, C the full team with qa review, D wide team, E fan-out.',
   'Model*': 'The model the roles marked * in Agents run on instead of Opus. opus keeps them on Opus.',
-  'Replies': 'How much Claude writes: short, normal or long. Red tests and skipped steps are said at every length.',
+  'Replies': 'How much Claude writes: short (key points, long detail folded away) or normal. Red tests and skipped steps are said at both.',
   'Budget': 'US dollars for this session, shown in Status against the measured spend (list price). Never a stop: work goes on past it.',
-  'Plan': 'Every task is split into steps in Status first. block: no code edit or commit until the steps exist. remind: only a reminder.',
+  'Plan': 'Every task is split into steps in Status first. force: no code edit or commit until the steps exist. remind: only a reminder.',
   'Pod': 'Connect to a pod. Stored only; nothing acts on it yet.',
-  'Format': 'The pod message format. Stored only; nothing acts on it yet.',
+  'Pod message': 'The pod message format. Stored only; nothing acts on it yet.',
   'Tests': 'Whether Claude writes unit tests and e2e specs for its changes.',
   'Merge': 'Which branches Claude merges finished work into, without asking.',
   'Push': 'Which branches Claude pushes after merging, without asking.',
@@ -35,6 +35,23 @@ export const ROW_HELP: Record<string, string> = {
   'Deploy': 'Which environments a pushed update is deployed to.',
   'E2E': 'Run the e2e suite before deploying to that environment.',
 }
+
+/** The Status box's labels (user decision 09/11/2026: every label of the pane has an (i) and a card). */
+export const STATUS_HELP = {
+  budget: 'What this session has spent so far (tokens x API list price) against the Budget setting. Information only: work never stops on it.',
+  session: 'This session\'s steps, written before the work starts, with their state, measured % and notes.',
+  subagent: 'One subagent\'s steps, written by the hooks when it starts and stops; its name is its role.',
+  todo: 'Steps still to do: the running one in bold, then what comes next. A failed step stays here until someone looks at it.',
+  done: 'Steps that are finished or skipped. Closed at start; the arrow opens it.',
+}
+
+/** A Promotion stage line's card, after the branch's own words. */
+export const STAGE_HELP: Record<string, string> = {
+  dev: 'dev: where finished work is merged first.',
+  test: 'test: what is promoted from dev for the test environment.',
+  prod: 'prod: what is promoted from test for production.',
+}
+export const STAGE_TAIL = 'The commit origin holds, and how many local commits are not pushed yet; under it, any gate waived on the commits that came in.'
 
 /** Every gate step row's card, after the step's own heading from the gate (gate-lib.sh), so no step is named here. */
 export const STEP_HELP = 'a step of the shared gate. Unticked, it does not run on that branch; the gate reports it as waived and the merge names it in Gate-Waived, never as passed.'

@@ -2264,3 +2264,35 @@ that fetches it from podium-flow, its only other change reads `deploy_after_push
 `scripts/plugin-setup.py` still moves it (it reads the installed folders, not GitHub). Earlier entries of this log, the
 legacy test's docstring and the step-statistics folder list keep the old name, because they record what was true then
 or must still match old paths.
+
+## The pane outside a repository, Pod message, force, the budget list and the (i) (09/11/2026, user decisions)
+
+**Decision.** Outside a git repository Settings shows *Mode*, *Model\**, *Replies*, *Plan*, *Budget*, *Pod* and *Pod
+message* and nothing else (was *Replies* alone; `NO_CODE_ROWS` in `hooks/rows.ts`). *Format* is labelled *Pod message*.
+*Plan* shows `force` for the stored `block` (the value stays, rule #4). *Budget* offers `none`, `200`, `500`, `1000`
+(default `200`, was `100`); `25`, `50` and `100` written before stay readable as `legacy` values of the schema, never
+offered. Every label of the pane carries an (i) and the pointer on the label or the (i) opens its English card: box
+titles, the Session/System tabs, every Settings row and gate step, every Agents role (its file's description), and in
+Status the budget line, each agent, To do / Completed and a step with a note, in Promotion each stage line (qa pass 1:
+Status and Promotion were missing). The head column is `INFO_CELLS` (4) wider for it. A stored old budget is drawn as one
+more chosen option; `set` refuses it while a file holding it still reads; `force` is accepted and stored as `block`.
+**Why.** The user wants the settings that also act on work without code to be reachable outside a repository, and to see
+at a glance that a label explains itself.
+**Not done here.** The same message asks that every setting act on the running session at once (a job queue, stopping a
+running push or deploy, a pod connection, a cloud-to-local runner fallback). Today a change reaches Claude only through
+the `notify` hook on the next message or Bash/Agent call, and `pod.*` is stored only; that work is planned separately.
+**Measured.** `deno test hooks/*.test.ts`: 92 passed, 2 failed — the 2 fail on `dev` too (`status.test.ts` uses `.not`,
+which the test shim lacks). `pytest scripts/tests`: the 3 tests that pinned the old budget now pass.
+
+## Reply length: short and normal; `long` is retired, `short` folds long detail away (09/11/2026, user decision)
+
+**Decision.** `reply.length` offers `short` and `normal`; `long` is not needed. `normal` is unchanged. `short` states the
+important points first and, plainly, what the user must do or decide, with no long back-and-forth; anything long
+(evidence, per-step detail, logs, long tables, the end-of-turn completeness block) goes inside a collapsed
+`<details><summary>…</summary>…</details>` section instead of being left out. What the rules put in a reply at every length
+is unchanged (`standards/00` §5a). The entry of 01/11/2026 above records the three-length setting as it was then.
+**Moving (rule #4).** A user, project or session file that still says `long`, and a `set reply.length long`, land on
+`normal` through the schema's `aliases` (`scripts/podium_schema.py`, applied in `podium_layers.check`), so the rest of
+such a file still counts: before, `long` would have failed the check and thrown away the whole layer.
+**Measured.** `scripts/tests/test_podium_config.py`: a file holding `long` and `mode: B` reads as `normal` and `B`; `set
+reply.length LONG` stores `normal`.

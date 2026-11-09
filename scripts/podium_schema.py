@@ -37,8 +37,10 @@ AGENTS_DIR = os.path.join(ROOT, 'agents')
 
 
 POD_FORMATS = ('short', 'full')
-BUDGETS = ('none', '25', '50', '100', '200', '500', '1000')   # the same list as podium_budget.BUDGETS (a test pins it)
-REPLY_LENGTHS = ('short', 'normal', 'long')       # how much Claude writes in a reply (standards/00 §5a)
+BUDGETS = ('none', '200', '500', '1000')   # the same list as podium_budget.BUDGETS (a test pins it); user decision 09/11/2026
+# Budgets a file written before 09/11/2026 may hold: still read (rule #4), never offered in the pane.
+LEGACY_BUDGETS = ('25', '50', '100')
+REPLY_LENGTHS = ('short', 'normal')              # how much Claude writes in a reply (standards/00 §5a); `long` retired 09/11/2026
 STEP_ENFORCEMENT = ('block', 'remind')            # steps first: refuse a code edit until the Status box holds steps, or remind
 DEPLOY_ENVS = ('test', 'prod')                    # which environment a push is deployed to
 CI_RUNNERS = ('hosted', 'self-hosted')            # where the shared SDLC workflow runs (self-hosted: this Mac's runners)
@@ -83,11 +85,13 @@ LOCKED_STEPS = tuple(locked_steps())
 SCHEMA = (
     [dict(_enum('mode', 'Working mode', MODES), group='Session'),
      dict(_enum('mode_model', 'Model that replaces Opus in the agents', MODELS), group='Session'),
-     dict(_enum('reply.length', 'Reply length', REPLY_LENGTHS), group='Session'),
-     dict(_enum('steps.enforce', 'Steps first', STEP_ENFORCEMENT), group='Session'),
+     # `long` was retired (user decision 09/11/2026): a file or a `set` that still says it lands on `normal` (rule #4).
+     dict(_enum('reply.length', 'Reply length', REPLY_LENGTHS), group='Session', aliases={'long': 'normal'}),
+     # The pane shows `force` for `block` (user decision 09/11/2026); `force` is accepted as input and stored as `block`.
+     dict(_enum('steps.enforce', 'Steps first', STEP_ENFORCEMENT), group='Session', aliases={'force': 'block'}),
      # Shown in the Status box against the measured spend; it never stops work (user decision 06/11/2026).
      dict(_enum('budget.session_usd', 'Session budget in US dollars (shown in Status, never a stop)', BUDGETS),
-          group='Session'),
+          group='Session', legacy=list(LEGACY_BUDGETS)),
      dict(_bool('pod.connect', 'Connect to pod'), group='Pod'),
      dict(_enum('pod.message_format', 'Message format', POD_FORMATS), group='Pod'),
      dict(_bool('write.unit_tests', 'Write unit tests'), group='Writing'),
