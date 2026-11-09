@@ -140,6 +140,9 @@ class RootPluginTest(unittest.TestCase):
         self.assertEqual(manifest['types'], './types/index.d.ts')
         self.assertTrue(os.path.isfile(os.path.join(REPO, 'types', 'index.d.ts')))
         self.assertIn("name: 'podium:panels'", read('hooks', 'register.tsx'))
+        # Typed while a turn runs, /podium:panels runs beside it instead of waiting for it (09/11/2026); the spec stays a
+        # literal so `claude plugin validate` sees the hook answers its own command.
+        self.assertIn("immediate: true })", read('hooks', 'register.tsx'))
 
     def test_panels_command_exists_as_a_file_so_it_is_there_where_mods_do_not_load(self):
         # The mod registers /podium:panels only where it runs; the file is the fallback everywhere else.
