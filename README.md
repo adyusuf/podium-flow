@@ -50,7 +50,7 @@ Your settings move by themselves: `~/.claude/adyusuf.json` and the `ADYUSUF_*` v
 | Engineering standards | `standards/` | 24 documents + 8 templates | [`standards/README.md`](standards/README.md) |
 | Operating modes and the role agents | `modes/`, `agents/` | 5 modes, 14 roles | [`modes/README.md`](modes/README.md) |
 | Gate, hook scripts, measurement, install | `scripts/` | 39 scripts, 886 tests | [`scripts/README.md`](scripts/README.md) |
-| Hooks and the `podium` pane (`/podium:panels`) | `hooks/` | 91 tests | [`hooks/README.md`](hooks/README.md) |
+| Hooks and the `podium` pane (`/podium:panels`) | `hooks/` | 96 tests | [`hooks/README.md`](hooks/README.md) |
 | Slash commands | `commands/` | `apply-project-standards`, `panels`, `prod-readiness`, `standards-check` | each file |
 | Skills | `skills/` | `board-plan`, `config`, `software-standards`, `test-inventory`, `working-mode` | each `SKILL.md` |
 | The record: motivation, measurements, case studies | `docs/` | 4 case studies | [`docs/README.md`](docs/README.md) |
