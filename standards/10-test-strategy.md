@@ -1,5 +1,16 @@
 # Test strategy
 
+> ⚠️ **This whole document is HOW to do test work, never WHETHER to do it. The podium
+> configuration is the only switch (`CLAUDE.md` #34).** Writing tests (unit, integration,
+> contract, e2e) happens only where `write unit tests`/`write e2e` is yes, or the user asks
+> in chat; running a suite, gate, coverage or e2e happens only where the matching key for
+> the step (`gates_before_push`, `coverage_before_push`, `ci_after_push`, `e2e_before_deploy`)
+> is yes, or the user asks. Where the key is off nothing here is written or run and the report
+> says **"not run (configuration)"** — neither a pass nor a failure. Nothing in this file —
+> the pyramid, "when a bug is found write the test first", the coverage threshold — starts
+> test work on its own; `CLAUDE.md` #8/#31/#32 do not either. Compiling or typechecking the
+> code you touched is always allowed; it is not a test run.
+
 ## 1. The pyramid
 
 ```
@@ -79,6 +90,13 @@ working copy**; `[Collection]` serialization only protects within a single proce
 section used to say "coverage is a diagnostic, not a target"; that sentence has
 been **removed** — the threshold is now a gate and it blocks the `dev → test` and
 `test → prod` promotions.
+
+⚠️ **The threshold applies only where coverage is ON for that step** (`coverage_before_push.<t>` yes,
+`CLAUDE.md` #34/#29). Where it is off, coverage is not measured, the step is reported **"not run
+(configuration)"** (the gate prints `WAIVED coverage`), and no 80% check runs — this is the configured
+absence of a run, not a failing or passing measurement. The threshold itself is never lowered and a
+project's `CLAUDE.md` cannot override it; turning the step off for a target is the configuration's call,
+not a loosening of the number.
 
 ### 7.1 What is measured
 
