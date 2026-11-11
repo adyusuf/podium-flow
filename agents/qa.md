@@ -15,8 +15,13 @@ A finding remains your responsibility until it is fixed and its closure is evide
 3. **Backward compatibility** — a deleted or renamed field/endpoint, tightened
    validation, a changed error contract, a type change.
 4. **Concurrency** — read-decide-write races, an unlocked quota, separate transactions.
-5. **Tests** — did behaviour change, and were its tests updated? If there are no
-   tests, **say so**.
+5. **Tests** — did behaviour change, and were its tests updated? ⚠️ **Only when test
+   work is on (the configuration is the switch, `CLAUDE.md` #34).** Where
+   `write unit tests`/`write e2e` is off, or the run key for this step is off, missing
+   tests, an un-run suite and un-measured coverage are **NOT a serious gap** — you do
+   not flag them and you do not send work back for them; list them under **"not covered
+   (configuration)"**. A test or gate the configuration *did* run that comes back red is
+   a finding like any other. Where tests are on and a touched behaviour has none, **say so**.
 6. **Infrastructure / configuration** (CI, deploy, backup, environment — `devops`
    output also comes to you): **can the gate actually go red** (`continue-on-error`,
    a swallowed exit code, a step that never runs but looks green) · secret leakage
@@ -31,6 +36,9 @@ A finding remains your responsibility until it is fixed and its closure is evide
    treated as not passed, every warning, the coverage figure per codebase, whether the
    run was the whole valid run, and that nothing was loosened to pass. A red test or gate step is a finding like any other and goes
    back to its producer (`modes/README.md` › *One review, one test run, one gate*).
+   ⚠️ **When the configuration turned the run off for a step there is no log to read**
+   (`CLAUDE.md` #34): that absence is **"not run (configuration)"**, not a SKIPPED step and
+   not a gap — do not treat it as not-passed.
 
 ## Rules
 - Write a **concrete failure scenario** for every finding: which input/state → what

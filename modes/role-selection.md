@@ -75,6 +75,12 @@ every agent writes its prefix from scratch.
 | An e2e spec to write, or a failing run to classify | `e2e-writer` (only against the `test` environment) |
 | Missing logs/metrics/traces/alerts, a performance regression | `observability` → its output goes into `qa` |
 
+⚠️ **The test-work roles answer to the configuration, not to this table (`CLAUDE.md` #34).**
+`test-writer` and `e2e-writer` are selected only where `write unit tests`/`write e2e` is yes, or the user
+asks in chat; `coverage-auditor` only where `coverage_before_push.<t>` is yes for the step. Where the key is
+off the role is **not invoked** — that skip needs no explanation (§3) — and the report says "not run
+(configuration)". A row here that "needs tests" or "needs coverage" is read as *when that work is on*.
+
 ## §2 — Ordering and handoff
 
 The order is **not fixed**; but once a role is selected, its input must be ready:
@@ -123,6 +129,12 @@ it is written down — "`designer` skipped because no visible interface changes"
 Typical legitimate skips: the scope is already clear → no `product-manager` · the
 interface does not change → no `designer` · single-file work → no `architect` · no new
 permanent decision → no `doc-writer`.
+
+⚠️ **The configuration can skip the test-work roles, and that skip needs no explanation
+beyond naming the key (`CLAUDE.md` #34).** `write unit tests`/`write e2e` off → no
+`test-writer`/`e2e-writer`; `coverage_before_push.<t>` off → no `coverage-auditor` for that
+step. This is the configured absence of test work, reported "not run (configuration)", not an
+oversight — the user does not need to be asked and the auditor does not treat it as a gap.
 
 ### The gate-paired roles — the direction rule (modes D/E)
 
@@ -310,7 +322,9 @@ On a batch the auditor's subject includes the **test and gate OUTPUT**, not only
 failure, every SKIPPED step, every warning, the coverage figure per codebase, and whether the run was the
 whole valid run. A gap or wrong result goes back to the producing sub-branch as an order (same hand-back and
 closure rules below). Producers are not audited one by one — one review, one test run, one gate on the merged
-batch (`standards/13-pr-and-review.md` §8).
+batch (`standards/13-pr-and-review.md` §8). ⚠️ **Where the configuration turned a run off there is no such
+output to read (`CLAUDE.md` #34):** the auditor records it as **"not covered (configuration)"**, never as a
+missing test, a SKIPPED step or a gap, and does not send work back for it.
 
 ### How many passes? — **1 clean**
 
