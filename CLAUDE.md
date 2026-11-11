@@ -30,7 +30,7 @@
 5. **One API — web and mobile consume the same contract.** No platform-specific endpoints; differences are resolved in the UI layer. Business logic **never** lives on the client. → `standards/07-api-design.md`
 6. **Authorization is fail-closed.** Default is DENIED. Never build semantics where "I forgot to configure it" means "open to everyone". Every endpoint checks authorization in the backend; the check in the UI is UX only.
 7. **Validation in two places.** On the client for UX, in the API for security. Client-side validation is never sufficient on its own.
-8. **Tests get updated.** If a file that has tests was touched, its tests are updated. If there are no tests, **say so explicitly**. A behaviour change is never merged untested.
+8. **Tests get updated — only when test work is ON (#34 is the switch).** Then a touched file's tests follow; off → none written, report **"not written (configuration)"**. HOW, never a trigger of its own.
 9. **Never leave a 300+ line file.** Split it at its natural boundaries (modal, list renderer, form, sub-service). Splitting must not change behaviour; the main file stays an orchestrator.
 10. **Ask before adding a dependency.** Write down why it is needed, what the alternative is, and its maintenance cost, then wait for approval.
 11. **No magic strings.** Constants become enums/consts. Enum switches always carry a `default` branch (forward compatibility).
@@ -48,7 +48,7 @@
 24. **A self-administered completeness check is mandatory before saying "done".** Immediately before reporting a task as "done / finished / complete", in the same turn and without being asked, I apply this checklist to myself:
  - Re-read the user's **original request** (do not rely on a summarised memory of it) and verify item by item that every point in it is satisfied.
  - Were **edge cases and error paths** considered? (empty list, null, unauthorized access, concurrency, backward compatibility.)
- - Were **tests** (#8), **build/lint/format**, and where relevant the **SETUP.md/.env.example/secret inventory** updates (#16) actually run?
+ - **Did the config require tests** (#8/#34)? If yes, were they **run**? Were **build/lint/format** and, where relevant, **SETUP.md/.env.example/secret inventory** (#16) run?
  - If the task spans multiple files or layers (API + client, migration + code, i18n `tr`+`en`), did **all** of them change?
  - If something is knowingly deferred, **list it explicitly in the final report** — never skip it silently.
  - Say "done" only after passing the check.
@@ -88,24 +88,19 @@
  - **Forbidden:** fake domains — `.test`, `.local`, `example.com`, `sample.*`.
  - **Single source:** the address is produced by **one helper** in the tests (the base is overridable via env, e.g. `E2E_EMAIL_BASE`); addresses are never written by hand into a spec or seed (#2).
  - **Out of scope:** tests whose sender is faked. → detail `standards/11-playwright.md` §4; rationale `docs/decision-log.md` §30
-31. **The run cycle (e2e AND every test/gate run → `standards/00` §11; parallelism/reuse → §12): full run → identify failures → fix → run only what was fixed → I decide on a full re-run.**
- - **The WHOLE suite runs first**, without stopping at the first failure. Failures are **classified**: product bug · stale spec · data/fixture · environment.
- - **Failures are fixed** — each fix in its own commit; fixes may share one gate and one merge (#26). Raising retries or loosening assertions does not count as a fix.
- - **Then ONLY the fixed tests** (and those they could affect) run.
- - ⚠️ **E2E is optional (#33):** if run, only against code on `test`; verification on `dev` is unit tests + tsc/lint (#25).
- - **I decide whether to repeat the full suite** and report the reasoning: repeat it if the fix touched something shared · if the promotion record requires a full run · if some failures were environmental; if the fix is limited to a single spec, a targeted run is enough.
- - **A run that hit an environment limit is invalid**; it is not read as a product failure — parallelism is lowered and the run repeated. → detail `standards/11-playwright.md` §9a; rationale `docs/decision-log.md` §31
-32. **Order: ALL the code first → then unit tests are written → then unit tests run; e2e is optional (#33).**
- - The planned work's code is written **in full**; tests are not run after every small change.
- - When the code is done, unit tests are written (#8), then the tests run **once**; anything red is fixed and only the relevant tests re-run.
- - **E2E is optional and never run by a gate (#33).**
+31. **The run cycle — HOW a run goes WHEN the config turns one on (#34); it never starts one itself** (e2e & every test/gate run → `standards/00` §11, §12): full run → classify → fix → run only the fixed, I decide on a full re-run.
+ - **The WHOLE suite runs first**, no stop at the first failure; **classify** each — product bug · stale spec · data/fixture · environment.
+ - **Fix** (each in its own commit; retries or loosened assertions are not a fix), then re-run **only** the fixed tests and what they affect.
+ - ⚠️ **E2E is optional (#33):** if run, only against `test` code; `dev` verification is unit + tsc/lint (#25). The full re-run (shared fix · record · environmental) is reported with its reason; **an environment-limited run is invalid** — lower parallelism, repeat. → `standards/11-playwright.md` §9a; rationale `docs/decision-log.md` §31
+32. **Order, WHEN test writing is on (#34; off → straight to merge): ALL code first → unit tests written → run once; e2e optional (#33).**
+ - Code **in full** first (no run after every small change); then unit tests written (#8) and run **once**, red fixed, only the relevant re-run. **E2E never runs in a gate (#33).**
  - #26 still holds: each task gets its own commit and reaches `dev` through a gate — alone or in a batch — once its unit run is green. → rationale: `docs/decision-log.md` §32
 33. **E2E is OPTIONAL — no gate runs it and it never blocks a promotion** (user decision 03/10/2026: not enough resources to run it).
  - Every promotion to `test` and to `prod` **WARNS "e2e was NOT run"** and carries on, never read as a pass. Run it by hand or with `GATE_RUN_E2E=1` (a red result then blocks like any step).
  - **`test → prod` checks neither the `test` branch nor the test environment** (04/10/2026, general rule): it WARNS; `GATE_CHECK_TEST_DEPLOY=1` verifies the deployed SHA and a mismatch then blocks. The missing-spec check stays a warning.
  → `docs/decision-log.md` §33
 
-34. **Merges, pushes and the gates before them follow the configuration (`/podium:config`), not questions.** When the code is done: merge where `merge.<t>` is yes, run the gates where `gates_before_push.<t>` is yes, push where `push.<t>` is yes, then wait for green CI where `ci_after_push.<t>` is yes; before deploying `test`/`prod`, run e2e on `dev`/`test` where `e2e_before_deploy.<t>` is yes. A red gate, CI run or e2e blocks every later target. A gate set to no is NOT run and the merge commit carries `Gate-Waived: <gates> (neden: configuration)`; before a `prod` merge list those lines in the report. Never ask what a setting answers. A gate that did not run did not pass; coverage follows `coverage_before_push.<t>` (#29). → `standards/13-pr-and-review.md` §8a; `docs/decision-log.md` §34
+34. **Merges, pushes and the gates before them follow the configuration, not questions.** When the code is done, per target: merge (`merge.<t>`), run the gates (`gates_before_push.<t>`), push (`push.<t>`), await green CI (`ci_after_push.<t>`), and before a `test`/`prod` deploy run e2e on `dev`/`test` (`e2e_before_deploy.<t>`) — each only where its key is yes. A red gate, CI run or e2e blocks every later target. A gate set to no is NOT run and the merge commit carries `Gate-Waived: <gates> (neden: configuration)`; before a `prod` merge list those lines in the report. Never ask what a setting answers. A gate that did not run did not pass; coverage follows `coverage_before_push.<t>` (#29). **The configuration is the ONLY switch for test work:** writing tests and every suite/gate/coverage/CI/e2e run happen only where its key is yes (or the user asks); else nothing is written or run, the report says **"not run (configuration)"**. Compiling/typechecking touched code is allowed (not a run). #8/#24/#31/#32 say HOW, never WHETHER (a project `CLAUDE.md` never overrides a config "no", §8a). → `standards/13-pr-and-review.md` §8a; `docs/decision-log.md` §34
 
 ## Never-do list
 

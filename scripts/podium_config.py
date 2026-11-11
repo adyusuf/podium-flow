@@ -94,6 +94,10 @@ def context(effective, problems, session=None):
              '  pod: connect %s, message format %s (stored only; nothing acts on it)' % (
                  shown(value('pod.connect')), value('pod.message_format')),
              '  write unit tests: %s, write e2e: %s' % (shown(value('write.unit_tests')), shown(value('write.e2e')))]
+    if not value('write.unit_tests'):
+        lines.append('    tests: do not write; suites/gates/coverage/CI/e2e: run only where the keys below say yes, '
+                     'else "not run (configuration)" (neither pass nor fail); global #8/#31/#32 are HOW, never a trigger '
+                     '- they do not start test work (#34).')
     active = agents({k: v[0] for k, v in effective.items()})
     lines.append('  agents: %s' % (', '.join('%s (%s)' % (row['role'], row['runs_on']) for row in active) or 'none'))
     lines.extend('  ' + step for step in steps)
