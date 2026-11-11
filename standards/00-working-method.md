@@ -102,7 +102,10 @@ in a row — and every time something real was.
 2. **"Done" means every line is closed.** Each line points either to **evidence** or to
    a **written reason** it was not done. Evidence is a command that was run plus its
    output, or a test that was written **and run**. "I looked and it is there" is not
-   evidence. One open line means the task is not done.
+   evidence. One open line means the task is not done. ⚠️ **A test or test-run line is a
+   written reason, not an open line, when the configuration had that work off** (#34): it
+   closes as **"not run (configuration)"** — the completeness check (#24) asks only "did
+   the config require tests? if yes, were they run?", never "were tests written" on its own.
 3. **Status labels:** ✅ done · ⚠️ partial (what is missing is written) · ❌ not done
    (the reason is written) · 🔒 infrastructure blocker (what is missing is written).
    Every line that is not ✅ is reported **unprompted**.
@@ -339,6 +342,11 @@ finished into one row and give the remaining work its own rows.
   cannot be measured, the row says "cannot be measured" — never a plausible-looking guess.
 - ⚠️ **A step that did not run is reported as "did not run"**, never folded into a pass.
   The same rule as the gate's own (#25): a step that did not run did not pass.
+- ⚠️ **A step the configuration turned OFF is reported "not run (configuration)"** (#34) — a third
+  state, **neither a pass nor a failure**: the key for this step is `no`, so nothing was written or run
+  and there was nothing to measure. Keep it distinct from "did not run" (a step that should have run and
+  could not): that one is incomplete and blocks; "not run (configuration)" is the configured, expected
+  absence of a run. Writing/running tests, gates, coverage, CI and e2e are all subject to it.
 - ⚠️ **An over-optimistic estimate is an ERROR and gets corrected.** If the figure drops
   once the breakdown exists, drop it and say why — never round quietly upward.
 - ⚠️ **Never pipe a long run's output into something that buffers** (`tail`/`head`): no
@@ -439,6 +447,13 @@ Generalises `CLAUDE.md` #31 (which was written for e2e). The mistake it prevents
 each failure the whole merge gate (tens of minutes: every tier plus the shared core) was re-run from the top,
 repeatedly, although each fix could be proven by running only the step that failed.
 
+⚠️ **This cycle is HOW a run proceeds once the configuration has turned one on (`CLAUDE.md` #34); it never
+starts a run itself.** Where the step's panel key is off (`gates_before_push`, `coverage_before_push`,
+`ci_after_push`, `e2e_before_deploy`, or `write unit tests`/`write e2e` for the writing that precedes a run),
+there is no suite to run and nothing to classify: the report says **"not run (configuration)"** — not a pass
+and not a failure — and this cycle has no subject. The user asking in chat is the other way a run begins.
+`CLAUDE.md` #8/#31/#32 and this section describe the steps; they are never themselves the reason a run starts.
+
 1. **First run is FULL** and does not stop at the first failure. Read the WHOLE result before touching anything.
 2. **Classify each failure** — product bug · stale test · fixture/data · environment · gate/tooling defect.
    One root cause often explains several red lines; find it before fixing line by line.
@@ -453,6 +468,15 @@ repeatedly, although each fix could be proven by running only the step that fail
    coverage dirs, branch checkout) — the second run invalidates the first.
 7. **On a batch promotion to `test` the narrow re-run of step 3 is not enough:** after the fixes the FULL
    suite runs again before the gate. On the way to `dev` step 3 stands (`13-pr-and-review.md` §8).
+
+The `CLAUDE.md` #31 bullets, in full (the active file carries the compressed form; the detail lives here):
+
+- **The WHOLE suite runs first**, without stopping at the first failure. Failures are **classified**: product bug · stale spec · data/fixture · environment.
+- **Failures are fixed** — each fix in its own commit; fixes may share one gate and one merge (#26). Raising retries or loosening assertions does not count as a fix.
+- **Then ONLY the fixed tests** (and those they could affect) run.
+- ⚠️ **E2E is optional (#33):** if run, only against code on `test`; verification on `dev` is unit tests + tsc/lint (#25).
+- **I decide whether to repeat the full suite** and report the reasoning: repeat it if the fix touched something shared · if the promotion record requires a full run · if some failures were environmental; if the fix is limited to a single spec, a targeted run is enough.
+- **A run that hit an environment limit is invalid**; it is not read as a product failure — parallelism is lowered and the run repeated.
 
 ## 12. Parallelism and reuse in test / coverage / gate runs (PERMANENT, all projects)
 

@@ -544,6 +544,18 @@ code, then write and run unit tests, and e2e once the code reaches `test`.
 **How to apply:** do not start a run while writing code; batch the verifications,
 including tsc/lint, after the code and the tests are written.
 
+⚠️ **This order is HOW, not WHETHER (11/11/2026, §34 amendment).** Writing and running unit
+tests here happen only where the configuration turns them on (`write unit tests`,
+`gates_before_push.<t>`); off → "not written / not run (configuration)", and the code still
+reaches `dev` by whatever merge/push the configuration allows. #32 never starts test work itself.
+**When test writing IS on, the full order (moved here from `CLAUDE.md` #32, which now carries only the
+compressed form):**
+
+- The planned work's code is written **in full**; tests are not run after every small change.
+- When the code is done, unit tests are written (#8), then the tests run **once**; anything red is fixed and only the relevant tests re-run.
+- **E2E is optional and never run by a gate (#33).**
+- #26 still holds: each task gets its own commit and reaches `dev` through a gate — alone or in a batch — once its unit run is green.
+
 ## §33 — The only place for e2e is the pre-production gate
 
 **Amended 03/10/2026 — e2e is OPTIONAL (user decision, general rule).** The machine runs several sessions, a live Android emulator and the project stacks at once (load average 100–340 on 10 cores); the suites could not run, and a gate that cannot run only blocks. From now on no gate runs e2e: the `test` and `prod` promotions print a warning that e2e was NOT run (the report never reads it as a pass), `GATE_RUN_E2E=1` runs the suite and a red result then blocks like any step, and the `test → prod` deploy verification stays. The hotfix exception is void. What follows is the original rationale, kept for the record.
@@ -592,6 +604,48 @@ to match; until the script is updated, tell the user in advance that "the gate w
 run e2e".
 
 ## §34 — Ask before every merge what runs; a waived gate is recorded (17/10/2026, user decision, general rule)
+
+### Amendment 11/11/2026 — the configuration is the ONLY switch for test work (user decision, general rule)
+
+**The problem.** Claude read global rules #8 (tests get updated), #24 (the completeness check asking "were tests
+run"), #31 (the run cycle) and #32 (code → write tests → run) as **independent triggers**, each able to start test
+work on its own. A project `CLAUDE.md` line such as "new endpoint → add a smoke test" was read the same way. So test
+work happened even where the configuration said not to. **The example (11/11/2026):** the panel said
+`write unit tests: no`, `gates_before_push.<t>: no`, `coverage_before_push.<t>: no`, yet Claude wrote smoke tests and
+ran all four suites (~40 minutes) for a change that asked for none. The user: *"all of these, if needed, the podium
+flow will tell you."*
+
+**The decision.** The podium configuration (the panel, `CLAUDE.md` #34) is the **only** switch for test work:
+
+- **Writing** tests (unit, smoke, e2e) happens only where `write unit tests`/`write e2e` is yes, or the user asks in
+  chat. Off → nothing is written and the report says **"not written (configuration)"**.
+- **Running** suites, gates, coverage, CI and e2e happens only where the matching key for the current step
+  (`gates_before_push`, `coverage_before_push`, `ci_after_push`, `e2e_before_deploy`) is yes, or the user asks. Off →
+  nothing runs and the report says **"not run (configuration)"**. Neither state is a pass or a failure; it is the
+  configured, expected absence of a run — distinct from "did not run" (a step that should have run and could not).
+- **Compiling/typechecking** the code you touched is always allowed; no key gates it and it is not a test run.
+- **#8, #24, #31, #32 describe HOW test work is done once it is on; they never start it.** #24's checklist asks only
+  *"did the config require tests? if yes, were they run?"*, never "were tests written" on its own. The old
+  unconditional wording of #8 — *"If there are no tests, say so explicitly. A behaviour change is never merged
+  untested."* — is **retired**: "never merged untested" was exactly the independent trigger that caused the incident.
+- **A project `CLAUDE.md` line asking for tests** is read as *"when test writing is on, include these"*; it does not
+  override a configuration "no". #29's coverage threshold applies only where `coverage_before_push.<t>` is yes, and
+  is never itself lowered (that remains a separate, un-overridable rule).
+- **Reviewers do not manufacture a test gap.** `qa` (the first pass) and the #28 auditor do not report missing tests,
+  an un-run suite or un-measured coverage as a serious gap and do not send work back for it when the configuration had
+  that work off; they list it under **"not covered (configuration)"**. A test or gate the configuration *did* run that
+  comes back red is a finding like any other.
+
+**Where it is written:** `CLAUDE.md` #8/#24/#31/#32/#34; `standards/00-working-method.md` §4a/§10/§11;
+`standards/10-test-strategy.md` (lead banner, §7); `standards/13-pr-and-review.md` §8a; `agents/qa.md`,
+`agents/test-writer.md`; `modes/role-selection.md` §1/§3/§7; and the SessionStart config summary
+(`scripts/podium_config.py` `context()` prints the explicit line when `write unit tests` is no).
+
+### §32 note (11/11/2026)
+
+The order in §32 (all the code → write unit tests → run once) applies **only when test writing is on** (above). Where
+`write unit tests` is off, there are no tests to write or run in the cycle and the step is "not written / not run
+(configuration)"; the code still reaches `dev` through whatever merge/push the configuration turns on (#26, #34).
 
 - **Decision (the maintainer, 17/10/2026):** the full gate has ONE owner per project, and a gate that is not run is
   written down instead of skipped quietly. Before every `dev`/`test`/`prod` merge Claude asks "will CI and e2e run for

@@ -192,12 +192,33 @@ Status file, the settings and session layers, `.claude/mode`, the scratchpad.
   settings (#14, #15, #24). Writing a permanent decision into a repository (#14) is code work from that step on.
 - The class follows what the task does, not how it began: once a question turns into changing a project repository's
   files, every setting applies from that point (#26 first: fetch `dev`, branch).
-- Code written outside any repository is still code work for #8 (tests) and the mode's review; only the repository
-  steps have nothing to act on.
+- Code written outside any repository is still code work for #8 (tests — **only when test writing is on**, below)
+  and the mode's review; only the repository steps have nothing to act on.
 - The pane cannot see the task, only the folder: outside every git repository it shows only Status and, in Settings,
   *Mode*, *Model\**, *Replies*, *Plan*, *Budget*, *Pod* and *Pod message* (user decisions 01/11/2026 and 09/11/2026), so
   the tests settings that still hold for code written there are changed with `/podium:config`. Inside a repository it
   shows everything, and the class above is Claude's to follow.
+
+**The configuration is the only switch for test work (user decision 11/11/2026, general rule, `CLAUDE.md` #34).**
+Global rules #8 (tests get updated), #24 (the completeness check), #31 (the run cycle) and #32 (code → write →
+run) are **not independent triggers** and never start test work on their own; they describe HOW test work is done
+once the configuration — or the user, in chat — turns it on. In detail:
+
+- **Writing tests** (unit, smoke, e2e) happens only where `write.unit_tests`/`write.e2e` is yes, or the user asks.
+  Off → no test is written and the report says **"not written (configuration)"**.
+- **Running** a suite, gate, coverage or e2e happens only where the matching key for the current step is yes
+  (`gates_before_push`, `coverage_before_push`, `ci_after_push`, `e2e_before_deploy`), or the user asks. Off →
+  nothing runs and the report says **"not run (configuration)"**. Neither state is a pass or a failure.
+- **Compiling or typechecking** the code you touched (`dotnet build`, `tsc --noEmit`) is always allowed — it is
+  not a test run and no key gates it.
+- **A project `CLAUDE.md` line that asks for tests** ("new endpoint → add a smoke test") is read as *"when test
+  writing is on, include these"*; it does **not** override a configuration "no". A project `CLAUDE.md` cannot
+  turn test work on against the panel, and #29's coverage threshold applies only where `coverage_before_push.<t>`
+  is yes (it is never lowered — that is a separate rule, #29).
+- **Reviewers do not manufacture a test gap.** The `qa` first pass and the #28 auditor do **not** report "missing
+  tests", an un-run suite or un-measured coverage as a serious gap, and do not send work back for it, when the
+  configuration had that work off: they list it under **"not covered (configuration)"**. A real red test or a
+  real failing gate that the configuration *did* run is a finding like any other.
 
 **Scripts read the panel too (user decision 06/11/2026).** Every panel value a script acts on (`gates_before_push`,
 `gate_steps`, `coverage_before_push`, `e2e_before_deploy`, `ci_after_push`) is read by the script itself: from the
