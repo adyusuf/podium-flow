@@ -138,6 +138,19 @@ class Legacy(Case):
         backup = os.path.join(self.home, '.claude-standards', 'backups')
         self.assertTrue(any('settings.json' in files for _, _, files in os.walk(backup)))
 
+    def test_the_legacy_move_leaves_podium_json_byte_identical(self):
+        config = '{ "mode":"C",\t"note": "Şişman — İstanbul" }'.encode('utf-8')      # odd spacing, no newline at the end
+        path = os.path.join(self.home, '.claude', 'podium.json')
+        self.settings({'enabledPlugins': {setup.LEGACY_ID: False}, 'env': {'CLAUDE_CODE_PLUGIN_DIRS': OLD_DIR}})
+        with open(path, 'wb') as handle:
+            handle.write(config)
+        fake = LegacyFake(self.home)
+        fake.enable = lambda: None
+        self.assertEqual(0, self.go(fake)[0])
+        self.assertIn(['disable', setup.PLUGIN_ID], self.claude(fake))   # the move did its whole work
+        with open(path, 'rb') as handle:
+            self.assertEqual(config, handle.read())
+
     def test_an_unreadable_settings_file_is_said_and_left_alone_and_the_move_goes_on(self):
         path = os.path.join(self.home, '.claude', 'settings.json')
         os.makedirs(os.path.dirname(path), exist_ok=True)
