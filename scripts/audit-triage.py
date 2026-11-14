@@ -82,7 +82,7 @@ def pnpm_severe_advisories(report):
 def severe_advisories(report):
     if 'vulnerabilities' not in report and 'advisories' in report:
         return pnpm_severe_advisories(report)
-    """{GHSA: (package, title)} for every high/critical advisory in an npm audit report."""
+    # {GHSA: (package, title)} for every high/critical advisory in an npm audit report.
     vulns = report.get('vulnerabilities')
     if not isinstance(vulns, dict):
         raise Untrusted('the report has no "vulnerabilities" object')
