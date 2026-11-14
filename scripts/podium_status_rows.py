@@ -18,6 +18,7 @@ STEP_FIELDS = ('percent', 'blocker', 'agent', 'note', 'since', 'tools', 'model')
 STATES = ('not started', 'running', 'done', 'blocked', 'did not run', 'failed')
 OPEN, CLOSED = STATES[:2] + STATES[3:4], (STATES[2], STATES[4])      # a step still to finish, and one that is over
 CONTROL = re.compile('[\x00-\x1f\x7f-\x9f]')
+WHOLE_PERCENT = re.compile(r'^\s*(\d{1,3})\s*%?\s*$')
 
 
 class StatusError(Exception):
@@ -34,6 +35,17 @@ def percent(value):
     """How much of a step is done, as '0'..'100', or '' when not given (`45`, `45%`, `45.5` read as 45)."""
     match = re.match(r'^\s*(\d+(?:\.\d+)?)\s*%?\s*$', '' if value is None else str(value))
     return str(min(100, int(float(match.group(1))))) if match else ''
+
+
+def given_percent(value):
+    """The percent `step` is given, as '0'..'100': a whole number 0-100, a trailing `%` allowed; anything else is a
+    StatusError (F-006, 14/11/2026: "3 of 8" was stored as no percent, and the guard then saw no open step). `percent`
+    stays lenient for what is already in a file, so an older row with no percent is still read."""
+    match = WHOLE_PERCENT.match('' if value is None else str(value))
+    if not match or int(match.group(1)) > 100:
+        raise StatusError('%r is not a percent: give a whole number 0-100 (a trailing %% is fine); a figure such as '
+                          '"3 of 8" goes in --note' % (value,))
+    return str(int(match.group(1)))
 
 
 def step_percent(row):
