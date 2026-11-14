@@ -11,7 +11,7 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from plugin_setup_helpers import Case, Fake, NEW, OLD, setup  # noqa: E402
+from plugin_setup_helpers import CONFIG, Case, Fake, NEW, OLD, setup  # noqa: E402
 
 OLD_DIR = '/home/u/.claude/plugins/marketplaces/adyusuf-marketplace'
 
@@ -151,6 +151,21 @@ class Legacy(Case):
         self.assertIn(['disable', setup.PLUGIN_ID], self.claude(fake))   # the move did its whole work
         with open(path, 'rb') as handle:
             self.assertEqual(config, handle.read())
+
+    def test_the_legacy_move_backs_up_podium_json_before_it_changes_anything(self):
+        os.makedirs(os.path.join(self.home, '.claude'), exist_ok=True)
+        with open(os.path.join(self.home, '.claude', 'podium.json'), 'wb') as handle:
+            handle.write(CONFIG)
+        fake = LegacyFake(self.home, fail=('claude plugin marketplace add',))     # the very first change fails
+        code, out, _ = self.go(fake)
+        self.assertEqual(2, code)
+        backups = os.path.join(self.home, '.claude-standards', 'backups')
+        copies = [os.path.join(root, 'podium.json') for root, _, files in os.walk(backups) if 'podium.json' in files]
+        self.assertEqual(1, len(copies))
+        self.assertTrue(os.path.basename(os.path.dirname(copies[0])).startswith('plugin-setup-'))
+        with open(copies[0], 'rb') as handle:
+            self.assertEqual(CONFIG, handle.read())
+        self.assertIn(f'backup    {os.path.dirname(copies[0])}/podium.json', out)
 
     def test_an_unreadable_settings_file_is_said_and_left_alone_and_the_move_goes_on(self):
         path = os.path.join(self.home, '.claude', 'settings.json')

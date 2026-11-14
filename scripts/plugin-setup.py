@@ -237,8 +237,10 @@ def move_from_legacy(ctx, old, market, ref, remote):
     """The plugin was renamed adyusuf -> podium and moved to its own repository (02/11/2026). The new one is linked and
     installed first, in the old install's scope and branch; only then is the old plugin removed (its data kept) and a
     disabled one disabled again. The old marketplace link stays, so sessions that were running keep their folder.
-    A rerun after a failed removal finds the new one linked and current: it goes straight to the removal."""
+    A rerun after a failed removal finds the new one linked and current: it goes straight to the removal.
+    ~/.claude/podium.json is copied to the backups folder first, as on a replace."""
     scope = old['scope'] if old else 'user'
+    back_up(ctx, snapshot(ctx.home))
     settings_unreadable(ctx)
     settings, _ = plugin_dirs(ctx.home)
     enabled = (settings or {}).get('enabledPlugins', {}).get(LEGACY_ID) if isinstance(settings, dict) else None
