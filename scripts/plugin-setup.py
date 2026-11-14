@@ -212,14 +212,17 @@ def repoint_plugin_dirs(ctx):
     ctx.say(f'  CLAUDE_CODE_PLUGIN_DIRS now {settings["env"]["CLAUDE_CODE_PLUGIN_DIRS"]} (backup in {folder})')
 
 
-def move_from_legacy(ctx, old, ref, remote):
+def move_from_legacy(ctx, old, market, ref, remote):
     """The plugin was renamed adyusuf -> podium and moved to its own repository (02/11/2026). The new one is linked and
     installed first, in the old install's scope and branch; only then is the old plugin removed (its data kept) and a
-    disabled one disabled again. The old marketplace link stays, so sessions that were running keep their folder."""
+    disabled one disabled again. The old marketplace link stays, so sessions that were running keep their folder.
+    A rerun after a failed removal finds the new one linked and current: it goes straight to the removal."""
     scope = old['scope'] if old else 'user'
     settings, _ = plugin_dirs(ctx.home)
     enabled = (settings or {}).get('enabledPlugins', {}).get(LEGACY_ID) if isinstance(settings, dict) else None
-    if not connect(ctx, None, ref) or not install(ctx, scope):
+    entry = installed_entry(ctx.home)
+    done = market is not None and entry is not None and is_current(entry, remote)
+    if not done and (not connect(ctx, market, ref) or not install(ctx, scope)):
         ctx.say(f'✗ the new plugin is not installed — the old one is left as it was. Retry, or: claude plugin marketplace '
                 f'add {REPO}#{ref} && claude plugin install {PLUGIN_ID} --scope {scope}')
         return 2
@@ -234,7 +237,7 @@ def move_from_legacy(ctx, old, ref, remote):
     return finish(ctx, remote)
 
 
-def legacy(ctx, args, old, old_market, remote):
+def legacy(ctx, args, old, old_market, market, remote):
     """An install under the old name: report it (--check), or ask, then move it."""
     ctx.say(f'! found the plugin under its old name ({LEGACY_ID}); it moves to {PLUGIN_ID}')
     if args.check:
@@ -247,8 +250,8 @@ def legacy(ctx, args, old, old_market, remote):
         if ctx.ask(f'Install {PLUGIN_ID} and remove {LEGACY_ID}? [y/N] ').strip().lower() not in ('y', 'yes'):
             ctx.say('left as it is — nothing was changed')
             return 0
-    ref = (old_market or {}).get('ref') or args.ref
-    return move_from_legacy(ctx, old, ref, remote)
+    ref = (market or old_market or {}).get('ref') or args.ref
+    return move_from_legacy(ctx, old, market, ref, remote)
 
 
 def decide(ctx, args):
@@ -268,8 +271,10 @@ def decide(ctx, args):
         ctx.say(f'✗ {why} — nothing was changed')
         return 2
     old, old_market = installed_entry(ctx.home, LEGACY_ID), getattr(ctx, 'legacy_market', None)
-    if (old or old_market) and market is None:
-        return legacy(ctx, args, old, old_market, remote)
+    # The old plugin still installed is due whether or not the new link exists (a rerun retries a failed removal);
+    # the old link alone is due only while the new one is missing: after a move it stays on purpose.
+    if old or (old_market and market is None):
+        return legacy(ctx, args, old, old_market, market, remote)
     entry = installed_entry(ctx.home)
     ctx.say(f'GitHub    {ref} is at {remote[:12]}')
     ctx.say('installed ' + (f'{entry["version"] or "?"} ({entry["scope"]} scope)' if entry else 'not installed'))

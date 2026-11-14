@@ -109,6 +109,21 @@ class Legacy(Case):
         self.assertEqual(0, code)
         self.assertIn(f'both are installed now; remove the old one with: claude plugin uninstall {setup.LEGACY_ID}', out)
 
+    def test_a_rerun_after_a_failed_legacy_removal_retries_it_and_the_old_link_alone_does_not_retrigger(self):
+        fake = LegacyFake(self.home, fail=('claude plugin uninstall',))
+        self.assertEqual(0, self.go(fake)[0])
+        self.assertTrue(fake.legacy_installed)
+        fake.fail, fake.commands = set(), []
+        code, out, _ = self.go(fake)
+        self.assertEqual(0, code)
+        self.assertEqual(self.claude(fake)[1:], [['uninstall', setup.LEGACY_ID, '--keep-data', '--scope', 'user']])
+        self.assertFalse(fake.legacy_installed)
+        fake.commands = []
+        code, out, _ = self.go(fake)                          # only the old link is left now: an ordinary run
+        self.assertEqual((0, False), (code, 'old name' in out))
+        self.assertIsNotNone(fake.legacy_market)
+        self.assertEqual(fake.verbs(), ['claude plugin marketplace', 'git'])
+
     def test_a_disabled_old_install_stays_disabled_and_the_desktop_folder_follows(self):
         path = self.settings({'enabledPlugins': {setup.LEGACY_ID: False}, 'env': {'CLAUDE_CODE_PLUGIN_DIRS': OLD_DIR}})
         fake = LegacyFake(self.home)
