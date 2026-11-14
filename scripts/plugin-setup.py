@@ -104,6 +104,17 @@ def remote_sha(ctx, ref):
     return sha, None
 
 
+def settings_unreadable(ctx):
+    """True, and said, when ~/.claude/settings.json is there but is not a readable JSON object. It is then left as it
+    is and the plugin's enabled state is not acted on: it could not be read, so it is not guessed (rule #6)."""
+    path = os.path.join(ctx.home, '.claude', 'settings.json')
+    if not os.path.exists(path) or isinstance(read_json(path), dict):
+        return False
+    ctx.say(f'! {path} cannot be read or is not valid JSON — it is left as it is; if the plugin was disabled, '
+            f'disable it again after the install: claude plugin disable {PLUGIN_ID}')
+    return True
+
+
 def snapshot(home):
     settings = read_json(os.path.join(home, '.claude', 'settings.json')) or {}
     path = os.path.join(home, '.claude', 'podium.json')
@@ -175,6 +186,7 @@ def finish(ctx, remote):
 
 def replace(ctx, entry, market, ref, remote):
     before = snapshot(ctx.home)
+    settings_unreadable(ctx)
     back_up(ctx, before)
     if not connect(ctx, market, ref):
         ctx.say('✗ could not refresh the marketplace — nothing was removed')
@@ -227,6 +239,7 @@ def move_from_legacy(ctx, old, market, ref, remote):
     disabled one disabled again. The old marketplace link stays, so sessions that were running keep their folder.
     A rerun after a failed removal finds the new one linked and current: it goes straight to the removal."""
     scope = old['scope'] if old else 'user'
+    settings_unreadable(ctx)
     settings, _ = plugin_dirs(ctx.home)
     enabled = (settings or {}).get('enabledPlugins', {}).get(LEGACY_ID) if isinstance(settings, dict) else None
     entry = installed_entry(ctx.home)

@@ -138,6 +138,22 @@ class Legacy(Case):
         backup = os.path.join(self.home, '.claude-standards', 'backups')
         self.assertTrue(any('settings.json' in files for _, _, files in os.walk(backup)))
 
+    def test_an_unreadable_settings_file_is_said_and_left_alone_and_the_move_goes_on(self):
+        path = os.path.join(self.home, '.claude', 'settings.json')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        broken = ('{"enabledPlugins": {"%s": false}, "env": {"CLAUDE_CODE_PLUGIN_DIRS": "%s"' % (setup.LEGACY_ID, OLD_DIR))
+        with open(path, 'w', encoding='utf-8') as handle:
+            handle.write(broken)
+        fake = LegacyFake(self.home)
+        fake.enable = lambda: None
+        code, out, _ = self.go(fake)
+        self.assertEqual(0, code)
+        self.assertIn(f'! {path} cannot be read or is not valid JSON — it is left as it is', out)
+        self.assertIn(['install', setup.PLUGIN_ID, '--scope', 'user'], self.claude(fake))
+        self.assertNotIn(['disable', setup.PLUGIN_ID], self.claude(fake))
+        with open(path, encoding='utf-8') as handle:
+            self.assertEqual(broken, handle.read())
+
     def test_the_desktop_folder_rewrite_keeps_other_keys_and_non_ascii_and_is_all_or_nothing(self):
         data = {'theme': 'İstanbul — Şişman', 'enabledPlugins': {'x@y': True},
                 'env': {'CLAUDE_CODE_PLUGIN_DIRS': OLD_DIR, 'OTHER': 'ğü'}}
