@@ -78,6 +78,13 @@ class Legacy(Case):
         self.assertIn(f'claude plugin marketplace remove {setup.LEGACY_MARKETPLACE}', out)
         self.assertIn('✓ podium@podium-marketplace', out)
 
+    def test_an_old_link_without_a_branch_links_the_default_branch_github_was_asked_about(self):
+        fake = LegacyFake(self.home)
+        del fake.legacy_market['ref']
+        self.assertEqual(0, self.go(fake)[0])
+        self.assertIn(['git', 'ls-remote', setup.GIT_URL, 'HEAD'], fake.commands)
+        self.assertIn(['marketplace', 'add', setup.REPO], self.claude(fake))
+
     def test_it_asks_first_and_a_no_changes_nothing(self):
         fake = LegacyFake(self.home)
         code, out, _ = self.go(fake, answer='n')

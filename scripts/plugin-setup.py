@@ -163,11 +163,16 @@ def keep_settings(ctx, before):
     return problems
 
 
+def source(ref):
+    """What `marketplace add` links: 'HEAD' (a link without a branch) is the repository's default branch, unsuffixed."""
+    return REPO if ref == 'HEAD' else f'{REPO}#{ref}'
+
+
 def connect(ctx, market, ref):
     """The link to GitHub: add the marketplace if it is missing, otherwise pull its newest state."""
     if market is None:
-        return step(ctx, f'linking the marketplace ({REPO}#{ref})',
-                    ['claude', 'plugin', 'marketplace', 'add', f'{REPO}#{ref}'])
+        return step(ctx, f'linking the marketplace ({source(ref)})',
+                    ['claude', 'plugin', 'marketplace', 'add', source(ref)])
     return step(ctx, 'refreshing the marketplace from GitHub', ['claude', 'plugin', 'marketplace', 'update', MARKETPLACE])
 
 
@@ -248,7 +253,7 @@ def move_from_legacy(ctx, old, market, ref, remote):
     done = market is not None and entry is not None and is_current(entry, remote)
     if not done and (not connect(ctx, market, ref) or not install(ctx, scope)):
         ctx.say(f'✗ the new plugin is not installed — the old one is left as it was. Retry, or: claude plugin marketplace '
-                f'add {REPO}#{ref} && claude plugin install {PLUGIN_ID} --scope {scope}')
+                f'add {source(ref)} && claude plugin install {PLUGIN_ID} --scope {scope}')
         return 2
     if old and not step(ctx, 'removing the old name (its data is kept)',
                         ['claude', 'plugin', 'uninstall', LEGACY_ID, '--keep-data', '--scope', scope]):
@@ -261,8 +266,9 @@ def move_from_legacy(ctx, old, market, ref, remote):
     return finish(ctx, remote)
 
 
-def legacy(ctx, args, old, old_market, market, remote):
-    """An install under the old name: report it (--check), or ask, then move it."""
+def legacy(ctx, args, old, market, ref, remote):
+    """An install under the old name: report it (--check), or ask, then move it. `ref` is the branch GitHub was asked
+    about, so the commit that was checked is the one that gets linked."""
     ctx.say(f'! found the plugin under its old name ({LEGACY_ID}); it moves to {PLUGIN_ID}')
     if args.check:
         ctx.say('! moving from the old name is due')
@@ -274,7 +280,6 @@ def legacy(ctx, args, old, old_market, market, remote):
         if ctx.ask(f'Install {PLUGIN_ID} and remove {LEGACY_ID}? [y/N] ').strip().lower() not in ('y', 'yes'):
             ctx.say('left as it is — nothing was changed')
             return 0
-    ref = (market or old_market or {}).get('ref') or args.ref
     return move_from_legacy(ctx, old, market, ref, remote)
 
 
@@ -298,7 +303,7 @@ def decide(ctx, args):
     # The old plugin still installed is due whether or not the new link exists (a rerun retries a failed removal);
     # the old link alone is due only while the new one is missing: after a move it stays on purpose.
     if old or (old_market and market is None):
-        return legacy(ctx, args, old, old_market, market, remote)
+        return legacy(ctx, args, old, market, ref, remote)
     entry = installed_entry(ctx.home)
     ctx.say(f'GitHub    {ref} is at {remote[:12]}')
     ctx.say('installed ' + (f'{entry["version"] or "?"} ({entry["scope"]} scope)' if entry else 'not installed'))
