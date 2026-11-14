@@ -13,7 +13,10 @@ inline in a heredoc until recently. Extracted for two reasons:
 
 The patterns below were moved VERBATIM by a script, not retyped. They are the
 difference between a blocked force-push and a lost branch, and a regex rewritten
-from memory is how a guard quietly stops matching.
+from memory is how a guard quietly stops matching. They were widened once since
+(14/11/2026, F-001): every bypass named in that finding is a row of the table in
+scripts/tests/test_guard_bypasses.py, run through the real wrapper - change a
+pattern only with that table green.
 
 Reads the hook payload (JSON, or raw text) on stdin.
 Exit 0 = allowed. Exit 2 = blocked, with the reason on stderr.
@@ -39,22 +42,46 @@ def without_heredocs(text):
                 tag = None
             continue
         kept.append(line)
-        m = re.search(r"<<-?\s*[\"\x27]?([A-Za-z_][A-Za-z_0-9]*)", line)
+        # `<<<word` is a here-string, not a heredoc: taking it for one stripped every later line (F-002).
+        m = re.search(r"(?<!<)<<(?!<)-?\s*[\"\x27]?([A-Za-z_][A-Za-z_0-9]*)", line)
         if m:
             tag = m.group(1)
     return "\n".join(kept)
+
+# `git` and the global options it takes before the verb (`git -C <dir>`, `git -c k=v`, `git --git-dir <d>`): without
+# them `git -C repo push --force` was no push to the rules below (F-001).
+ARG = r"(?:\"[^\"]*\"|\x27[^\x27]*\x27|\S+)"
+GIT = (r"git(?:\s+(?:-[Cc]\s+" + ARG + r"|--(?:git-dir|work-tree|namespace|exec-path|config-env|super-prefix)\s+" + ARG
+       + r"|-\S+))*\s+")
+PUSH = GIT + r"push(?![-\w.])"            # not `push.default=` in a `-c`
+
+
+def bundle(letter):
+    """A short-option bundle holding `letter` (`-f`, `-fu`, `-uf`); a `--long` option never matches it."""
+    return r"-[a-z0-9]*" + letter + r"[a-z0-9]*"
+
 
 # Heredoc bodies are stripped for the GIT rules only — a heredoc that WRITES a
 # script containing "--no-verify" is not a commit. They are NOT stripped for the
 # rules below it, because `psql <<EOF ...` really does execute.
 GIT_RULES = (
-    (r"git\s+push([^;&|\n]*\s)?(-f|--force[a-z-]*)(\s|$)", "forced push"),
-    (r"git\s+push[^;&|\n]*(\s|:)main(\s|$)", "push straight to main"),
-    (r"git\s+(commit|push|merge)[^;&|\n]*--no-verify", "--no-verify skips the pre-commit gitleaks hook"),
+    (PUSH + r"([^;&|\n]*\s)?(" + bundle("f") + r"|--force[a-z-]*(=\S*)?)(\s|$)", "forced push"),
+    (PUSH + r"[^;&|\n]*\s[\"\x27]?\+", "forced push (a + refspec)"),
+    (PUSH + r"([^;&|\n]*\s)?--mirror(\s|$)", "mirror push (overwrites and deletes remote branches)"),
+    (PUSH + r"([^;&|\n]*\s)?(" + bundle("d") + r"|--delete)(\s|$)", "deletes a remote branch"),
+    (PUSH + r"[^;&|\n]*\s[\"\x27]?:[^\s:]", "deletes a remote branch (a :branch refspec)"),
+    (PUSH + r"[^;&|\n]*(\s|:|refs/heads/)main(\s|$)", "push straight to main"),
+    (GIT + r"(commit|push|merge)[^;&|\n]*--no-verify", "--no-verify skips the pre-commit gitleaks hook"),
+    # `git commit -n` IS --no-verify (on push and merge -n means something else).
+    (GIT + r"commit(?![-\w])([^;&|\n]*\s)?" + bundle("n") + r"(\s|$)", "-n (--no-verify) skips the pre-commit gitleaks hook"),
 )
+# rm: the recursive option anywhere among the options, short (`-r`, `-rf`, `-r -f`) or long (`--recursive --force`); the
+# target bare or quoted (`"$HOME"`, `'/'`) - F-001.
+RM_OPTION = r"\s+-\S+"
 ANY_RULES = (
     (r"(drop|truncate)\s+(table|database|schema)", "DROP/TRUNCATE (take a backup and get approval first)"),
-    (r"rm\s+-[a-zA-Z]*[rR][a-zA-Z]*\s+(--\s+)?(/|~|\$HOME|\*|\.)/?\*?(\s|$)", "recursive delete of a root/home/working directory"),
+    (r"rm(" + RM_OPTION + r")*?\s+(" + bundle("r") + r"|--recursive)(" + RM_OPTION + r")*\s+(--\s+)?[\"\x27]?"
+     r"(/|~|\$HOME|\$\{HOME\}|\*|\.)/?\*?[\"\x27]?(\s|$)", "recursive delete of a root/home/working directory"),
 )
 
 

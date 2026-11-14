@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # PreToolUse(Bash) hook: blocks the irreversible commands from the never-do list.
 #
-#   git push --force / -f / --force-with-lease     git push ... main (any refspec)
+#   git push --force / -f / -fu / --force-with-lease / +refspec   git push ... main (any refspec, refs/heads/main)
+#   git push --mirror / --delete / -d / :branch                    git -C <dir> / -c k=v before any git verb
 #   (a push to the prod branch is not judged here: the configuration decides, 17/10/2026)
-#   git commit/push/merge --no-verify               DROP|TRUNCATE  TABLE|DATABASE|SCHEMA
-#   rm -rf on / ~ $HOME . *
+#   git commit/push/merge --no-verify, git commit -n               DROP|TRUNCATE  TABLE|DATABASE|SCHEMA
+#   rm -rf / -r -f / --recursive on / ~ $HOME . *, bare or quoted
 #
 # Exit 2 = the harness blocks the call and shows this message to the model. The
 # model cannot approve it; the user runs the command themselves, or rewords a
@@ -19,14 +20,15 @@
 # accidents, not a sandbox.
 #
 # Cost: a grep prefilter runs on every Bash call (a few ms, ~93% of real calls
-# stop there); the JSON is parsed and the patterns applied only on a keyword hit.
+# stop there before `commit` joined the keywords for `git commit -n`, 14/11/2026);
+# the JSON is parsed and the patterns applied only on a keyword hit.
 set -uo pipefail
 
 payload="$(cat 2>/dev/null || true)"
 # grep's 1 means "no keyword": allowed. Anything else means grep did not run, and reading that as "no
 # keyword" let EVERY command through — `rm -rf ~` included — on a PATH where grep could not start
 # (found on Windows, 04/10/2026). That fails closed now, like every other path here.
-printf '%s' "$payload" | grep -qiE 'push|drop|truncate|rm |no-verify'
+printf '%s' "$payload" | grep -qiE 'push|drop|truncate|rm |no-verify|commit'
 case $? in
   0) ;;
   1) exit 0 ;;
