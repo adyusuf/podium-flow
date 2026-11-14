@@ -153,15 +153,19 @@ def compare_cuts():
            "|---|---|---|---|---|"]
     index = 0
     with open(cuts_file, encoding='utf-8') as handle:
-        for line in handle:
+        for number, line in enumerate(handle, 1):
             if line.startswith('#') or not line.strip():
                 continue
             index += 1
             try:
                 timestamp, label = line.rstrip('\n').split('\t', 1)
+                cut = datetime.datetime.fromisoformat(timestamp).timestamp()
             except ValueError:
+                # A bad line is skipped and said (F-040, 14/11/2026: a bad timestamp was a traceback); the line itself
+                # is not echoed, the tsv is local.
+                print(f"warning: measurement-cuts.tsv line {number} is not '<ISO timestamp><TAB><label>', skipped",
+                      file=sys.stderr)
                 continue
-            cut = datetime.datetime.fromisoformat(timestamp).timestamp()
             before = [value for when, value in rows if when <= cut]
             after = [value for when, value in rows if when > cut]
             b = int(statistics.median(before)) if before else 0
@@ -225,10 +229,19 @@ def report(days=None):
     return "\n".join(lines)
 
 
+def days_of(argv):
+    """`--days N` as a whole number, None when not given; anything else exits 2 with a message (F-040, 14/11/2026)."""
+    if '--days' not in argv:
+        return None
+    try:
+        return int(argv[argv.index('--days') + 1])
+    except (IndexError, ValueError):
+        print("step-stats: --days takes a whole number of days, e.g. --days 30", file=sys.stderr)
+        sys.exit(2)
+
+
 if __name__ == '__main__':
-    window = None
-    if '--days' in sys.argv:
-        window = int(sys.argv[sys.argv.index('--days') + 1])
+    window = days_of(sys.argv)
     print("sanitiser gate:", sanitizer_gate())
     text = report(window)
     dirty = scan_output(text)
@@ -242,6 +255,7 @@ if __name__ == '__main__':
                   "> `python3 scripts/step-stats.py --write`. The estimate table in\n"
                   "> `modes/role-selection.md` §8 is corrected with these numbers (never from a\n"
                   "> single measurement: at least three records, or one real end-to-end round).\n\n")
-        open(target, 'w').write(header + text + "\n")
+        with open(target, 'w', encoding='utf-8') as handle:
+            handle.write(header + text + "\n")
         print("written:", target)
     print(text)
