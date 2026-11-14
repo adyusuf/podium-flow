@@ -303,8 +303,9 @@ def decide(ctx, args):
     if entry and is_current(entry, remote):
         ctx.say('✓ the installed plugin is the newest')
         due = market is None
-        if due and not args.check:
-            connect(ctx, market, ref)
+        if due and not args.check and not connect(ctx, market, ref):
+            ctx.say('✗ could not link the marketplace again — the plugin stays as it is; rerun to retry')
+            return 2
         return 1 if due and args.check else 0
     if args.check:
         ctx.say('! a new version is due' if entry else '! the plugin is not installed')
@@ -435,11 +436,14 @@ def main(argv, ctx=None):
     try:
         return decide(ctx, args)
     finally:
-        if not args.check:
+        if not args.check:          # an unwritable log is a warning: it never replaces the run's own exit code
             folder = os.path.join(ctx.home, '.claude-standards', 'logs')
-            os.makedirs(folder, exist_ok=True)
-            with open(os.path.join(folder, f'plugin-setup-{ctx.stamp}.log'), 'w', encoding='utf-8') as log:
-                log.write('\n'.join(lines) + '\n')
+            try:
+                os.makedirs(folder, exist_ok=True)
+                with open(os.path.join(folder, f'plugin-setup-{ctx.stamp}.log'), 'w', encoding='utf-8') as log:
+                    log.write('\n'.join(lines) + '\n')
+            except OSError as error:
+                print(f'! the log could not be written in {folder} ({error.strerror or error})', file=sys.stderr)
 
 
 if __name__ == '__main__':
