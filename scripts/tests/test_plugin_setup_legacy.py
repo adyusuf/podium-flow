@@ -6,6 +6,7 @@ CLAUDE_CODE_PLUGIN_DIRS follows; the old marketplace link stays for sessions sti
 import json
 import os
 import sys
+import types
 import unittest
 from unittest import mock
 
@@ -191,6 +192,16 @@ class Legacy(Case):
         data['env']['CLAUDE_CODE_PLUGIN_DIRS'] = OLD_DIR.replace('adyusuf-marketplace', 'podium-marketplace')
         self.assertEqual(data, json.loads(text))
         self.assertEqual(0o644, os.stat(path).st_mode & 0o777)
+
+    def test_a_windows_desktop_folder_follows_too(self):
+        win = 'C:\\Users\\u\\.claude\\plugins\\marketplaces\\adyusuf-marketplace;D:\\other'
+        path = self.settings({'env': {'CLAUDE_CODE_PLUGIN_DIRS': win}})
+        ctx = types.SimpleNamespace(home=self.home, stamp='s', say=lambda text: None)
+        with mock.patch.object(setup.os, 'sep', '\\'):          # only os.sep: the paths it writes are built by os.path
+            setup.repoint_plugin_dirs(ctx)
+        with open(path, encoding='utf-8') as handle:
+            self.assertEqual(win.replace('adyusuf-marketplace', 'podium-marketplace'),
+                             json.load(handle)['env']['CLAUDE_CODE_PLUGIN_DIRS'])
 
     def test_without_the_old_name_nothing_extra_runs(self):
         fake = Fake(self.home, installed=NEW, market={'name': setup.MARKETPLACE, 'source': 'github', 'repo': setup.REPO, 'ref': 'prod'})
