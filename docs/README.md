@@ -11,6 +11,7 @@ Why the rule set exists, how it is carried out, and what was measured. The rules
 | `case-03-agent-cost-measurement.md` | Case: agent turns were 7.7% of cost, the orchestrator's cache reads 73% — measuring what agents actually cost |
 | `case-04-the-audit-gap.md` | Case: nine roles, only one audited — the fix was mandatory evidence, not another agent |
 | `benchmark-method.md` | How the measurements are produced and compared: what is and is not measured, the comparison rules, when a comparison is invalid, the reproduce commands |
+| `test-inventory/` | The test inventory (`/podium:test-inventory`): one report per surface, the findings register (`findings.md`) and the index (`README.md`); phase 1 of 14/11/2026 |
 | `coverage-gap.md` | Line coverage of this repository's own scripts against the 80% rule (#29): the measured numbers per script, the plan to close the gap, and why shell is not measured |
 | `images/podium-panels.webp` | The screenshot of the `podium` pane, explained in [`hooks/README.md`](../hooks/README.md) |
 | `measurement-log.md` | **Generated.** Aggregate statistics: prefix, per-role cost, how often each step ran (`scripts/step-stats.py`) |
