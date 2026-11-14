@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from plugin_setup_helpers import Case, Fake, NEW, OLD, setup  # noqa: E402
@@ -136,6 +137,31 @@ class Legacy(Case):
                              json.load(handle)['env']['CLAUDE_CODE_PLUGIN_DIRS'])
         backup = os.path.join(self.home, '.claude-standards', 'backups')
         self.assertTrue(any('settings.json' in files for _, _, files in os.walk(backup)))
+
+    def test_the_desktop_folder_rewrite_keeps_other_keys_and_non_ascii_and_is_all_or_nothing(self):
+        data = {'theme': 'İstanbul — Şişman', 'enabledPlugins': {'x@y': True},
+                'env': {'CLAUDE_CODE_PLUGIN_DIRS': OLD_DIR, 'OTHER': 'ğü'}}
+        path = self.settings(data)
+        os.chmod(path, 0o644)                                           # a temp file alone would be 0600
+        with open(path, 'rb') as handle:
+            original = handle.read()
+        fake = LegacyFake(self.home)
+        fake.enable = lambda: None
+        with mock.patch.object(setup.os, 'replace', side_effect=OSError('disk full')):
+            with self.assertRaises(OSError):
+                self.go(fake)
+        with open(path, 'rb') as handle:
+            self.assertEqual(original, handle.read())                 # never half written
+        self.assertEqual(['settings.json'], [n for n in os.listdir(os.path.dirname(path)) if n.endswith('.json')])
+        fake = LegacyFake(self.home)                                    # the first run removed the old plugin
+        fake.enable = lambda: None
+        self.assertEqual(0, self.go(fake)[0])
+        with open(path, encoding='utf-8') as handle:
+            text = handle.read()
+        self.assertIn('İstanbul — Şişman', text)                       # not escaped to İ
+        data['env']['CLAUDE_CODE_PLUGIN_DIRS'] = OLD_DIR.replace('adyusuf-marketplace', 'podium-marketplace')
+        self.assertEqual(data, json.loads(text))
+        self.assertEqual(0o644, os.stat(path).st_mode & 0o777)
 
     def test_without_the_old_name_nothing_extra_runs(self):
         fake = Fake(self.home, installed=NEW, market={'name': setup.MARKETPLACE, 'source': 'github', 'repo': setup.REPO, 'ref': 'prod'})

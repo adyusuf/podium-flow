@@ -29,6 +29,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import types
 
 REPO = 'adyusuf/podium-flow'
@@ -196,7 +197,8 @@ def plugin_dirs(home):
 
 
 def repoint_plugin_dirs(ctx):
-    """The desktop app's plugin folder follows the new marketplace folder; the settings file is backed up first."""
+    """The desktop app's plugin folder follows the new marketplace folder; the settings file is backed up first and
+    replaced whole (a temp file in the same folder, then os.replace), so a crash never leaves it half written."""
     settings, value = plugin_dirs(ctx.home)
     old = os.sep + LEGACY_MARKETPLACE
     if not isinstance(value, str) or old not in value:
@@ -206,9 +208,16 @@ def repoint_plugin_dirs(ctx):
     os.makedirs(folder, exist_ok=True)
     shutil.copyfile(path, os.path.join(folder, 'settings.json'))
     settings['env']['CLAUDE_CODE_PLUGIN_DIRS'] = value.replace(old, os.sep + MARKETPLACE)
-    with open(path, 'w', encoding='utf-8') as handle:
-        json.dump(settings, handle, indent=2)
-        handle.write('\n')
+    handle, temp = tempfile.mkstemp(prefix='.settings-', suffix='.json', dir=os.path.dirname(path))
+    try:
+        with os.fdopen(handle, 'w', encoding='utf-8') as out:
+            json.dump(settings, out, indent=2, ensure_ascii=False)
+            out.write('\n')
+        shutil.copymode(path, temp)
+        os.replace(temp, path)
+    finally:
+        if os.path.exists(temp):
+            os.remove(temp)
     ctx.say(f'  CLAUDE_CODE_PLUGIN_DIRS now {settings["env"]["CLAUDE_CODE_PLUGIN_DIRS"]} (backup in {folder})')
 
 
