@@ -212,6 +212,12 @@ class RealHook(Base):
         self.assertIn('NO BUDGET', out)
         self.assertIn('FILE MISSING', out)
 
+    def test_a_bad_budget_row_is_reported(self):
+        # F-022: the gate now fails a row whose ceiling is not a number; the hook must say so, not stay silent.
+        write(os.path.join(self.project, 'CLAUDE.md'), 'x')
+        write(self.copy('md-budget.tsv'), 'CLAUDE.md\tabc\t1\tnote\n')
+        self.assertIn('BAD BUDGET ROW', self.run_hook('{}'))
+
     def test_no_budget_is_SILENT_on_a_stop_event(self):
         self.assertEqual(self.run_hook('{}').strip(), '', 'suggesting an install every turn is noise')
 
