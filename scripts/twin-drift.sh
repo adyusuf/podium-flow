@@ -54,6 +54,8 @@ if [ -f "$root/scripts/gate-core.sh" ]; then
 fi
 
 echo "▶ Twin drift (project copies vs. the canonical set in $(basename "$root"))"
+# Nothing is fetched (no network in a gate): a project's origin/dev is what its checkout last fetched, so say so.
+echo "  compares each project's LOCAL origin/dev as last fetched — nothing is fetched here; git fetch a project for its newest dev"
 
 drifted=0 checked=0 projects=0
 for candidate in "$search"/*; do
