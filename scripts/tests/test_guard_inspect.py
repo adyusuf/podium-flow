@@ -96,13 +96,14 @@ class Blocked(unittest.TestCase):
 
     def test_inside_a_push_command_a_mention_DOES_match(self):
         # The scope is the verb, not the intent: the flag named anywhere in a
-        # PUSH command matches, message or not. Measured, including the boundary
-        # — the pattern needs whitespace or end-of-string after the flag, so
-        # `"no --force"` (quote straight after) slips past while
-        # `"no --force here"` does not. Over-blocking on a push is the safe side
-        # of that line and the model can reword; relying on the gap would not be.
+        # PUSH command matches, message or not. The boundary used to need
+        # whitespace or end-of-string after the flag, so `"no --force"` (quote
+        # straight after) slipped past - the same gap let `bash -c "git push
+        # --force"` through. A closing quote ends a flag now (QA 16/11/2026):
+        # both spellings are blocked. Over-blocking on a push is the safe side of
+        # that line and the model can reword.
         self.assertBlocked(f'{PUSH} origin dev -m "no {FORCE} here"', 'forced push')
-        self.assertAllowed(f'{PUSH} origin dev -m "no {FORCE}"')
+        self.assertBlocked(f'{PUSH} origin dev -m "no {FORCE}"', 'forced push')
 
     def test_but_the_sql_and_rm_rules_are_NOT_scoped(self):
         # The asymmetry is real and worth knowing before someone "fixes" it: an
