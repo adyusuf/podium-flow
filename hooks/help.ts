@@ -51,7 +51,7 @@ export const STAGE_HELP: Record<string, string> = {
   test: 'test: what is promoted from dev for the test environment.',
   prod: 'prod: what is promoted from test for production.',
 }
-export const STAGE_TAIL = 'The commit origin holds, and how many local commits are not pushed yet; under it, any gate waived on the commits that came in.'
+export const STAGE_TAIL = 'The commit origin holds, and how many local commits are not pushed yet; under it, any gate waived on the commits waiting to come in.'
 
 /** Every gate step row's card, after the step's own heading from the gate (gate-lib.sh), so no step is named here. */
 export const STEP_HELP = 'a step of the shared gate. Unticked, it does not run on that branch; the gate reports it as waived and the merge names it in Gate-Waived, never as passed.'

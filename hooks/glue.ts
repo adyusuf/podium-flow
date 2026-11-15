@@ -2,7 +2,7 @@
 // the engine: no import from it. Each function takes the engine's `$` (typed in port.ts as only the calls it makes), so a
 // test hands in a fake one; register.tsx keeps the hooks and the drawing.
 import { outsideRepository, type Scope } from './boxes'
-import { countOf, overrideNote, plannedStages, refSet, waivedLines, waivedRange } from './choose'
+import { countOf, overrideNote, plannedStages, refSet, WAIVED_LOG_FORMAT, waivedLines, waivedRange } from './choose'
 import { warnings } from './notices'
 import {
   type Engine, type Layer, promotion, type Ran, scriptPath, sessionId, settings, settingsError, settingsProblems, type SettingsData,
@@ -70,7 +70,7 @@ async function readPromotion($: Engine) {
     const tip = await git(['rev-parse', '--short', `origin/${stage.branch}`])
     const ahead = stage.local ? await git(['rev-list', '--count', `origin/${stage.branch}..${stage.branch}`]) : null
     const range = waivedRange(stage)
-    const log = range ? await git(['log', '--format=@@%h%n%B', range]) : null
+    const log = range ? await git(['log', `--format=${WAIVED_LOG_FORMAT}`, range]) : null
     const unreadable = failure('rev-parse', tip) || failure('rev-list', ahead) || failure('log', log)
     stages.push({
       branch: stage.branch,

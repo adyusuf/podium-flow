@@ -38,7 +38,7 @@ test('each stage has its origin commit, its unpushed count and the waived gates 
     'for-each-ref': () => ok(REFS),
     'rev-parse': argv => ok(`${argv.at(-1)!.slice('origin/'.length)}1\n`),
     'rev-list': argv => ok(argv.at(-1) === 'origin/dev..dev' ? '2\n' : '0\n'),
-    log: argv => ok(argv.at(-1) === 'origin/prod..origin/test' ? '@@abc1234\nmerge\n\nGate-Waived: e2e (neden: configuration)\n' : ''),
+    log: argv => ok(argv.at(-1) === 'origin/prod..origin/test' ? '\0abc1234\nmerge\n\nGate-Waived: e2e (neden: configuration)\n' : ''),
   }))
   await createGlue().refreshPromotion($)
   expect(stages($.store)).toEqual([
@@ -48,7 +48,7 @@ test('each stage has its origin commit, its unpushed count and the waived gates 
   ])
   // A stage with no local branch is not counted; the first stage has no range to read.
   expect(commands($).filter(one => one.startsWith('rev-list'))).toEqual(['rev-list --count origin/dev..dev', 'rev-list --count origin/test..test'])
-  expect(commands($).filter(one => one.startsWith('log')).length).toBe(2)
+  expect(commands($).filter(one => one.startsWith('log'))).toEqual(['log --format=%x00%h%n%B origin/test..origin/dev', 'log --format=%x00%h%n%B origin/prod..origin/test'])
 })
 
 const FILE = '/status/s1.json'
