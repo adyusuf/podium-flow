@@ -37,8 +37,8 @@ Rules: `${CLAUDE_PLUGIN_ROOT}/modes/README.md` › *Session start*.
 
 Priority order: **the session's choice** → the project's `.claude/mode` → the configuration (`mode`, default C).
 One script answers it: `podium_config.py` reads the session layer, then the project's `.claude/podium.json` with its
-`.claude/mode` and `.claude/mode-model` (the project's `podium.json` beats them when it sets the key), then the user's
-file and the shipped defaults.
+`.claude/mode` and `.claude/mode-model` (the project's `podium.json` beats them when it sets the key; a letter with no
+`mode-model` beside it means `keep`, every agent on its defined model), then the user's file and the shipped defaults.
 
 ```bash
 SID="<this session's id: the 'this session is <id>' line of the start-of-session block; empty if there is none>"

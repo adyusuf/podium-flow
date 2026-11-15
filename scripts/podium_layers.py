@@ -78,7 +78,10 @@ MODE_FILES = (('mode', 'mode'), ('mode-model', 'mode_model'))
 def read_mode_files(folder):
     """({setting: value}, problems) from <folder>/mode and <folder>/mode-model. The first non-empty line is the value,
     checked like a `set` (a letter A-E in any case; a model of MODELS); anything else is a problem line and that file is
-    ignored, while the other file and the project's podium.json still count. A missing file sets nothing."""
+    ignored, while the other file and the project's podium.json still count. A missing file sets nothing.
+
+    A valid letter with no usable mode-model beside it means every agent on its defined model (CLAUDE.md #27, "the letter
+    alone"; modes/README.md): `mode_model` is then `keep`, so the user's or the shipped override never leaks under it."""
     values, problems = {}, []
     for name, key in MODE_FILES:
         path = os.path.join(folder, name)
@@ -90,6 +93,8 @@ def read_mode_files(folder):
             values[key] = check(key, word)
         except (OSError, ValueError, ConfigError) as error:
             problems.append('%s: %s (this file is ignored)' % (path, error))
+    if 'mode' in values:
+        values.setdefault('mode_model', 'keep')
     return values, problems
 
 

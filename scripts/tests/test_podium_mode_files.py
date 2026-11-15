@@ -69,11 +69,37 @@ class ModeFiles(base.Tool):
             self.assertEqual((0, 'sonnet\n'), (code, out), text)
             self.assertIn(os.path.join('.claude', 'mode-model'), err, text)
 
-    def test_a_bad_mode_model_leaves_the_good_mode_letter_in_force(self):
+    def test_a_bad_mode_model_leaves_the_good_mode_letter_in_force_alone(self):
         self.write('mode', 'B\n')
         self.write('mode-model', 'gpt\n')
         self.assertEqual(('B', 'project'), self.pair('mode'))
-        self.assertEqual(('sonnet', 'default'), self.pair('mode_model'))
+        self.assertEqual(('keep', 'project'), self.pair('mode_model'))    # the ignored file counts as absent: the letter alone
+
+    def test_the_letter_alone_runs_every_agent_on_its_defined_model(self):
+        # CLAUDE.md #27, modes/README.md: a project letter without its own mode-model means the defined models; the user's
+        # or the shipped mode_model must not leak under it.
+        self.run_tool('set', 'mode_model', 'haiku')
+        self.write('mode', 'D\n')
+        self.assertEqual(('keep', 'project'), self.pair('mode_model'))
+        self.assertEqual(('keep\n', '', 0), self.run_tool('get', 'mode_model'))
+        rows = {row['role']: row for row in json.loads(self.run_tool('agents', '--json')[0])}
+        self.assertEqual('opus', rows['qa']['runs_on'])
+        self.assertEqual(('haiku', 'user'), self.pair('mode_model', '--user'))
+        self.write('mode-model', 'fable\n')                              # its own mode-model wins
+        self.assertEqual(('fable', 'project'), self.pair('mode_model'))
+        os.remove(os.path.join(self.repo, '.claude', 'mode-model'))
+        self.run_tool('set', 'mode_model', 'sonnet', '--project')          # and so does the project's podium.json
+        self.assertEqual(('sonnet', 'project'), self.pair('mode_model'))
+        self.run_tool('set', '--session', 's1', 'mode_model', 'haiku')     # a session choice beats them all
+        self.assertEqual(('haiku', 'session'), self.pair('mode_model', '--session', 's1'))
+        self.run_tool('unset', 'mode_model', '--project')
+        self.assertEqual(('keep', 'project'), self.pair('mode_model'))
+
+    def test_no_letter_or_a_bad_letter_leaves_the_user_mode_model(self):
+        self.run_tool('set', 'mode_model', 'haiku')
+        self.assertEqual(('haiku', 'user'), self.pair('mode_model'))
+        self.write('mode', 'Z\n')
+        self.assertEqual(('haiku', 'user'), self.pair('mode_model'))
 
     def test_agents_and_the_session_start_block_follow_the_mode_files(self):
         self.write('mode', 'B\n')

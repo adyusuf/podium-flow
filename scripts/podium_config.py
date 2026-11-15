@@ -16,9 +16,9 @@
 
 Layers, lowest first: defaults/podium.json (shipped with the plugin) < ~/.claude/podium.json (the user's own
 defaults) < <project>/.claude/podium.json (committed; the project's .claude/mode and .claude/mode-model are read into
-this layer as `mode` and `mode_model` where the file does not set them) < the session's own layer (podium_session.py:
-what the rail boxes change; gone with the session). The user changes them with the
-`podium:config` skill; Claude never asks what a setting already answers (global rule #34).
+this layer as `mode` and `mode_model` where the file does not set them; a letter with no mode-model is `keep`) < the
+session's own layer (podium_session.py: what the rail boxes change; gone with the session). The user changes them with
+the `podium:config` skill; Claude never asks what a setting already answers (global rule #34).
 
 Keys are dotted (`push.prod`); files hold them nested. A key is validated against SCHEMA, a file that does not
 parse or holds one invalid value is reported (show, get on stderr, context) and ignored as a whole (the layer below
