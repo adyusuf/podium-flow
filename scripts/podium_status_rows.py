@@ -12,7 +12,9 @@ FIELDS = ('item', 'state', 'figure', 'waiting')
 # A step's own fields: a row written by `row` leaves them empty. `since` (epoch seconds) and `tools` (tool calls so far)
 # and `model` (only when the hook payload names it) belong to the row a subagent's hooks write: its time and tool count
 # are measured from them.
-STEP_FIELDS = ('percent', 'blocker', 'agent', 'note', 'since', 'tools', 'model')
+# `label` (`<description> (<model>)`), `spent` (seconds of the runs before this one) and `resumed` (how many times the
+# agent was resumed) are the subagent row's too (layer 2, 16/11/2026); a file written before them reads them as empty.
+STEP_FIELDS = ('percent', 'blocker', 'agent', 'note', 'since', 'tools', 'model', 'label', 'spent', 'resumed')
 # `failed` (05/11/2026) is a step that ended in error: not open (nothing is left to finish) and not closed (it must stay
 # visible until someone looks at it), so `trim` keeps it longer than a finished step.
 STATES = ('not started', 'running', 'done', 'blocked', 'did not run', 'failed')

@@ -68,8 +68,10 @@ class AgentRows(unittest.TestCase):
         self.assertIn(WRITER_NAME + ' | task | running', self.run_tool('show')[0])
         self.run_hook('subagent-stop', dict(WRITER, duration_ms=125000, tool_uses=7))
         row = self.rows(WRITER_NAME)[0]
-        self.assertEqual(('done', '100', '2m05s · 7 tool uses'), (row['state'], row['percent'], row['note']))
-        self.assertIn(WRITER_NAME + ' | task | done | 100%', self.run_tool('show')[0])
+        # Done with no % either (layer 2, 16/11/2026): nothing measures how much of an agent's work is done.
+        self.assertEqual(('done', '', '2m05s · 7 tool uses'), (row['state'], row['percent'], row['note']))
+        self.assertIn(WRITER_NAME + ' | task | done', self.run_tool('show')[0])
+        self.assertNotIn('100%', self.run_tool('show')[0])
 
     def test_a_running_row_counts_the_agents_tool_calls_and_the_time_since_it_started(self):
         self.run_hook('subagent', dict(DEVELOPER, model='sonnet'))

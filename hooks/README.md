@@ -14,8 +14,8 @@ All of them run locally; none opens a network connection.
 | `UserPromptSubmit`, `PostToolUse` (Agent, Bash) | `scripts/podium_config.py notify` | when a setting changed since the session last looked, says so; keeps what it saw in `~/.claude/podium-seen/<session id>` |
 | `SessionStart`, `UserPromptSubmit`, `Stop`, `StopFailure` | `scripts/podium_status.py hook` | keeps every session's Status box alive: a session starts `waiting for you`, your message's first line becomes *Now* (`working on: …`; a system-started turn leaves it), the end of a turn sets `waiting for you` or `waiting for background work`; Claude's rows stay. The mod does the same after an interrupted turn. Writes only `~/.claude/podium-status/<session id>.json`, pruned after 14 days |
 | `UserPromptSubmit` (same hook) | `scripts/podium_status.py hook prompt` | also reminds Claude to analyse the message and write or insert its steps first |
-| `SubagentStart` | `scripts/podium_status.py hook subagent` | opens the subagent's `task` row in this session's Status box (running, no %) and tells the agent not to write it |
-| `SubagentStop` | `scripts/podium_status.py hook subagent-stop` | closes that row as done (100%) or failed, with the measured duration, tool calls and output tokens |
+| `SubagentStart` | `scripts/podium_status.py hook subagent` | opens the subagent's `task` row in this session's Status box (running, no %), titled `<description> (<model>)` from the agent's meta file, and tells the agent not to write it; a resumed agent reopens its row (`resumed ×N`, time and tool calls carried on) |
+| `SubagentStop` | `scripts/podium_status.py hook subagent-stop` | closes that row as done (no %) or failed - `failed: rate limit` when the agent's transcript ends on a usage limit - with the measured duration, tool calls and output tokens |
 | `PostToolUse` (every tool) | `scripts/podium_status.py hook tool` | a subagent's tool call refreshes its row's tool count and time; a call of the session itself writes nothing |
 | `PreToolUse` (Edit, Write, NotebookEdit, Bash) | `scripts/podium_status.py hook guard` | with *Plan* on `block`, refuses a code edit or a `git commit` (also inside `if`/`for`/`( )`/`$( )`, behind `env`, `command`, `sudo`, `exec`, `time`, `nohup`, `!`, `{`, git options) until the Status box holds steps, and refuses a payload it cannot judge; Claude's bookkeeping under `~/.claude` and temp files are never refused, except a git work tree in a temp folder. Bash file writes (`sed -i`, `>`, `tee`) are not judged |
 | `PreToolUse` (Bash) | `scripts/guard-destructive.sh` | refuses the never-do commands (forced push, `--mirror`, a remote branch deletion or `--prune`, push to `main`, abbreviated options too, `--no-verify` and `git commit -n`, `DROP`/`TRUNCATE`, a recursive `rm` on `/` `~` `$HOME` `.` `*`); a push to `prod` is not judged here, it follows `push.prod` in the configuration |
@@ -52,7 +52,7 @@ It opens no network connection. The code is split so the drawing and the data pa
 decisions), `notices.ts` (chat lines), `glue.ts` (the data paths: reading the settings, the branches and the status file,
 a press and its queue, the interrupted turn) and `port.ts` (the few engine calls they make, typed so a test hands in a fake
 `$`, plus the plugin-script lookup and the refresh queue); `register.tsx` is the engine glue: the hooks and the drawing.
-Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (147 tests; `fake.test.ts`
+Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (148 tests; `fake.test.ts`
 is the shared fake `$`, with no test of its own).
 
 ## The four boxes
