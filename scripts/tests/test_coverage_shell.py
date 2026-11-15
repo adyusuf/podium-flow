@@ -42,11 +42,12 @@ class ShellCoverageRunsEndToEnd(Repo):
         '</lines></class>'
         '</classes></package></packages></coverage>\n')
 
-    def build(self, hits_second_line, failure=None, targets_file=None):
+    def build(self, hits_second_line, failure=None, targets_file=None, extra=(), env_extra=None):
         """A repo with one shell script, one trivial test, and a stub kcov whose
         reports cover 1 or 2 of that script's 2 lines. `failure` makes the trivial
         test fail with that message, standing in for a red suite; `targets_file`,
-        when given, receives the script path each kcov run was handed."""
+        when given, receives the script path each kcov run was handed; `extra` are more files (relative paths) no
+        test runs; `env_extra` is added to the run's environment."""
         # ⚠️ realpath, not the tempfile path. On macOS /var is a symlink to
         # /private/var, so `git rev-parse --show-toplevel` inside the script
         # reports the physical path while tempfile hands out the logical one —
@@ -61,6 +62,10 @@ class ShellCoverageRunsEndToEnd(Repo):
         target = os.path.join(root, 'scripts', 'thing.sh')
         with open(target, 'w', encoding='utf-8') as handle:
             handle.write('#!/usr/bin/env bash\ntrue\ntrue\n')
+        for name in extra:
+            os.makedirs(os.path.dirname(os.path.join(root, name)), exist_ok=True)
+            with open(os.path.join(root, name), 'w', encoding='utf-8') as handle:
+                handle.write('#!/usr/bin/env bash\ntrue\n')
         # ⚠️ NOT copied. The original is run with the temp repo as cwd — it
         # resolves its root with `git rev-parse --show-toplevel` and cd's there,
         # so behaviour is identical, and a tracer then attributes the run to the
@@ -101,7 +106,7 @@ class ShellCoverageRunsEndToEnd(Repo):
                    '[ -n "$target" ] && [ -f "$target" ] && sh "$target" >/dev/null 2>&1\n'
                    'exit 0\n')
         env = {'PATH': self.bin + os.pathsep + os.environ['PATH'],
-               'COVERAGE_BASH': '/bin/sh'}
+               'COVERAGE_BASH': '/bin/sh', **(env_extra or {})}
         result = subprocess.run(['bash', SHELL_COVERAGE],
                                 cwd=root, capture_output=True, text=True,
                                 env=dict(os.environ, **env))
@@ -122,6 +127,26 @@ class ShellCoverageRunsEndToEnd(Repo):
         self.assertIn('50.0%', out)
         self.assertIn('below 80%', out)
         self.assertEqual(1, code)
+
+    @KCOV_RUN
+    def test_a_threshold_below_80_is_raised_to_80(self):
+        # F-013, rule #29: 80 is a floor - 50% must not pass because COVERAGE_MIN said 10.
+        out, code = self.build(hits_second_line=0, env_extra={'COVERAGE_MIN': '10'})
+        self.assertIn('raised to 80', out)
+        self.assertIn('below 80%', out)
+        self.assertEqual(1, code, out)
+
+    @KCOV_RUN
+    def test_a_script_no_test_runs_is_NOT_MEASURED_and_blocks(self):
+        # F-014: kcov reports only what it traced, so an untested script used to leave the denominator silently.
+        # A script under scripts/tests/ is the measurement, not the product, and stays out.
+        out, code = self.build(hits_second_line=1, extra=('scripts/other.sh', 'scripts/sub/deep.sh',
+                                                          'scripts/tests/helper.sh'))
+        self.assertIn('NOT MEASURED: no test runs scripts/other.sh', out)
+        self.assertIn('NOT MEASURED: no test runs scripts/sub/deep.sh', out)
+        self.assertNotIn('helper.sh', out)
+        self.assertNotIn('at or above', out)
+        self.assertEqual(3, code, out)
 
     @KCOV_RUN
     def test_the_traced_run_count_is_reported(self):

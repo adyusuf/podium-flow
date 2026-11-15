@@ -68,7 +68,7 @@
 #   COVERAGE_CMD="bash scripts/coverage.sh"             # must MEASURE (run the tests), not read an old
 #                                                       # report, and exit non-zero below the threshold
 #   COVERAGE_MIN=80                                     # NOT in a project's conf (standards/13 §8a): 80 is
-#                                                       # the default here; the env may only RAISE it (#29)
+#                                                       # the floor; a lower value is raised to 80 (#29)
 #   SAST_CMD="bash scripts/codeql-scan.sh"              # default: scripts/codeql-scan.sh
 #   BACKCOMPAT_CMD="bash scripts/api-compat.sh"         # default: scripts/backward-compat-scan.sh
 #   SECRET_CMD="gitleaks detect --no-banner --redact"   # default: the same
@@ -126,6 +126,11 @@ cd "$ROOT" || exit 2
 # absence is handled by the [ -f ] test and by each step's own default.
 [ -f scripts/merge-gate.conf ] && . scripts/merge-gate.conf
 COVERAGE_MIN="${COVERAGE_MIN:-80}"
+# Rule #29: 80 is a floor. A higher value applies; a lower one, or anything but a whole number, is raised to 80.
+if ! [[ "$COVERAGE_MIN" =~ ^[0-9]+$ ]] || [ "$COVERAGE_MIN" -lt 80 ]; then
+  echo "COVERAGE_MIN=$COVERAGE_MIN is not a whole number of at least 80 (the floor of rule #29) - raised to 80"; COVERAGE_MIN=80
+fi
+export COVERAGE_MIN   # the coverage command measures against the same threshold
 
 # Fail closed: a copy of this file without its libraries must not run a partial gate.
 for lib in gate-lib.sh gate-lib-panel.sh gate-lib-node.sh gate-lib-prod.sh; do

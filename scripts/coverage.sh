@@ -21,12 +21,21 @@
 # with `brew install bash`); both are probed, and a missing tool exits 3, which blocks
 # exactly like a failure (#29). The tests must run the ORIGINAL scripts, not copies:
 # a tracer attributes execution to the file it ran, so a copied script measures 0%.
+#
+# What is left out of the denominator (#29) is written in three places, one per tool: .coveragerc (Python: the
+# tests), this file (JavaScript: the tests; TypeScript: the tests, .d.ts and the glue file ts_glue) and
+# scripts/coverage-shell.sh (shell: the tests). A change to one is checked against the other two.
 set -uo pipefail
 
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not inside a git repository" >&2; exit 2; }
 cd "$root" || exit 2
 venv="${COVERAGE_VENV:-$HOME/.cache/claude-standards/venv}"
 min="${COVERAGE_MIN:-80}"
+# Rule #29: 80 is a floor (as in gate-core.sh). A higher value applies; a lower one, or anything but a whole number, is raised to 80.
+if ! [[ "$min" =~ ^[0-9]+$ ]] || [ "$min" -lt 80 ]; then
+  echo "COVERAGE_MIN=$min is not a whole number of at least 80 (the floor of rule #29) - raised to 80"; min=80
+fi
+export COVERAGE_MIN="$min"   # coverage-shell.sh below reads it
 status=0
 # A Windows venv keeps its executables in Scripts/, not bin/.
 vbin="$venv/bin"
