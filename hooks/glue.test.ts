@@ -140,3 +140,18 @@ test('two quick presses run one after another, in the order pressed', async () =
   await glue.click($, 'push.prod', 'no', 'session')
   expect(events).toEqual(['start mode', 'end mode', 'start push.prod', 'end push.prod'])
 })
+
+test('a press whose run is rejected says so in a toast and the log, and the next press still runs (F-030)', async () => {
+  const script = configScript(layers())
+  let spawn = false
+  const $ = fake(argv => {
+    if (argv[2] === 'set' && !spawn) { spawn = true; throw new Error('spawn python3 ENOENT') }
+    return script(argv)
+  })
+  const glue = createGlue()
+  await glue.click($, 'mode', 'B', 'session')
+  expect($.toasts).toEqual(['The change could not be made: Error: spawn python3 ENOENT'])
+  expect($.logs).toEqual(['podium: a press in the Settings box failed: Error: spawn python3 ENOENT'])
+  await glue.click($, 'mode', 'B', 'session')
+  expect(commands($).filter(one => one.startsWith('set')).length).toBe(2)
+})

@@ -152,10 +152,14 @@ export function createGlue() {
     return statusQueue
   }
 
-  // Clicks run one after another: two settings changed quickly must not race each other's read-modify-write.
+  // Clicks run one after another: two settings changed quickly must not race each other's read-modify-write. A press
+  // that fails (the script cannot be spawned) is said in a toast and the log, never dropped (F-030); the next one still runs.
   let queue: Promise<void> = Promise.resolve()
   function click($: Engine, key: string, value: string, scope: Scope): Promise<void> {
-    queue = queue.then(() => setSetting($, key, value, scope, refreshSettings)).catch(() => undefined)
+    queue = queue.then(() => setSetting($, key, value, scope, refreshSettings)).catch(error => {
+      $.ui.log(`podium: a press in the Settings box failed: ${String(error).slice(0, 200)}`)
+      $.ui.toast(`The change could not be made: ${String(error).slice(0, 160)}`)
+    })
     return queue
   }
 
