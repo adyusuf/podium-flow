@@ -38,7 +38,7 @@ test('the status file is read as text: only strings are kept, anything else is n
   expect(parseStatus('[1, 2]')).toBe(null)
   expect(parseStatus('null')).toBe(null)
   const odd = parseStatus(JSON.stringify({ now: 5, rows: [{ item: 'a', state: 1 }, 'x', null] }))
-  expect(odd).toEqual({ now: '', next: '', updated: '', budget: '', rows: [{ item: 'a', state: '', figure: '', waiting: '', percent: '', blocker: '', agent: '', note: '' }] })
+  expect(odd).toEqual({ now: '', next: '', updated: '', budget: '', rows: [{ item: 'a', state: '', figure: '', waiting: '', percent: '', blocker: '', agent: '', note: '', label: '' }] })
   // A percentage is digits only; anything else reads as not given.
   expect(parseStatus(JSON.stringify({ rows: [{ item: 'a', percent: '45' }, { item: 'b', percent: '45%' }, { item: 'c', percent: 7 }] }))!.rows.map(row => row.percent)).toEqual(['45', '', ''])
 })
@@ -170,7 +170,7 @@ test('a state is a short word and its detail; the note holds the detail, the not
   expect(splitState('blocked (approval)')).toEqual({ short: 'stuck', detail: '(approval)' })
   expect(splitState('gate running')).toEqual({ short: '', detail: 'gate running' })
   expect(splitState('doneish')).toEqual({ short: '', detail: 'doneish' })
-  const row = (state: string) => ({ item: 'x', state, figure: '', waiting: '', percent: '', blocker: '', agent: '', note: '' })
+  const row = (state: string) => ({ item: 'x', state, figure: '', waiting: '', percent: '', blocker: '', agent: '', note: '', label: '' })
   // A failed step (a subagent that ended in error) is its own state.
   expect(splitState('failed').short).toBe('fail')
   expect(noteOf({ ...row('running: half'), note: 'n', figure: '3/8' })).toBe('half · n · 3/8')

@@ -71,3 +71,16 @@ test('a group header has an (i) and a card saying what it holds; an agent header
   expect([STATUS_HELP.stuck, STATUS_HELP.session, STATUS_HELP.subagent].every(card => cards.includes(card))).toBe(true)
   for (const group of STATE_GROUPS) expect(STATUS_HELP[group.id].length > 0).toBe(true)
 })
+
+test('a subagent is titled by its label, <description> (<model>), and keeps its fold id (layer 2, 16/11/2026)', () => {
+  const data = table([
+    { item: 'task', state: 'running', agent: 'podium:qa ae234b', label: 'QA review of ti-batch (Sonnet 5.5)' },
+    { item: 'task', state: 'done', agent: 'podium:dev a849d9' },
+  ])
+  const titles = shown(statusBody(ui, data, OPEN))
+  expect(titles.includes('QA review of ti-batch (Sonnet 5.5)')).toBe(true)
+  expect(titles.includes('podium:qa ae234b')).toBe(false)
+  expect(titles.includes('podium:dev a849d9')).toBe(true)          // no label: the agent's name, as before
+  const keys = all(statusBody(ui, data, OPEN), 'Button').map(button => String(button.props.key))
+  expect(keys.includes('fold-state:run:podium:qa ae234b')).toBe(true)
+})
