@@ -248,7 +248,7 @@ class CoverageWithAFakeVenv(FakeVenv):
     def test_a_threshold_below_80_is_raised_to_80_for_every_codebase(self):
         # F-013, rule #29: 80 is a floor. A lower COVERAGE_MIN (or one that is not a whole number) becomes 80, for the
         # Python report and for the shell helper it hands the threshold to; a higher one applies as given.
-        for value, expected in (('10', '80'), ('abc', '80'), ('90', '90')):
+        for value, expected in (('10', '80'), ('abc', '80'), ('90', '90'), ('85.5', '86')):  # a decimal rounds up (QA 16/11/2026)
             with self.subTest(value=value):
                 shutil.rmtree(os.path.join(self.root, '.venv'), ignore_errors=True)
                 venv = self.venv('#!/bin/sh\ncase "$1" in report) echo "report $*"; exit 0 ;; esac\nexit 0\n')
