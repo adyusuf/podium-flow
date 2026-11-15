@@ -5,8 +5,9 @@ import { type FoldId, isFolded, type Ui } from './boxes'
 import { explained, helpCard, INDENT } from './controls'
 import { STATUS_HELP } from './help'
 
-/** A step (user decision 02/11/2026): `percent` done ('' when not given), `blocker`, and `agent` ('' = this session). */
-type StatusRow = { item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string; note: string }
+/** A step (user decision 02/11/2026): `percent` done ('' when not given), `blocker`, `agent` ('' = this session) and, on a
+ *  subagent's row, `label` - `<description> (<model>)`, the title its accordion shows (layer 2, 16/11/2026). */
+type StatusRow = { item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string; note: string; label: string }
 /** `budget` (user decision 06/11/2026): this session's measured spend against the panel's budget, one line; shown, never a stop. */
 export type StatusData = { now: string; next: string; rows: StatusRow[]; updated: string; budget: string }
 
@@ -71,7 +72,7 @@ export function parseStatus(text: string): StatusData | null {
       item: clean(row.item), state: clean(row.state), figure: clean(row.figure), waiting: clean(row.waiting),
       // Over 100 reads as 100, as the script stores it (F-038).
       percent: /^\d{1,3}$/.test(clean(row.percent)) ? String(Math.min(100, Number(clean(row.percent)))) : '', blocker: clean(row.blocker),
-      agent: clean(row.agent), note: clean(row.note),
+      agent: clean(row.agent), note: clean(row.note), label: clean(row.label),
     }))
   return { now: clean(one.now), next: clean(one.next), rows: trim(rows), updated: clean(one.updated), budget: clean(one.budget) }
 }
@@ -206,8 +207,10 @@ export function statusBody(ui: Ui, data: StatusData | null, folds: AgentFolds = 
   const agentBlock = (group: StateGroup, one: { agent: string; rows: StatusRow[] }) => {
     const name = one.agent || 'this session'
     const id: FoldId = `state:${group}:${name}`
+    // A subagent is titled by its label (`<description> (<model>)`) when the hooks found one; the fold keeps its id.
+    const title = one.rows.find(row => row.label !== '')?.label || name
     return h(ui.Box, { flexDirection: 'column', marginLeft: INDENT },
-      header(id, `status-${group}-${name}`, name, one.agent ? STATUS_HELP.subagent : STATUS_HELP.session, one.rows.length),
+      header(id, `status-${group}-${name}`, title, one.agent ? STATUS_HELP.subagent : STATUS_HELP.session, one.rows.length),
       folds.folded(id) ? null : h(ui.Box, { flexDirection: 'column', marginLeft: INDENT }, stepRows(name, one.rows)))
   }
   const groupBlock = (group: { id: StateGroup; title: string; rows: StatusRow[] }) => {

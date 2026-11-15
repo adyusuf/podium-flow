@@ -40,7 +40,7 @@ export const ROW_HELP: Record<string, string> = {
 export const STATUS_HELP = {
   budget: 'What this session has spent so far (tokens x API list price) against the Budget setting. Information only: work never stops on it.',
   session: 'This session\'s steps in this group, written before the work starts, with their state, measured % and notes.',
-  subagent: 'One subagent\'s steps in this group, written by the hooks when it starts and stops; its name is its role.',
+  subagent: 'One subagent\'s steps in this group, written by the hooks when it starts and stops; its title is its task and model (else its role).',
   // The state groups (user decision 15/11/2026): what each holds.
   run: 'Steps at work now, drawn in bold.',
   stuck: 'Steps that are blocked; the line under a step says what blocks it.',
