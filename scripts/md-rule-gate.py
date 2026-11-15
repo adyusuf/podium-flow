@@ -24,7 +24,8 @@ Matching is normalized (markdown decoration, whitespace and case are stripped),
 because simplification may reformat a sentence — but the SUBSTANCE of the rule
 and the identifiers inside it must survive verbatim.
 
-Exit code: 0 = passed, 1 = a rule was lost (in which case DO NOT merge).
+Exit code: 0 = passed, 1 = a rule was lost (in which case DO NOT merge),
+2 = usage: a wrong argument count, or a file that cannot be read.
 """
 import re
 import sys
@@ -176,8 +177,16 @@ def main() -> int:
     if len(sys.argv) != 3:
         print(__doc__)
         return 2
-    old = open(sys.argv[1], encoding="utf-8").read()
-    new = open(sys.argv[2], encoding="utf-8").read()
+    # A missing or unreadable file used to end in a traceback; it is a usage error, and the gate is closed.
+    try:
+        old = open(sys.argv[1], encoding="utf-8").read()
+        new = open(sys.argv[2], encoding="utf-8").read()
+    except OSError as error:
+        print(f"✗ Cannot read {error.filename}: {error.strerror} — the gate counts as closed.")
+        return 2
+    except UnicodeDecodeError as error:
+        print(f"✗ A file is not UTF-8 text ({error.reason}) — the gate counts as closed.")
+        return 2
     # Normalized line by line: length and negation are measured PER LINE.
     new_lines = [normalize(l) for l in new.splitlines() if normalize(l)]
 

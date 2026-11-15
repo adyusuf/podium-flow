@@ -6,10 +6,12 @@ CLAUDE_CODE_PLUGIN_DIRS follows; the old marketplace link stays for sessions sti
 import json
 import os
 import sys
+import types
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from plugin_setup_helpers import Case, Fake, NEW, OLD, setup  # noqa: E402
+from plugin_setup_helpers import CONFIG, Case, Fake, NEW, OLD, setup  # noqa: E402
 
 OLD_DIR = '/home/u/.claude/plugins/marketplaces/adyusuf-marketplace'
 
@@ -76,6 +78,13 @@ class Legacy(Case):
         self.assertIn(f'claude plugin marketplace remove {setup.LEGACY_MARKETPLACE}', out)
         self.assertIn('✓ podium@podium-marketplace', out)
 
+    def test_an_old_link_without_a_branch_links_the_default_branch_github_was_asked_about(self):
+        fake = LegacyFake(self.home)
+        del fake.legacy_market['ref']
+        self.assertEqual(0, self.go(fake)[0])
+        self.assertIn(['git', 'ls-remote', setup.GIT_URL, 'HEAD'], fake.commands)
+        self.assertIn(['marketplace', 'add', setup.REPO], self.claude(fake))
+
     def test_it_asks_first_and_a_no_changes_nothing(self):
         fake = LegacyFake(self.home)
         code, out, _ = self.go(fake, answer='n')
@@ -109,6 +118,21 @@ class Legacy(Case):
         self.assertEqual(0, code)
         self.assertIn(f'both are installed now; remove the old one with: claude plugin uninstall {setup.LEGACY_ID}', out)
 
+    def test_a_rerun_after_a_failed_legacy_removal_retries_it_and_the_old_link_alone_does_not_retrigger(self):
+        fake = LegacyFake(self.home, fail=('claude plugin uninstall',))
+        self.assertEqual(0, self.go(fake)[0])
+        self.assertTrue(fake.legacy_installed)
+        fake.fail, fake.commands = set(), []
+        code, out, _ = self.go(fake)
+        self.assertEqual(0, code)
+        self.assertEqual(self.claude(fake)[1:], [['uninstall', setup.LEGACY_ID, '--keep-data', '--scope', 'user']])
+        self.assertFalse(fake.legacy_installed)
+        fake.commands = []
+        code, out, _ = self.go(fake)                          # only the old link is left now: an ordinary run
+        self.assertEqual((0, False), (code, 'old name' in out))
+        self.assertIsNotNone(fake.legacy_market)
+        self.assertEqual(fake.verbs(), ['claude plugin marketplace', 'git'])
+
     def test_a_disabled_old_install_stays_disabled_and_the_desktop_folder_follows(self):
         path = self.settings({'enabledPlugins': {setup.LEGACY_ID: False}, 'env': {'CLAUDE_CODE_PLUGIN_DIRS': OLD_DIR}})
         fake = LegacyFake(self.home)
@@ -121,6 +145,85 @@ class Legacy(Case):
                              json.load(handle)['env']['CLAUDE_CODE_PLUGIN_DIRS'])
         backup = os.path.join(self.home, '.claude-standards', 'backups')
         self.assertTrue(any('settings.json' in files for _, _, files in os.walk(backup)))
+
+    def test_the_legacy_move_leaves_podium_json_byte_identical(self):
+        config = '{ "mode":"C",\t"note": "Şişman — İstanbul" }'.encode('utf-8')      # odd spacing, no newline at the end
+        path = os.path.join(self.home, '.claude', 'podium.json')
+        self.settings({'enabledPlugins': {setup.LEGACY_ID: False}, 'env': {'CLAUDE_CODE_PLUGIN_DIRS': OLD_DIR}})
+        with open(path, 'wb') as handle:
+            handle.write(config)
+        fake = LegacyFake(self.home)
+        fake.enable = lambda: None
+        self.assertEqual(0, self.go(fake)[0])
+        self.assertIn(['disable', setup.PLUGIN_ID], self.claude(fake))   # the move did its whole work
+        with open(path, 'rb') as handle:
+            self.assertEqual(config, handle.read())
+
+    def test_the_legacy_move_backs_up_podium_json_before_it_changes_anything(self):
+        os.makedirs(os.path.join(self.home, '.claude'), exist_ok=True)
+        with open(os.path.join(self.home, '.claude', 'podium.json'), 'wb') as handle:
+            handle.write(CONFIG)
+        fake = LegacyFake(self.home, fail=('claude plugin marketplace add',))     # the very first change fails
+        code, out, _ = self.go(fake)
+        self.assertEqual(2, code)
+        backups = os.path.join(self.home, '.claude-standards', 'backups')
+        copies = [os.path.join(root, 'podium.json') for root, _, files in os.walk(backups) if 'podium.json' in files]
+        self.assertEqual(1, len(copies))
+        self.assertTrue(os.path.basename(os.path.dirname(copies[0])).startswith('plugin-setup-'))
+        with open(copies[0], 'rb') as handle:
+            self.assertEqual(CONFIG, handle.read())
+        self.assertIn(f'backup    {os.path.dirname(copies[0])}/podium.json', out)
+
+    def test_an_unreadable_settings_file_is_said_and_left_alone_and_the_move_goes_on(self):
+        path = os.path.join(self.home, '.claude', 'settings.json')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        broken = ('{"enabledPlugins": {"%s": false}, "env": {"CLAUDE_CODE_PLUGIN_DIRS": "%s"' % (setup.LEGACY_ID, OLD_DIR))
+        with open(path, 'w', encoding='utf-8') as handle:
+            handle.write(broken)
+        fake = LegacyFake(self.home)
+        fake.enable = lambda: None
+        code, out, _ = self.go(fake)
+        self.assertEqual(0, code)
+        self.assertIn(f'! {path} cannot be read or is not valid JSON — it is left as it is', out)
+        self.assertIn(['install', setup.PLUGIN_ID, '--scope', 'user'], self.claude(fake))
+        self.assertNotIn(['disable', setup.PLUGIN_ID], self.claude(fake))
+        with open(path, encoding='utf-8') as handle:
+            self.assertEqual(broken, handle.read())
+
+    def test_the_desktop_folder_rewrite_keeps_other_keys_and_non_ascii_and_is_all_or_nothing(self):
+        data = {'theme': 'İstanbul — Şişman', 'enabledPlugins': {'x@y': True},
+                'env': {'CLAUDE_CODE_PLUGIN_DIRS': OLD_DIR, 'OTHER': 'ğü'}}
+        path = self.settings(data)
+        os.chmod(path, 0o644)                                           # a temp file alone would be 0600
+        with open(path, 'rb') as handle:
+            original = handle.read()
+        fake = LegacyFake(self.home)
+        fake.enable = lambda: None
+        with mock.patch.object(setup.os, 'replace', side_effect=OSError('disk full')):
+            with self.assertRaises(OSError):
+                self.go(fake)
+        with open(path, 'rb') as handle:
+            self.assertEqual(original, handle.read())                 # never half written
+        self.assertEqual(['settings.json'], [n for n in os.listdir(os.path.dirname(path)) if n.endswith('.json')])
+        fake = LegacyFake(self.home)                                    # the first run removed the old plugin
+        fake.enable = lambda: None
+        self.assertEqual(0, self.go(fake)[0])
+        with open(path, encoding='utf-8') as handle:
+            text = handle.read()
+        self.assertIn('İstanbul — Şişman', text)                       # not escaped to İ
+        data['env']['CLAUDE_CODE_PLUGIN_DIRS'] = OLD_DIR.replace('adyusuf-marketplace', 'podium-marketplace')
+        self.assertEqual(data, json.loads(text))
+        self.assertEqual(0o644, os.stat(path).st_mode & 0o777)
+
+    def test_a_windows_desktop_folder_follows_too(self):
+        win = 'C:\\Users\\u\\.claude\\plugins\\marketplaces\\adyusuf-marketplace;D:\\other'
+        path = self.settings({'env': {'CLAUDE_CODE_PLUGIN_DIRS': win}})
+        ctx = types.SimpleNamespace(home=self.home, stamp='s', say=lambda text: None)
+        with mock.patch.object(setup.os, 'sep', '\\'):          # only os.sep: the paths it writes are built by os.path
+            setup.repoint_plugin_dirs(ctx)
+        with open(path, encoding='utf-8') as handle:
+            self.assertEqual(win.replace('adyusuf-marketplace', 'podium-marketplace'),
+                             json.load(handle)['env']['CLAUDE_CODE_PLUGIN_DIRS'])
 
     def test_without_the_old_name_nothing_extra_runs(self):
         fake = Fake(self.home, installed=NEW, market={'name': setup.MARKETPLACE, 'source': 'github', 'repo': setup.REPO, 'ref': 'prod'})

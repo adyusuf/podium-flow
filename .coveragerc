@@ -3,6 +3,8 @@
 # not the product). Nothing else is excluded — no `pragma: no cover`, no main-guard carve-out.
 # Paths come from the environment so subprocesses started by the tests (which run in
 # temporary directories) write into the same data set.
+# The other two exclusion lists (one per tool): scripts/coverage.sh (JavaScript, TypeScript) and
+# scripts/coverage-shell.sh (shell). A change to one is checked against the other two.
 [run]
 source = ${COVERAGE_SRC}
 omit = */tests/*

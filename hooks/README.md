@@ -17,8 +17,8 @@ All of them run locally; none opens a network connection.
 | `SubagentStart` | `scripts/podium_status.py hook subagent` | opens the subagent's `task` row in this session's Status box (running, no %) and tells the agent not to write it |
 | `SubagentStop` | `scripts/podium_status.py hook subagent-stop` | closes that row as done (100%) or failed, with the measured duration, tool calls and output tokens |
 | `PostToolUse` (every tool) | `scripts/podium_status.py hook tool` | a subagent's tool call refreshes its row's tool count and time; a call of the session itself writes nothing |
-| `PreToolUse` (Edit, Write, NotebookEdit, Bash) | `scripts/podium_status.py hook guard` | with *Plan* on `block`, refuses a code edit or a `git commit` until the Status box holds steps; `~/.claude` and temp files are never refused |
-| `PreToolUse` (Bash) | `scripts/guard-destructive.sh` | refuses the never-do commands (forced push, push to `main`, `--no-verify`, `DROP`/`TRUNCATE`, `rm -rf` on `/` `~` `.` `*`); a push to `prod` is not judged here, it follows `push.prod` in the configuration |
+| `PreToolUse` (Edit, Write, NotebookEdit, Bash) | `scripts/podium_status.py hook guard` | with *Plan* on `block`, refuses a code edit or a `git commit` (also inside `if`/`for`/`( )`/`$( )`, behind `env`, `command`, `sudo`, `exec`, `time`, `nohup`, `!`, `{`, git options) until the Status box holds steps, and refuses a payload it cannot judge; Claude's bookkeeping under `~/.claude` and temp files are never refused, except a git work tree in a temp folder. Bash file writes (`sed -i`, `>`, `tee`) are not judged |
+| `PreToolUse` (Bash) | `scripts/guard-destructive.sh` | refuses the never-do commands (forced push, `--mirror`, a remote branch deletion or `--prune`, push to `main`, abbreviated options too, `--no-verify` and `git commit -n`, `DROP`/`TRUNCATE`, a recursive `rm` on `/` `~` `$HOME` `.` `*`); a push to `prod` is not judged here, it follows `push.prod` in the configuration |
 | `PostToolUse` (Edit, Write), `Stop` | `scripts/md-hook.sh` | checks a touched `CLAUDE.md` against its size budget and for dropped rules, and the copied scripts for drift; warns only |
 
 ## The mod (`register.tsx`)
@@ -46,10 +46,14 @@ What the mod runs and reads:
 - A press writes `~/.claude/podium-session/<session id>.json` (this session's layer) or, in the *System* column,
   `~/.claude/podium.json`.
 
-It opens no network connection. The code is split so the drawing can be tested without the engine: `boxes.ts` (Settings,
-Agents, Promotion), `controls.ts` (the shared icons, options, aligned lines and hover cards), `help.ts` (what the hover
-cards say), `gatesteps.ts` (the gate's step rows under Gates), `status.ts` (Status), `choose.ts` (pure decisions), `notices.ts` (chat lines); `register.tsx` is the
-engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (96 tests).
+It opens no network connection. The code is split so the drawing and the data paths can be tested without the engine:
+`boxes.ts` (Settings, Agents, Promotion), `controls.ts` (the shared icons, options, aligned lines and hover cards), `help.ts`
+(what the hover cards say), `gatesteps.ts` (the gate's step rows under Gates), `status.ts` (Status), `choose.ts` (pure
+decisions), `notices.ts` (chat lines), `glue.ts` (the data paths: reading the settings, the branches and the status file,
+a press and its queue, the interrupted turn) and `port.ts` (the few engine calls they make, typed so a test hands in a fake
+`$`, plus the plugin-script lookup and the refresh queue); `register.tsx` is the engine glue: the hooks and the drawing.
+Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (147 tests; `fake.test.ts`
+is the shared fake `$`, with no test of its own).
 
 ## The four boxes
 
@@ -69,9 +73,12 @@ reopening them.
 
 - **Status.** The work's steps (what runs now and next stay in the status file but are not drawn): step · state · % · note, with no heading row (the step column is narrow and wraps). The state is one short word (todo,
   run, done, stuck, fail, skip), the % sits right after it, the note column holds every other detail (the state's own detail,
-  `--note`, an older row's figure), and `-> what blocks it` sits under the step; a running step is bold. Each agent
-  (this session first, then every subagent) is an accordion named in bold with its state and %; under it **To do** (what
-  runs and what is next, open) and **Completed** (closed at start; a `fail` row stays in To do until someone looks at it). A subagent's row is written by the hooks (SubagentStart, SubagentStop), never by the agent. The note is one line that does not wrap (the pane
+  `--note`, an older row's figure), and `-> what blocks it` sits under the step; a running step is bold. The steps are
+  grouped by state first, then by agent (user decision 15/11/2026), so a long list stays short: one accordion per state
+  group, in the order **Running**, **Stuck**, **Failed**, **To do** (also any state the box does not know), **Done** and
+  **Skipped**, each with its count and an (i) card saying what it holds; a group with no step is not drawn. Done and
+  Skipped start closed, the others open. Under a group, one accordion per agent (this session first, then every subagent
+  in the order it first wrote), named in bold with its count, open at start. A subagent's row is written by the hooks (SubagentStart, SubagentStop), never by the agent. The note is one line that does not wrap (the pane
   cannot scroll sideways): a long one is cut at the edge and shows whole in a card while the pointer is on the row. Claude
   writes the steps first, before any work, with `scripts/podium_status.py step`; a background gate or promotion writes
   its own ([`standards/00-working-method.md`](../standards/00-working-method.md) §1a, §10d).
@@ -109,9 +116,10 @@ reopening them.
   mode D; ticking one adds it to this session and marks it `(added)` at the end of its row. In mode A the box says it runs no agents.
 - **Promotion.** One block per `dev`/`test`/`prod` branch: the commit
   `origin` holds, then `pushed` or `N not pushed`, and below it any `Gate-Waived` line on the commits waiting to come in
-  from the stage before it; *no waived gate on the way in* means none.
-- **Colours.** Red: the configuration could not be read. Orange: a settings file that could not be read, or a waived
-  gate. Faded: waiting lines and options that are not chosen. Bold: titles and row labels. On the desktop a
+  from the stage before it; *no waived gate on the way in* means none. When one of the stage's git calls fails, the line
+  says *could not read* with the failing call, in orange, and nothing under it: a git error never reads as pushed.
+- **Colours.** Red: the configuration could not be read. Orange: a settings file that could not be read, a waived
+  gate, or a Promotion stage git could not read. Faded: waiting lines and options that are not chosen. Bold: titles and row labels. On the desktop a
   chosen option has a filled radio or checkbox icon; the terminal, which cannot draw SVG, shows it as `[C]`, `[dev]`.
 
 ## What runs only when you call it

@@ -5,9 +5,18 @@ import assert from 'node:assert/strict'
 
 export const test = (name: string, body: () => void | Promise<void>) => Deno.test(name, body)
 
+const contains = (actual: unknown, part: unknown) => String(actual).includes(String(part))
+
 export const expect = (actual: unknown) => ({
   toBe: (wanted: unknown) => assert.strictEqual(actual, wanted),
   toEqual: (wanted: unknown) => assert.deepStrictEqual(actual, wanted),
-  toContain: (part: string) => assert.ok(String(actual).includes(part), `${String(actual)} does not contain ${part}`),
+  toContain: (part: string) => assert.ok(contains(actual, part), `${String(actual)} does not contain ${part}`),
   toBeDefined: () => assert.notStrictEqual(actual, undefined),
+  // The negations the tests use (14/11/2026: two status tests used `.not.toContain`, which failed type-checking and made
+  // the coverage step red for the whole repository — test inventory F-042).
+  not: {
+    toBe: (wanted: unknown) => assert.notStrictEqual(actual, wanted),
+    toEqual: (wanted: unknown) => assert.notDeepStrictEqual(actual, wanted),
+    toContain: (part: string) => assert.ok(!contains(actual, part), `${String(actual)} contains ${part}`),
+  },
 })

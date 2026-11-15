@@ -213,6 +213,20 @@ class JavaScriptIsScannedToo(Scan):
         self.assertIn('NOT RUN', out)
         self.assertEqual(3, code)
 
+    def test_typescript_counts_for_the_javascript_pass_a_declaration_or_node_modules_does_not(self):
+        # F-018: the mod (hooks/) is TypeScript only, and counting *.js alone left it unscanned behind an "n/a".
+        os.remove(os.path.join(self.root, 'scripts', 'thing.py'))   # the Python pass is n/a: only this one can block
+        self.stub_codeql(sarif(('js/xss', 8.1, 3)))
+        for name, scanned in (('hooks/x.d.ts', False), ('web/node_modules/p/i.ts', False), ('hooks/x.ts', True),
+                              ('hooks/v.tsx', True)):
+            with self.subTest(name=name):
+                os.makedirs(os.path.dirname(os.path.join(self.root, name)), exist_ok=True)
+                open(os.path.join(self.root, name), 'w').close()
+                out, code = self.run_scan()
+                os.remove(os.path.join(self.root, name))
+                self.assertEqual(not scanned, 'n/a: this repository has no JavaScript' in out, out)
+                self.assertEqual(1 if scanned else 0, code, out)
+
 
 class ShellIsScannedToo(Scan):
     """CodeQL has no shell analyser and this repository is largely shell, so for

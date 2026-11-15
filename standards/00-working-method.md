@@ -25,9 +25,13 @@ message until it is done. A one-question/one-answer exchange gets no list.
   order: each with a short name, its state (not started · running · done · blocked · did not run), how much of it is done
   (%), what blocks it (`--blocker`) and any details (`--note`); the box shows the state as one short word (todo · run ·
   done · stuck · skip), the % beside it and every detail in a last column. A request that arrives mid-work is analysed the same way and its steps go in where they belong (`--after`).
-  A subagent's row is written by the hooks, never by the agent (§10d); the box shows each agent as an accordion (To do open, Completed closed). The setting
+  A subagent's row is written by the hooks, never by the agent (§10d); the box groups the rows by state first (Running · Stuck · Failed · To do · Done · Skipped; Done and Skipped closed at start), then by agent inside each state (user decision 15/11/2026). The setting
   `steps.enforce` decides how hard: `block` (default) refuses a code edit or a commit until the box holds steps,
-  `remind` only reminds on each message. Claude's own bookkeeping in `~/.claude` and temp files are never blocked.
+  `remind` only reminds on each message. Claude's own bookkeeping in `~/.claude` and temp scratch files are never blocked; a
+  file in a git work tree is code work even under a temp folder. Scope (14/11/2026): an Edit, Write or NotebookEdit and a
+  `git commit` in any spelling (behind `env`, `sudo`, `then`, `(`…); a Bash file write (`sed -i`, `>`, `tee`) is out of
+  scope by design. Under `block` a payload the guard cannot judge is refused (fail closed); a call without a session id
+  runs. A step's % is a whole number 0-100 or nothing; a figure like `3 of 8` goes in `--note`.
 - **Open choices are decision tasks:** what cannot be decided from the request, the code
   or a default (platform, framework, backend…) is asked **and** listed as
   `P0 · Decide …`. Once answered it collapses into one completed `Decided: …` line, and

@@ -180,6 +180,13 @@ Since 17/10/2026 Claude **does not ask** whether to merge, run a gate or push: t
 time was too much work for the user, so the defaults say what normally happens and whoever wants something else changes
 the setting once, or for one session.
 
+In CI the committed `.claude/sdlc-settings.json` is the configuration's word; the shared workflow prints which gates,
+coverage and steps it waives for the target (`sdlc_settings.py waived`) and never fails on it (14/11/2026). The CI plan
+skips the checks only when `ci_after_push.<t>` is exactly `false`. Two local checks are commit-time only, not gate steps:
+`scripts/doc-check.py` (pre-commit; it reads this rule set's own layout) and `scripts/evidence-check.py` (run on demand
+on a role's report, #28). The secret scan and SAST can never be an accepted gap (`ACCEPTED_GAPS`), as coverage cannot;
+a `COVERAGE_MIN` below 80 is raised to 80.
+
 **The settings steer code work only (user decision 01/11/2026).** *Code work* is a task that creates or changes files
 of a project repository: source, tests, build/CI/config, or that repository's documents. Everything else is a *no-code
 task*: a question, research, reading code to answer, an explanation, a document outside a project repository. Claude's

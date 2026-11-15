@@ -188,7 +188,7 @@ class AgentRows(unittest.TestCase):
     def test_drop_takes_an_exact_name_or_a_unique_prefix_and_refuses_an_ambiguous_one(self):
         for step in ('1. read the code', '2. write the code', '2b. write the tests'):
             self.run_tool('step', step, 'not started', '0')
-        self.run_tool('step', 'task', 'running', '', '--agent', DEVELOPER_NAME)
+        self.run_tool('step', 'task', 'running', '0', '--agent', DEVELOPER_NAME)
         self.assertEqual(0, self.run_tool('drop', '1. rea')[2])
         out, err, code = self.run_tool('drop', '2')
         self.assertEqual(2, code)
@@ -213,7 +213,7 @@ class AgentRows(unittest.TestCase):
         self.assertEqual('1. plan the work', self.table()['now'])
         for args in (('nothing', 'x'), ('1.', 'x', '--agent', 'nobody'), ('1. plan the work', '2. build'), ('1. plan the work', '')):
             self.assertEqual(2, self.run_tool('rename', *args)[2], args)
-        self.run_tool('step', 'work', 'running', '', '--agent', DEVELOPER_NAME)
+        self.run_tool('step', 'work', 'running', '0', '--agent', DEVELOPER_NAME)
         self.assertEqual(0, self.run_tool('rename', 'wo', 'task', '--agent', DEVELOPER_NAME)[2])
         self.assertEqual(['task'], [r['item'] for r in self.rows(DEVELOPER_NAME)])
 

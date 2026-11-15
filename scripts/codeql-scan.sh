@@ -5,9 +5,10 @@
 # thresholds CI uses — never two different rules in two places. gate-core.sh
 # calls this file through SAST_CMD in scripts/merge-gate.conf.
 #
-# Scope: Python and JavaScript via CodeQL, shell via ShellCheck. This repository carries no
-# JavaScript; the pass stays because every project that copies this script has some, and a pass
-# that finds none says so.
+# Scope: Python and JavaScript/TypeScript via CodeQL, shell via ShellCheck. CodeQL's javascript extractor
+# reads TypeScript too, so *.ts/*.tsx (not .d.ts, not node_modules) count for that pass: this repository's mod
+# (hooks/) is TypeScript only, and counting *.js alone left it unscanned behind an "n/a". A pass that finds
+# none says so.
 # CodeQL has no shell analyser, and this repository is mostly shell — "SAST passed" would have read as
 # "everything was scanned" while more than half the code was never looked at.
 # ShellCheck closes that half. Both tools are PROBED; a missing one is reported
@@ -37,12 +38,17 @@ command -v codeql >/dev/null 2>&1 || {
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
 
-# One CodeQL pass: $1 language, $2 label, $3 file pattern, $4 query suite, $5 database,
+# One CodeQL pass: $1 language, $2 label, $3 file pattern(s), space-separated, $4 query suite, $5 database,
 # $6 SARIF output. Returns 0 clean or n/a · 1 high/critical · 3 NOT RUN.
 codeql_pass() {
-  local lang="$1" label="$2" pattern="$3" suite="$4" db="$5" out="$6"
+  local lang="$1" label="$2" pattern="$3" suite="$4" db="$5" out="$6" one pats=() names=()
+  read -r -a pats <<<"$pattern"   # `read`, not an unquoted $pattern: that would glob *.js against the files here
+  for one in "${pats[@]}"; do
+    if [ "${#names[@]}" -gt 0 ]; then names+=(-o); fi
+    names+=(-name "$one")
+  done
   echo "▶ SAST (CodeQL, $label)"
-  if [ -z "$(find . -name "$pattern" -not -path './.codeql/*' -not -path '*/node_modules/*' -print -quit 2>/dev/null)" ]; then
+  if [ -z "$(find . \( "${names[@]}" \) -not -name '*.d.ts' -not -path './.codeql/*' -not -path '*/node_modules/*' -print -quit 2>/dev/null)" ]; then
     echo "  n/a: this repository has no $label"
     return 0
   fi
@@ -114,7 +120,7 @@ status=$?
 if [ "$status" = 3 ]; then exit 3; fi
 
 echo
-codeql_pass javascript JavaScript '*.js' \
+codeql_pass javascript JavaScript '*.js *.ts *.tsx' \
   "codeql/javascript-queries:codeql-suites/javascript-security-extended.qls" \
   "$root/.codeql/db-javascript" "$root/.codeql/results-javascript.sarif"
 js_status=$?

@@ -28,10 +28,10 @@ def read(path):
         return handle.read()
 
 
-def plan_script():
-    """The `run:` block of the step with `id: read` (indentation stripped)."""
+def plan_script(marker='- id: read'):
+    """The `run:` block of the step whose first line is `marker` (indentation stripped)."""
     lines = read(WORKFLOW).splitlines()
-    start = next(i for i, line in enumerate(lines) if line.strip() == '- id: read')
+    start = next(i for i, line in enumerate(lines) if line.strip().startswith(marker))
     run = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
     body = []
     for line in lines[run + 1:]:
@@ -139,6 +139,80 @@ class PlanStep(unittest.TestCase):
         plan, out = self.plan('prod')
         self.assertEqual('true', plan['ci'])
         self.assertIn('missing', out)
+
+    def test_only_an_explicit_false_turns_ci_off(self):
+        # F-015: a skipped gate job reads green, so anything but boolean false must run the checks (as the local gate).
+        for value in ('"no"', '0', 'null', '"false"'):
+            with self.subTest(value=value):
+                self.settings('{"dev": %s, "test": true, "prod": true}' % value)
+                self.assertEqual('true', self.plan('dev')[0]['ci'])
+
+    def test_a_missing_key_runs_the_checks_and_says_so(self):
+        self.settings('{"test": false}')
+        plan, out = self.plan('dev')
+        self.assertEqual('true', plan['ci'])
+        self.assertIn('no readable ci_after_push.dev - running the checks', out)
+
+
+WAIVERS = '- name: Turned off by the committed settings'
+
+
+class WaiversStep(unittest.TestCase):
+    """F-016: the gate job prints what the committed .claude/sdlc-settings.json turns off for the target. It is a
+    report, never a verdict (#34: the configuration is the switch): every outcome, a failed fetch included, exits 0.
+    The step's own script is run for real, with a `git` stub whose checkout links this repository's scripts/."""
+
+    def setUp(self):
+        self.project = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.project, ignore_errors=True)
+        os.makedirs(os.path.join(self.project, '.claude'))
+        self.bin = os.path.join(self.project, '.bin')
+        os.makedirs(self.bin)
+        with open(os.path.join(self.bin, 'git'), 'w', encoding='utf-8') as handle:
+            handle.write('#!/bin/sh\ncase "$1" in\n  init) mkdir -p "$3" ;;\n'
+                         '  -C) case "$3" in fetch) [ -z "$FETCH_FAILS" ] || exit 1 ;;\n'
+                         '      checkout) ln -s "%s" "$2/scripts" ;; esac ;;\nesac\nexit 0\n' % os.path.join(ROOT, 'scripts'))
+        os.chmod(os.path.join(self.bin, 'git'), 0o755)
+        self.summary = os.path.join(self.project, 'summary.md')
+
+    def step(self, settings, **env):
+        if settings is not None:
+            with open(os.path.join(self.project, '.claude', 'sdlc-settings.json'), 'w', encoding='utf-8') as handle:
+                handle.write(settings)
+        run_env = dict(os.environ, PATH=self.bin + os.pathsep + os.environ['PATH'], RUNNER_TEMP=self.project,
+                       TARGET='dev', STANDARDS_REPO='https://example.invalid/x.git', STANDARDS_REF='abc',
+                       GITHUB_STEP_SUMMARY=self.summary, **env)
+        done = subprocess.run(['bash', '-c', plan_script(WAIVERS)], cwd=self.project, capture_output=True, text=True, env=run_env)
+        return done.stdout + done.stderr, done.returncode
+
+    def test_a_committed_waiver_is_printed_with_a_warning_and_the_job_goes_on(self):
+        out, code = self.step('{"settings": {"coverage_before_push": {"dev": false}, "gate_steps": {"sast": {"dev": false}}}}')
+        self.assertEqual(0, code, out)
+        self.assertIn('coverage_before_push.dev = false: coverage is WAIVED in CI too', out)
+        self.assertIn('IGNORED: sast is locked', out)
+        self.assertIn('::warning::.claude/sdlc-settings.json waives coverage or gate steps for dev', out)
+        with open(self.summary, encoding='utf-8') as handle:
+            self.assertIn('coverage is WAIVED', handle.read())
+
+    def test_no_waiver_prints_no_warning(self):
+        out, code = self.step('{"settings": {"coverage_before_push": {"dev": true}}}')
+        self.assertEqual(0, code, out)
+        self.assertIn('turns nothing off for dev', out)
+        self.assertNotIn('::warning::', out)
+
+    def test_a_failed_fetch_or_an_unreadable_file_warns_and_never_fails(self):
+        out, code = self.step('{}', FETCH_FAILS='1')
+        self.assertEqual(0, code, out)
+        self.assertIn('::warning::the standards could not be fetched - the waivers are NOT reported', out)
+        out, code = self.step('{ broken')
+        self.assertEqual(0, code, out)
+        self.assertIn('::warning::the waivers could not be read - NOT reported', out)
+
+    def test_the_step_cannot_fail_the_job_and_runs_before_the_gate(self):
+        text = read(WORKFLOW)
+        gate_job = text.split('\n  gate:\n', 1)[1].split('\n  dast:\n', 1)[0]
+        self.assertLess(gate_job.index(WAIVERS), gate_job.index('- name: Gate\n'))
+        self.assertIn('continue-on-error: true', gate_job.split(WAIVERS, 1)[1].split('run: |', 1)[0])
 
 
 if __name__ == '__main__':

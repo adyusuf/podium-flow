@@ -48,6 +48,22 @@ class Replace(Case):
         self.go(fake)
         self.assertIn(['claude', 'plugin', 'disable', setup.PLUGIN_ID], fake.commands)
 
+    def test_an_unreadable_settings_file_is_said_and_left_alone_and_the_replace_goes_on(self):
+        self.settings()
+        path = os.path.join(self.home, '.claude', 'settings.json')
+        for broken in (b'{"enabledPlugins": {', b'[]'):
+            with open(path, 'wb') as handle:
+                handle.write(broken)
+            fake = self.fake()
+            fake.enable = lambda: None              # the fake's install would rewrite it; keep the test's own bytes
+            code, out, _ = self.go(fake)
+            self.assertEqual(0, code)
+            self.assertIn(f'! {path} cannot be read or is not valid JSON — it is left as it is', out)
+            self.assertIn(['claude', 'plugin', 'install', setup.PLUGIN_ID, '--scope', 'user'], fake.commands)
+            self.assertNotIn('disable', [c[2] for c in fake.commands])
+            with open(path, 'rb') as handle:
+                self.assertEqual(broken, handle.read())
+
     def test_a_vanished_marketplace_link_is_a_failure(self):
         fake = self.fake()
         original = fake.marketplace

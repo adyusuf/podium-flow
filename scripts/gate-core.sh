@@ -68,7 +68,7 @@
 #   COVERAGE_CMD="bash scripts/coverage.sh"             # must MEASURE (run the tests), not read an old
 #                                                       # report, and exit non-zero below the threshold
 #   COVERAGE_MIN=80                                     # NOT in a project's conf (standards/13 §8a): 80 is
-#                                                       # the default here; the env may only RAISE it (#29)
+#                                                       # the floor; a lower value is raised to 80 (#29)
 #   SAST_CMD="bash scripts/codeql-scan.sh"              # default: scripts/codeql-scan.sh
 #   BACKCOMPAT_CMD="bash scripts/api-compat.sh"         # default: scripts/backward-compat-scan.sh
 #   SECRET_CMD="gitleaks detect --no-banner --redact"   # default: the same
@@ -85,8 +85,8 @@
 #                                                       # Put it in merge-gate.conf as
 #                                                       #   GATE_PARALLEL_NODE="${GATE_PARALLEL_NODE:-1}"
 #                                                       # so the environment wins: =0 forces serial.
-#   ACCEPTED_GAPS="SAST|backward"                       # gaps the USER has accepted, with a reason
-#   ACCEPTED_GAPS_REASON="no SAST tooling yet; tracked in docs/gates.md, review 01/11/2026"
+#   ACCEPTED_GAPS="backward"                            # gaps the USER has accepted, with a reason
+#   ACCEPTED_GAPS_REASON="no public API yet; tracked in docs/gates.md, review 01/11/2026"
 #
 # ⚠️ ACCEPTED_GAPS is the only way a missing step stops failing the gate, and it is
 # not a silence: every accepted gap is printed as an ACCEPTED GAP with its reason
@@ -94,10 +94,10 @@
 # fails. This is the written, time-boxed risk acceptance the security standard asks
 # for, not a switch that turns a step off.
 #
-# ⚠️ ONE STEP CANNOT BE ACCEPTED AT ALL: coverage. Rule #29 grants it no
-# exceptions and says a project cannot override it, so listing it in
-# ACCEPTED_GAPS does nothing but print that it cannot be accepted, and the gate
-# stays INCOMPLETE. Install the measurement (scripts/coverage.sh) instead.
+# ⚠️ THREE STEPS CANNOT BE ACCEPTED AT ALL: coverage (rule #29 grants it no exceptions and
+# a project cannot override it) and the locked rows of GATE_STEPS, the secret scan and SAST
+# (rule #19: never switched off). Listing one in ACCEPTED_GAPS only prints that it cannot be
+# accepted, and the gate stays INCOMPLETE; so does a pattern with an empty branch (`a|`).
 #
 # The gate is split over five files so that none passes 300 lines (global rule #9): this one
 # orchestrates, gate-lib.sh holds the helpers, stack detection and the verdict, gate-lib-panel.sh where the panel's
@@ -126,6 +126,12 @@ cd "$ROOT" || exit 2
 # absence is handled by the [ -f ] test and by each step's own default.
 [ -f scripts/merge-gate.conf ] && . scripts/merge-gate.conf
 COVERAGE_MIN="${COVERAGE_MIN:-80}"
+# Rule #29: 80 is a floor. A higher value applies; a lower one, or anything but a number, is raised to 80.
+if [[ "$COVERAGE_MIN" =~ ^([0-9]+)\.([0-9]+)$ ]]; then   # a decimal rounds UP, never down (85.5 -> 86)
+  w=$((10#${BASH_REMATCH[1]} + (10#${BASH_REMATCH[2]} > 0))); echo "COVERAGE_MIN=$COVERAGE_MIN is a decimal - rounded up to $w"; COVERAGE_MIN=$w; fi
+if ! [[ "$COVERAGE_MIN" =~ ^[0-9]+$ ]] || [ "$COVERAGE_MIN" -lt 80 ]; then
+  echo "COVERAGE_MIN=$COVERAGE_MIN is not a whole number of at least 80 (the floor of rule #29) - raised to 80"; COVERAGE_MIN=80; fi
+export COVERAGE_MIN   # the coverage command measures against the same threshold
 
 # Fail closed: a copy of this file without its libraries must not run a partial gate.
 for lib in gate-lib.sh gate-lib-panel.sh gate-lib-node.sh gate-lib-prod.sh; do
@@ -226,7 +232,8 @@ if true; then
   if [ "$HAS_DOTNET" = 1 ]; then
     if have dotnet; then
       cve_limit="${GATE_CVE_TIMEOUT:-300}"; cve_timer=""
-      if have timeout; then cve_timer="timeout $cve_limit"; elif have gtimeout; then cve_timer="gtimeout $cve_limit"; fi
+      if have timeout; then cve_timer="timeout $cve_limit"; elif have gtimeout; then cve_timer="gtimeout $cve_limit"
+      else warn "dotnet vulnerable packages: neither timeout nor gtimeout is installed - the listing runs WITHOUT a time limit (brew install coreutils)"; fi
       cve_out="$($cve_timer dotnet list ${SLN:+"$SLN"} package --vulnerable 2>&1)"; cve_rc=$?
       if [ -n "$cve_timer" ] && [ "$cve_rc" = 124 ]; then
         bad "dotnet vulnerable packages: no answer in ${cve_limit}s (NuGet feed unreachable? on an IPv6 black hole run the listing with DOTNET_SYSTEM_NET_DISABLEIPV6=1)"

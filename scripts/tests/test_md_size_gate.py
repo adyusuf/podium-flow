@@ -90,6 +90,68 @@ class Verdicts(Gate):
         self.assertEqual(0, code, out)
 
 
+class ABadBudgetRowClosesTheGate(Gate):
+    """F-022: a ceiling or target that is not a whole number made `[ "$now" -gt abc ]` error, the
+    error read as false, and a 40 KB file over any sane ceiling printed "under the ceiling", exit 0."""
+
+    def setUp(self):
+        super().setUp()
+        self.write('CLAUDE.md', 'x' * 40000)
+
+    def assert_bad(self, row, *args):
+        self.budget(row)
+        out, code = self.run_gate(*args)
+        self.assertIn('BAD BUDGET ROW', out)
+        self.assertIn(row.replace('\t', '\\t'), out)       # the row itself is shown
+        self.assertNotIn('within its budget', out)
+        self.assertEqual(1, code, out)
+
+    def test_a_non_numeric_ceiling_fails(self):
+        self.assert_bad('CLAUDE.md\tabc\t3\treason')
+
+    def test_a_non_numeric_target_fails(self):
+        self.assert_bad('CLAUDE.md\t99\t3.5\treason')
+
+    def test_a_row_without_its_numbers_fails(self):
+        self.assert_bad('CLAUDE.md')
+        self.assert_bad('CLAUDE.md\t99')
+
+    def test_a_bad_row_fails_in_hook_mode_too(self):
+        self.assert_bad('CLAUDE.md\tabc\t3\treason', '--hook')
+
+    def test_padded_numbers_and_a_crlf_row_still_pass(self):
+        # The old integer test trimmed whitespace, CR included: a CRLF budget without a note kept working.
+        self.budget('CLAUDE.md\t 99 \t50\r')
+        out, code = self.run_gate()
+        self.assertNotIn('BAD BUDGET ROW', out)
+        self.assertEqual(0, code, out)
+
+
+class ListedPathsMatchLiterally(Gate):
+    """F-025: a discovered path was matched as a regex against the listed ones, and as a prefix, so a
+    row for another file hid an unbudgeted one."""
+
+    def test_a_dot_in_a_path_is_not_a_wildcard(self):
+        # The discovered path was the pattern: an unbudgeted `a.b/CLAUDE.md` matched the row for `axb/`.
+        self.write('CLAUDE.md', 'x')
+        self.write('axb/CLAUDE.md', 'x')
+        self.write('a.b/CLAUDE.md', 'x')
+        self.budget('CLAUDE.md\t1\t1\treason', 'axb/CLAUDE.md\t1\t1\treason')
+        out, code = self.run_gate()
+        self.assertIn('NO BUDGET', out)
+        self.assertIn('a.b/CLAUDE.md', out)
+        self.assertEqual(1, code)
+
+    def test_a_listed_path_does_not_cover_a_shorter_one(self):
+        self.write('CLAUDE.md', 'x')
+        self.write('web/CLAUDE.md', 'x')
+        self.write('web/CLAUDE.md.old', 'x')
+        self.budget('CLAUDE.md\t1\t1\treason', 'web/CLAUDE.md.old\t1\t1\treason')
+        out, code = self.run_gate()
+        self.assertIn('NO BUDGET', out)
+        self.assertEqual(1, code)
+
+
 class LineEndingsDoNotChangeTheMeasurement(Gate):
     """The Windows incident: with core.autocrlf=true every line is one byte
     longer, and budgeted files reported "ceiling exceeded" with no change made."""
@@ -173,6 +235,21 @@ class UpdateIsARatchet(Gate):
         kept = open(path).read()
         self.assertIn('CLAUDE.md\t2\t1\treason', kept)
         self.assertNotIn('\t5\t', kept)
+
+    def test_update_refuses_a_bad_row_and_leaves_the_budget_untouched(self):
+        # F-046: the bad row was written back as it was and --update exited 0.
+        self.write('CLAUDE.md', 'x' * 1000)                  # 1 KB: a good row would be lowered
+        self.write('web/CLAUDE.md', 'x')
+        path = self.budget('CLAUDE.md\t9\t1\treason', 'web/CLAUDE.md\tabc\t1\treason')
+        with open(path, 'rb') as handle:
+            before = handle.read()
+        out, code = self.run_gate('--update')
+        self.assertIn('BAD BUDGET ROW', out)
+        self.assertIn('NOT updated', out)
+        self.assertNotIn('Budget updated', out)
+        self.assertEqual(1, code, out)
+        with open(path, 'rb') as handle:
+            self.assertEqual(before, handle.read())
 
 
 class AGlobInTheRepositoryPATH(Gate):
