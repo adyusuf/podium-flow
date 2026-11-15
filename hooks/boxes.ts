@@ -252,8 +252,9 @@ export function agentsBody(ui: Ui, data: SettingsData | null, press: Press) {
   // The model `default` gives; from an older script without `default_model`, known only while the role is on `default`.
   const givenByDefault = (agent: AgentRow) => agent.default_model ?? (agent.model === 'default' ? agent.runs_on : undefined)
   const mark = (agent: AgentRow) => (agentMark(agent, mode) === '' ? null : h(ui.Text, { dimColor: true }, agentMark(agent, mode)))
+  // Mode A runs no agents, so a model press would write a setting with no effect: ignored like a role press (F-034).
   const models = (agent: AgentRow) => AGENT_MODELS.map(model => option(ui, `${key(agent)}=${model}`, model, 'radio', model === agent.runs_on,
-    () => press(key(agent), model === givenByDefault(agent) ? 'default' : model)))
+    () => { if (mode !== 'A') press(key(agent), model === givenByDefault(agent) ? 'default' : model) }))
   return h(
     ui.Box,
     { flexDirection: 'column' },
