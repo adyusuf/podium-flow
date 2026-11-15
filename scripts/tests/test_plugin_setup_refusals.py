@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -86,6 +87,14 @@ class Helpers(unittest.TestCase):
     def test_run_returns_the_exit_code_and_both_streams(self):
         code, out = setup.run([sys.executable, '-c', 'import sys; print("a"); print("b", file=sys.stderr); sys.exit(3)'])
         self.assertEqual((code, out.split()), (3, ['a', 'b']))
+
+    def test_a_child_that_outlives_its_600_seconds_is_exit_127(self):
+        expired = subprocess.TimeoutExpired(['git', 'ls-remote'], 600)
+        with mock.patch.object(setup.subprocess, 'run', side_effect=expired) as child:
+            code, out = setup.run(['git', 'ls-remote'])
+        self.assertEqual(127, code)
+        self.assertIn('timed out after 600 seconds', out)
+        self.assertEqual(600, child.call_args.kwargs['timeout'])
 
     def test_run_never_lets_git_prompt(self):
         code, out = setup.run([sys.executable, '-c', 'import os; print(os.environ["GIT_TERMINAL_PROMPT"])'])

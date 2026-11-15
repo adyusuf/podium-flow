@@ -5,6 +5,7 @@
     sdlc_settings.py check [--project DIR] [--session ID]    exit 1 when that file differs from what the panel says now
     sdlc_settings.py show  [--session ID]                    print the settings as the file would hold them
     sdlc_settings.py vars  --repo OWNER/NAME [--session ID] [--dry-run]   set the repo variable SDLC_RUNNER_LABELS from "CI runner"
+    sdlc_settings.py waived --target dev|test|prod [--project DIR]   print what the COMMITTED file turns off for that target
 
 CI runs on a server that cannot read this machine's panel, so every merge writes the panel's SDLC settings into the
 project (user decision 29/10/2026): the shared workflow (.github/workflows/sdlc.yml) and the local gate read this one
@@ -14,14 +15,18 @@ settings and keep none of their own. A setting the panel has not seen yet takes 
 
 The file is the same for the same settings (sorted keys, no timestamp), so writing it on every merge changes nothing
 when nothing changed. Exit codes: 0 done / equal · 1 differs (check) or a configuration file is unreadable · 2 usage.
+`waived` reads the committed file itself, not the panel: CI prints it on every run (sdlc.yml), so a pull request that
+commits a step off is seen. It reports and never blocks - the configuration is the switch (#34).
 """
 import json
 import os
+import re
 import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import podium_config as cfg  # noqa: E402
+import podium_schema as schema  # noqa: E402
 
 FILE = os.path.join('.claude', 'sdlc-settings.json')
 # What the pipeline reads. The session's own choices (mode, agents) and the pod are not part of the SDLC.
@@ -88,12 +93,56 @@ def set_runner_variable(repo, runner, dry_run):
     return 0
 
 
+def waived(path, target):
+    """[(key, what it means)] for every value in the committed file that turns something off for `target`. Only an
+    explicit false turns a thing off, as in the gate (gate-lib.sh); a locked step stays on whatever the file says."""
+    with open(path, encoding='utf-8') as handle:
+        values = json.load(handle)['settings']
+    found = []
+    if values.get('ci_after_push', {}).get(target) is False:
+        found.append(('ci_after_push.%s' % target, 'CI does not run for %s' % target))
+    if values.get('gates_before_push', {}).get(target) is False:
+        found.append(('gates_before_push.%s' % target, 'the local gate is off; CI ignores it and runs the gate'))
+    if values.get('coverage_before_push', {}).get(target) is False:
+        found.append(('coverage_before_push.%s' % target, 'coverage is WAIVED in CI too (rule #29: not measured)'))
+    for step, ticks in sorted(values.get('gate_steps', {}).items()):
+        # Only the ids the gate reads (gate-lib.sh gate_steps_off): another key turns nothing off there.
+        if re.fullmatch('[a-z0-9_]+', step) and isinstance(ticks, dict) and ticks.get(target) is False:
+            found.append(('gate_steps.%s.%s' % (step, target), 'IGNORED: %s is locked and always runs (rule #19)' % step
+                          if step in schema.LOCKED_STEPS else '%s is WAIVED in CI too' % step))
+    return found
+
+
+def report_waived(project, target):
+    if target not in ('dev', 'test', 'prod'):
+        print('waived needs --target dev|test|prod', file=sys.stderr)
+        return 2
+    path = os.path.join(project_root(project), FILE)
+    if not os.path.exists(path):
+        print('%s is not committed: nothing is turned off for %s, every step runs' % (FILE, target))
+        return 0
+    try:
+        found = waived(path, target)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as problem:
+        print('sdlc_settings: %s cannot be read (%s): %r' % (path, type(problem).__name__, problem), file=sys.stderr)
+        return 1
+    if not found:
+        print('%s turns nothing off for %s: every gate step and coverage run' % (FILE, target))
+        return 0
+    print('%s turns off for %s:' % (FILE, target))
+    for key, meaning in found:
+        print('  - %s = false: %s' % (key, meaning))
+    return 0
+
+
 def main(argv):
-    if not argv or argv[0] not in ('write', 'check', 'show', 'vars'):
+    if not argv or argv[0] not in ('write', 'check', 'show', 'vars', 'waived'):
         print(__doc__)
         return 2
     command, rest = argv[0], argv[1:]
     session, project = option(rest, '--session'), option(rest, '--project')
+    if command == 'waived':
+        return report_waived(project, option(rest, '--target'))
     try:
         text = render(settings(session=session, user_path=os.environ.get('PODIUM_CONFIG_USER') or None))
     except cfg.ConfigError as problem:

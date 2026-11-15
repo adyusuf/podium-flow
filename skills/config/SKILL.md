@@ -9,7 +9,8 @@ Claude does not ask what a setting already answers (global rule #34). These sett
 changes them here; everything else in this skill is mechanics.
 
 Layers, lowest first: the plugin's `defaults/podium.json` < the user's `~/.claude/podium.json` < the project's
-`.claude/podium.json` (committed, like `.claude/mode`) < **this session's own layer**. A change typed as a command is
+`.claude/podium.json` (committed, with the project's `.claude/mode` and `.claude/mode-model`, which it beats when it
+sets the key) < **this session's own layer**. A change typed as a command is
 written to the **user** layer unless the user says "for this project" (the project layer) or "for this session" (the
 session layer, `--session <id>`; the id is on the `this session is <id>` line of the start-of-session block).
 
@@ -51,8 +52,8 @@ went to. Never edit the JSON files by hand when the tool can do it.
 
 | Key | Values | Meaning |
 |---|---|---|
-| `mode` | A-E | The operating mode (`modes/README.md`). A per-session choice (`$S/mode`) or a project `.claude/mode` beats it. |
-| `mode_model` | keep, sonnet, haiku, fable | What the Opus-defined agents run on (`keep` = as defined). Same override order as `mode`. |
+| `mode` | A-E | The operating mode (`modes/README.md`). The project's `.claude/mode` (one letter) is read as the project layer's `mode` when its `podium.json` does not set it; a per-session choice (`/podium:working-mode --once`, `set --session <id> mode`) beats both. A file that is not one letter is reported and ignored. |
+| `mode_model` | keep, sonnet, haiku, fable | What the Opus-defined agents run on (`keep` = as defined). Same order as `mode`, from the project's `.claude/mode-model`; a project `.claude/mode` letter without one means `keep` (the letter alone = the defined models, #27). |
 | `steps.enforce` | block, remind | *Plan* in the pane, which shows `block` as `force`; `force` may be given and is stored as `block`. Steps first (default block): every task is split into steps in the Status box before work; `block` refuses a code edit or a commit until they exist, `remind` only reminds. `standards/00-working-method.md` §1a. |
 | `reply.length` | short, normal | How much Claude writes in a reply (default short; `long` retired 09/11/2026, read as `normal`); `short` puts long detail in collapsed sections; what each level holds: `standards/00-working-method.md` §5a. A red test, a skipped step and what the rules put in a reply (the long-run table, the #28 block) stay at every length. |
 | `agents.<role>.enabled` | auto, on, off | One of the 14 roles: `auto` follows the mode's set, `on` adds it, `off` removes it (mode A runs none). |

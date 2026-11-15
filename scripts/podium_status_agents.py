@@ -17,7 +17,7 @@ from podium_status_rows import CLOSED, clip, one_row, put_row
 
 AGENT_STEP = 'task'            # the one step the hooks write for an agent
 FAILED_STATUS = ('failed', 'error', 'errored', 'cancelled', 'canceled', 'interrupted', 'aborted')
-MAX_TRANSCRIPT = 64 * 1024 * 1024
+MAX_TRANSCRIPT = 64 * 1024 * 1024     # also the budget line's cap (podium_budget.py)
 
 
 def agent_name(payload):

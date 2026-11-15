@@ -37,7 +37,7 @@ user asks, the answer is "it cannot be started today".
 Who checks each role's output, and what has to be re-run before a finding counts as
 closed (global #28: *a claim of "fixed" is not closure*). "Block" = the role closes its
 report with the §7 completeness-check block, which
-`python3 scripts/evidence-check.py <report>` validates. Sources:
+`python3 scripts/evidence-check.py <report>` validates, on demand (no hook or gate runs it; 14/11/2026). Sources:
 [`role-selection.md`](role-selection.md) §1–§3 and §7, and each `agents/<role>.md`.
 
 | Role | Modes | Audited by | Closed by re-running | Block |
@@ -133,9 +133,16 @@ is the producer's own confidence, **never** a substitute for the combined run.
 
 A session does **not** ask the mode or the Opus replacement. The read order decides, silently:
 
-1. the session's own choice (`$S/mode`, `$S/mode-model`, written by `/podium:working-mode <letter> [<model>] --once`);
-2. the project's `.claude/mode` and `.claude/mode-model`;
-3. the configuration (`/podium:config`): `mode` (default **C**) and `mode_model` (default `sonnet`).
+1. the session's own choice (`podium_config.py set --session <id> mode|mode_model`, written by `/podium:working-mode
+   <letter> [<model>] --once`; the older `$S/mode` files are no longer read);
+2. the project: `mode`/`mode_model` in its `.claude/podium.json`, else its `.claude/mode` and `.claude/mode-model`
+   (first non-empty line; an invalid file is a problem line and ignored). A letter with no mode-model means every agent
+   on its defined model (`keep`);
+3. the user's `~/.claude/podium.json`, then the shipped defaults: `mode` (default **C**) and `mode_model` (default
+   `sonnet`).
+
+One engine reads this order (`scripts/podium_layers.py`, 15/11/2026), so the session-start block, `agents` and the pane
+show the mode actually in force.
 
 The SessionStart hook prints the effective values and the agents they enable, so the session starts knowing them.
 Whoever wants another mode says so in the first message (`C sonnet`, `/podium:working-mode …`) or changes the default

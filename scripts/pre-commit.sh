@@ -77,11 +77,13 @@ esac
 
 # --- 1. CLAUDE.md size budget ------------------------------------------------
 if [ -f "$root/scripts/md-size-gate.sh" ]; then
-  output="$(MD_ROOT="$root" bash "$root/scripts/md-size-gate.sh" 2>&1)" || true
-  if printf '%s' "$output" | grep -qi 'CEILING EXCEEDED\|NO BUDGET'; then
+  # The exit code decides, not two phrases in the output: FILE MISSING, a missing budget file, a bad row and a crash
+  # all exit non-zero, and each used to let the commit through because it printed neither phrase.
+  if ! output="$(MD_ROOT="$root" bash "$root/scripts/md-size-gate.sh" 2>&1)"; then
     printf '%s\n' "$output"
     echo "✗ commit STOPPED — CLAUDE.md budget (standards/00-working-method.md §6a)."
-    echo "  Move the rule to docs/decision-log.md, or raise the ceiling with a written reason."
+    echo "  Fix what the gate printed above: a missing scripts/md-budget.tsv or a bad row in it, a budgeted CLAUDE.md"
+    echo "  that is gone - or, over the ceiling, move the rule to docs/decision-log.md or raise the ceiling with a reason."
     failed=1
   fi
 fi

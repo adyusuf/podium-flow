@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Gate library: the test -> prod steps (the test deploy check and e2e, BOTH only on request, see below).
 # Sourced by gate-core.sh - never run on its own. A TWIN (scripts/twins.txt). Code unchanged from
-# the former gate-core.sh lines 460-524.
+# the former gate-core.sh lines 460-524, plus the e2e spec check (gate_e2e_specs, moved from gate-lib.sh).
 # shellcheck shell=bash
 
 # Opt-in since 04/10/2026 (CLAUDE.md #33): the prod gate does not look at the test branch or the test
@@ -107,4 +107,42 @@ gate_e2e_suite() {
       if [ "${GATE_RUN_E2E:-0}" = 1 ] && [ "$TARGET" = "prod" ]; then skip "e2e: this project has no e2e suite — nothing proves this promotion"
       else warn "no e2e suite in this project — e2e was NOT run (not a failure, standards/13 §8a)"; fi
     fi
+}
+
+# The e2e spec check: a WARNING in both directions, it blocks nothing (#33). Moved here from gate-core.sh unchanged, so
+# that file stays under 300 lines (rule #9), and on from gate-lib.sh to this file, the e2e one, for the same reason.
+gate_e2e_specs() {
+  missing=0
+  if [ "$LIST_ONLY" = 1 ]; then
+    printf '  → %-42s %s\n' "e2e spec check" "git diff --name-only <base>..HEAD (no e2e run)"
+    PASS+=("e2e spec check")
+    return 0
+  fi
+  if [ "$HAS_E2E_WEB" = 1 ] || [ "$HAS_E2E_MOBILE" = 1 ]; then
+    base="$(git merge-base HEAD "origin/$TARGET" 2>/dev/null || git rev-parse HEAD~1 2>/dev/null)"
+    changed="$(git diff --name-only "$base"..HEAD 2>/dev/null)"
+    behaviour="$(printf '%s\n' "$changed" | grep -Ev '^(docs/|\.github/|scripts/|e2e/|[^/]+/e2e/|.*\.md$)' | grep -E '\.(cs|ts|tsx|js|jsx|kt|swift)$' || true)"
+    specs_touched="$(printf '%s\n' "$changed" | grep -E '^(e2e/|tests/e2e/|[^/]+/e2e/|.*\.maestro/|.*\.spec\.ts)' || true)"
+    if [ -n "$behaviour" ] && [ -z "$specs_touched" ]; then
+      missing=1
+      warn "behaviour changed in $(printf '%s\n' "$behaviour" | wc -l | tr -d ' ') file(s) but no e2e spec was touched"
+      printf '%s\n' "$behaviour" | head -8 | sed 's/^/      /'
+    else
+      ok "e2e specs: nothing missing for this change"
+    fi
+  else
+    skip "e2e spec check: this project has no e2e suite"
+  fi
+  # A missing spec is a WARNING in both directions and blocks nothing. It used to
+  # fail the dev -> test promotion, which put the whole e2e backlog in front of an
+  # integration merge and stopped work that had nothing to do with e2e. #33 moved
+  # the writing to the pre-prod gate, where a spec can actually be verified
+  # against a deployed test environment — writing it earlier means writing it
+  # blind. The gap is NOT dropped: step 2 of the test -> prod gate writes every
+  # missing spec before the suite runs, and that gate does block. The gate still
+  # SAYS it on every run, so the backlog stays visible rather than silent.
+  # User decision.
+  if [ "$missing" = 1 ] && [ "$TARGET" = "test" ]; then
+    warn "the missing spec(s) above are a reminder only: e2e is optional (#33); dev -> test is not blocked"
+  fi
 }

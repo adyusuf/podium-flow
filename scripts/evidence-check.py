@@ -27,7 +27,15 @@ KEYS = (('verification', re.compile(r'^\s*-\s*Verification\s*→?\s*(.*)$', re.I
         ('result', re.compile(r'^\s*→?\s*Result\s*:\s*(.*)$', re.I)))
 YES = re.compile(r'^YES\b\s*(?:→|->)?\s*(?:BACK TO\s*:)?\s*(.*)$', re.I)
 CLEAN = re.compile(r'^(?:serious gap\s+)?(?:clean\s+)?NO\b', re.I)
+# The template's own alternative ("clean NO  |  YES") read as a clean NO: a block copied and never filled in passed.
+TEMPLATE = re.compile(r'^(?:serious gap\s+)?(?:clean\s+)?NO\s*\|\s*YES\b', re.I)
 NOT_VERIFIED = re.compile(r'not\s+verified', re.I)
+# Evidence the schema's pattern accepts too easily: any backticked fragment, so `ls` alone passed. A fragment
+# counts when it carries a command with arguments (whitespace) or a path (/ . :); file:line and line ranges
+# are the schema's other two forms.
+FRAGMENT = re.compile(r'`([^`]+)`')
+LOCATION = re.compile(r'[\w./-]+:\d+|\blines?\s+\d+', re.I)
+SUBSTANCE = re.compile(r'\s|[/.:]')
 
 
 def parse_blocks(text):
@@ -72,6 +80,8 @@ def build(block):
 
 def parse_result(text):
     text = text.strip()
+    if TEMPLATE.match(text):
+        return {'serious_gap': text}
     yes = YES.match(text)
     if yes:
         parts = [p.strip() for p in re.split(r'\s*[·|]\s*', yes.group(1)) if p.strip()]
@@ -121,7 +131,20 @@ def semantic_errors(block):
         errors.append('$.not_covered: says "not verified" but the result is clean — what cannot be verified is not fine')
     if result.get('serious_gap') == 'YES' and 'back_to' not in result:
         errors.append('$.result: YES needs BACK TO: <who> · <what to fix> · <closing evidence>')
+    if TEMPLATE.match(result.get('serious_gap', '')):
+        errors.append('$.result: still the template alternative "NO | YES" — write the one verdict')
+    if thin_verification(block.get('verification', '')):
+        errors.append('$.verification: its only evidence is a single backticked word — give the command with '
+                      'its arguments, a path, or file:line')
     return errors
+
+
+def thin_verification(text):
+    """True when the backticked fragments are the only evidence and each is one bare word."""
+    fragments = [f.strip() for f in FRAGMENT.findall(text)]
+    if not fragments or LOCATION.search(text):
+        return False
+    return not any(SUBSTANCE.search(f) for f in fragments)
 
 
 def validate(text):

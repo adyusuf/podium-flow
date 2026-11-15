@@ -29,6 +29,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import types
 
 REPO = 'adyusuf/podium-flow'
@@ -103,6 +104,17 @@ def remote_sha(ctx, ref):
     return sha, None
 
 
+def settings_unreadable(ctx):
+    """True, and said, when ~/.claude/settings.json is there but is not a readable JSON object. It is then left as it
+    is and the plugin's enabled state is not acted on: it could not be read, so it is not guessed (rule #6)."""
+    path = os.path.join(ctx.home, '.claude', 'settings.json')
+    if not os.path.exists(path) or isinstance(read_json(path), dict):
+        return False
+    ctx.say(f'! {path} cannot be read or is not valid JSON — it is left as it is; if the plugin was disabled, '
+            f'disable it again after the install: claude plugin disable {PLUGIN_ID}')
+    return True
+
+
 def snapshot(home):
     settings = read_json(os.path.join(home, '.claude', 'settings.json')) or {}
     path = os.path.join(home, '.claude', 'podium.json')
@@ -151,11 +163,16 @@ def keep_settings(ctx, before):
     return problems
 
 
+def source(ref):
+    """What `marketplace add` links: 'HEAD' (a link without a branch) is the repository's default branch, unsuffixed."""
+    return REPO if ref == 'HEAD' else f'{REPO}#{ref}'
+
+
 def connect(ctx, market, ref):
     """The link to GitHub: add the marketplace if it is missing, otherwise pull its newest state."""
     if market is None:
-        return step(ctx, f'linking the marketplace ({REPO}#{ref})',
-                    ['claude', 'plugin', 'marketplace', 'add', f'{REPO}#{ref}'])
+        return step(ctx, f'linking the marketplace ({source(ref)})',
+                    ['claude', 'plugin', 'marketplace', 'add', source(ref)])
     return step(ctx, 'refreshing the marketplace from GitHub', ['claude', 'plugin', 'marketplace', 'update', MARKETPLACE])
 
 
@@ -174,6 +191,7 @@ def finish(ctx, remote):
 
 def replace(ctx, entry, market, ref, remote):
     before = snapshot(ctx.home)
+    settings_unreadable(ctx)
     back_up(ctx, before)
     if not connect(ctx, market, ref):
         ctx.say('✗ could not refresh the marketplace — nothing was removed')
@@ -196,7 +214,8 @@ def plugin_dirs(home):
 
 
 def repoint_plugin_dirs(ctx):
-    """The desktop app's plugin folder follows the new marketplace folder; the settings file is backed up first."""
+    """The desktop app's plugin folder follows the new marketplace folder; the settings file is backed up first and
+    replaced whole (a temp file in the same folder, then os.replace), so a crash never leaves it half written."""
     settings, value = plugin_dirs(ctx.home)
     old = os.sep + LEGACY_MARKETPLACE
     if not isinstance(value, str) or old not in value:
@@ -206,22 +225,35 @@ def repoint_plugin_dirs(ctx):
     os.makedirs(folder, exist_ok=True)
     shutil.copyfile(path, os.path.join(folder, 'settings.json'))
     settings['env']['CLAUDE_CODE_PLUGIN_DIRS'] = value.replace(old, os.sep + MARKETPLACE)
-    with open(path, 'w', encoding='utf-8') as handle:
-        json.dump(settings, handle, indent=2)
-        handle.write('\n')
+    handle, temp = tempfile.mkstemp(prefix='.settings-', suffix='.json', dir=os.path.dirname(path))
+    try:
+        with os.fdopen(handle, 'w', encoding='utf-8') as out:
+            json.dump(settings, out, indent=2, ensure_ascii=False)
+            out.write('\n')
+        shutil.copymode(path, temp)
+        os.replace(temp, path)
+    finally:
+        if os.path.exists(temp):
+            os.remove(temp)
     ctx.say(f'  CLAUDE_CODE_PLUGIN_DIRS now {settings["env"]["CLAUDE_CODE_PLUGIN_DIRS"]} (backup in {folder})')
 
 
-def move_from_legacy(ctx, old, ref, remote):
+def move_from_legacy(ctx, old, market, ref, remote):
     """The plugin was renamed adyusuf -> podium and moved to its own repository (02/11/2026). The new one is linked and
     installed first, in the old install's scope and branch; only then is the old plugin removed (its data kept) and a
-    disabled one disabled again. The old marketplace link stays, so sessions that were running keep their folder."""
+    disabled one disabled again. The old marketplace link stays, so sessions that were running keep their folder.
+    A rerun after a failed removal finds the new one linked and current: it goes straight to the removal.
+    ~/.claude/podium.json is copied to the backups folder first, as on a replace."""
     scope = old['scope'] if old else 'user'
+    back_up(ctx, snapshot(ctx.home))
+    settings_unreadable(ctx)
     settings, _ = plugin_dirs(ctx.home)
     enabled = (settings or {}).get('enabledPlugins', {}).get(LEGACY_ID) if isinstance(settings, dict) else None
-    if not connect(ctx, None, ref) or not install(ctx, scope):
+    entry = installed_entry(ctx.home)
+    done = market is not None and entry is not None and is_current(entry, remote)
+    if not done and (not connect(ctx, market, ref) or not install(ctx, scope)):
         ctx.say(f'✗ the new plugin is not installed — the old one is left as it was. Retry, or: claude plugin marketplace '
-                f'add {REPO}#{ref} && claude plugin install {PLUGIN_ID} --scope {scope}')
+                f'add {source(ref)} && claude plugin install {PLUGIN_ID} --scope {scope}')
         return 2
     if old and not step(ctx, 'removing the old name (its data is kept)',
                         ['claude', 'plugin', 'uninstall', LEGACY_ID, '--keep-data', '--scope', scope]):
@@ -234,8 +266,9 @@ def move_from_legacy(ctx, old, ref, remote):
     return finish(ctx, remote)
 
 
-def legacy(ctx, args, old, old_market, remote):
-    """An install under the old name: report it (--check), or ask, then move it."""
+def legacy(ctx, args, old, market, ref, remote):
+    """An install under the old name: report it (--check), or ask, then move it. `ref` is the branch GitHub was asked
+    about, so the commit that was checked is the one that gets linked."""
     ctx.say(f'! found the plugin under its old name ({LEGACY_ID}); it moves to {PLUGIN_ID}')
     if args.check:
         ctx.say('! moving from the old name is due')
@@ -247,8 +280,7 @@ def legacy(ctx, args, old, old_market, remote):
         if ctx.ask(f'Install {PLUGIN_ID} and remove {LEGACY_ID}? [y/N] ').strip().lower() not in ('y', 'yes'):
             ctx.say('left as it is — nothing was changed')
             return 0
-    ref = (old_market or {}).get('ref') or args.ref
-    return move_from_legacy(ctx, old, ref, remote)
+    return move_from_legacy(ctx, old, market, ref, remote)
 
 
 def decide(ctx, args):
@@ -268,16 +300,19 @@ def decide(ctx, args):
         ctx.say(f'✗ {why} — nothing was changed')
         return 2
     old, old_market = installed_entry(ctx.home, LEGACY_ID), getattr(ctx, 'legacy_market', None)
-    if (old or old_market) and market is None:
-        return legacy(ctx, args, old, old_market, remote)
+    # The old plugin still installed is due whether or not the new link exists (a rerun retries a failed removal);
+    # the old link alone is due only while the new one is missing: after a move it stays on purpose.
+    if old or (old_market and market is None):
+        return legacy(ctx, args, old, market, ref, remote)
     entry = installed_entry(ctx.home)
     ctx.say(f'GitHub    {ref} is at {remote[:12]}')
     ctx.say('installed ' + (f'{entry["version"] or "?"} ({entry["scope"]} scope)' if entry else 'not installed'))
     if entry and is_current(entry, remote):
         ctx.say('✓ the installed plugin is the newest')
         due = market is None
-        if due and not args.check:
-            connect(ctx, market, ref)
+        if due and not args.check and not connect(ctx, market, ref):
+            ctx.say('✗ could not link the marketplace again — the plugin stays as it is; rerun to retry')
+            return 2
         return 1 if due and args.check else 0
     if args.check:
         ctx.say('! a new version is due' if entry else '! the plugin is not installed')
@@ -408,11 +443,14 @@ def main(argv, ctx=None):
     try:
         return decide(ctx, args)
     finally:
-        if not args.check:
+        if not args.check:          # an unwritable log is a warning: it never replaces the run's own exit code
             folder = os.path.join(ctx.home, '.claude-standards', 'logs')
-            os.makedirs(folder, exist_ok=True)
-            with open(os.path.join(folder, f'plugin-setup-{ctx.stamp}.log'), 'w', encoding='utf-8') as log:
-                log.write('\n'.join(lines) + '\n')
+            try:
+                os.makedirs(folder, exist_ok=True)
+                with open(os.path.join(folder, f'plugin-setup-{ctx.stamp}.log'), 'w', encoding='utf-8') as log:
+                    log.write('\n'.join(lines) + '\n')
+            except OSError as error:
+                print(f'! the log could not be written in {folder} ({error.strerror or error})', file=sys.stderr)
 
 
 if __name__ == '__main__':

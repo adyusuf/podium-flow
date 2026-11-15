@@ -30,7 +30,7 @@ type AgentRow = {
 }
 type Layer = { values: Record<string, boolean | string>; sources: Record<string, string> }
 type SettingsData = Layer & { schema: Spec[]; saved?: Layer; agents: AgentRow[] }
-type Stage = { branch: string; origin: string; unpushed: number; waived: string[] }
+type Stage = { branch: string; origin: string; unpushed: number; waived: string[]; unreadable?: string }
 type PromotionData = { stages: Stage[]; error?: string; outside?: boolean }
 
 export const SECTIONS = ['status', 'settings', 'agents', 'promotion'] as const
@@ -52,14 +52,17 @@ export const outsideRepository = (repo: unknown) => repo === null
 /**
  * What starts folded, so the pane opens as a short card and not as one long list: two boxes, `claude`, which keeps
  * the Settings tab (folded = Session, the tab at start; the saved defaults are under System, opened when wanted), and
- * `steps`, the gate's steps under Gates (user decision 02/11/2026: an accordion, closed at start).
+ * `steps`, the gate's steps under Gates (user decision 02/11/2026: an accordion, closed at start); and the Status box's
+ * Done and Skipped groups (user decision 15/11/2026).
  */
-export const FOLDED_AT_START: Record<string, boolean> = { agents: true, promotion: true, claude: true, steps: true }
-/** What can fold: a box, `claude` (the Settings tab), `steps`, or a Status agent (`agent:<name>` and its `:todo`, `:done`). */
-export type FoldId = SectionId | 'claude' | 'steps' | `agent:${string}`
+export const FOLDED_AT_START: Record<string, boolean> = {
+  agents: true, promotion: true, claude: true, steps: true, 'state:done': true, 'state:skip': true,
+}
+/** What can fold: a box, `claude` (the Settings tab), `steps`, or a Status state group (`state:<group>`) and an agent in it (`state:<group>:<agent>`). */
+export type FoldId = SectionId | 'claude' | 'steps' | `state:${string}`
 
-/** Whether `id` is folded; a state saved before `id` could fold falls back to how it starts. */
-export const isFolded = (fold: Record<string, boolean>, id: FoldId) => fold[id] ?? FOLDED_AT_START[id] ?? id.endsWith(':done')
+/** Whether `id` is folded; a state saved before `id` could fold falls back to how it starts (open unless FOLDED_AT_START closes it). */
+export const isFolded = (fold: Record<string, boolean>, id: FoldId) => fold[id] ?? FOLDED_AT_START[id] ?? false
 /** The fold state after a press on `id`'s header: what it reads as now, turned over. */
 export const nextFold = (fold: Record<string, boolean>, id: FoldId) => ({ ...fold, [id]: !isFolded(fold, id) })
 /** The Settings tab: `folded` (the fold id `claude`, folded at start) means the Session tab; `toggle` switches tabs. It
@@ -252,8 +255,9 @@ export function agentsBody(ui: Ui, data: SettingsData | null, press: Press) {
   // The model `default` gives; from an older script without `default_model`, known only while the role is on `default`.
   const givenByDefault = (agent: AgentRow) => agent.default_model ?? (agent.model === 'default' ? agent.runs_on : undefined)
   const mark = (agent: AgentRow) => (agentMark(agent, mode) === '' ? null : h(ui.Text, { dimColor: true }, agentMark(agent, mode)))
+  // Mode A runs no agents, so a model press would write a setting with no effect: ignored like a role press (F-034).
   const models = (agent: AgentRow) => AGENT_MODELS.map(model => option(ui, `${key(agent)}=${model}`, model, 'radio', model === agent.runs_on,
-    () => press(key(agent), model === givenByDefault(agent) ? 'default' : model)))
+    () => { if (mode !== 'A') press(key(agent), model === givenByDefault(agent) ? 'default' : model) }))
   return h(
     ui.Box,
     { flexDirection: 'column' },
@@ -276,11 +280,14 @@ export function promotionBody(ui: Ui, data: PromotionData | null) {
   return h(
     ui.Box,
     { flexDirection: 'column' },
+    // A stage git could not read says so in orange and nothing else: never "pushed" or "no waived gate" (F-035).
     data.stages.map(stage =>
       h(ui.Box, { flexDirection: 'column', marginBottom: 1 },
-        explained(ui, `stage-${stage.branch}`, h(ui.Text, { bold: true }, `${stage.branch.padEnd(5)} origin ${stage.origin}${stage.unpushed > 0 ? `  ${stage.unpushed} not pushed` : '  pushed'}`), stageCard(stage.branch)),
+        explained(ui, `stage-${stage.branch}`, stage.unreadable
+          ? h(ui.Text, { bold: true, color: WARN }, `${stage.branch.padEnd(5)} could not read: ${stage.unreadable}`)
+          : h(ui.Text, { bold: true }, `${stage.branch.padEnd(5)} origin ${stage.origin}${stage.unpushed > 0 ? `  ${stage.unpushed} not pushed` : '  pushed'}`), stageCard(stage.branch)),
         helpCard(ui, `stage-${stage.branch}`, stageCard(stage.branch)),
-        h(ui.Box, { flexDirection: 'column', marginLeft: INDENT },
+        stage.unreadable ? null : h(ui.Box, { flexDirection: 'column', marginLeft: INDENT },
           stage.waived.length === 0
             ? h(ui.Text, { dimColor: true }, 'no waived gate on the way in')
             : stage.waived.map(line => h(ui.Text, { color: WARN }, `waived ${line}`))))),

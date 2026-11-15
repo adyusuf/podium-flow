@@ -96,13 +96,14 @@ class Blocked(unittest.TestCase):
 
     def test_inside_a_push_command_a_mention_DOES_match(self):
         # The scope is the verb, not the intent: the flag named anywhere in a
-        # PUSH command matches, message or not. Measured, including the boundary
-        # — the pattern needs whitespace or end-of-string after the flag, so
-        # `"no --force"` (quote straight after) slips past while
-        # `"no --force here"` does not. Over-blocking on a push is the safe side
-        # of that line and the model can reword; relying on the gap would not be.
+        # PUSH command matches, message or not. The boundary used to need
+        # whitespace or end-of-string after the flag, so `"no --force"` (quote
+        # straight after) slipped past - the same gap let `bash -c "git push
+        # --force"` through. A closing quote ends a flag now (QA 16/11/2026):
+        # both spellings are blocked. Over-blocking on a push is the safe side of
+        # that line and the model can reword.
         self.assertBlocked(f'{PUSH} origin dev -m "no {FORCE} here"', 'forced push')
-        self.assertAllowed(f'{PUSH} origin dev -m "no {FORCE}"')
+        self.assertBlocked(f'{PUSH} origin dev -m "no {FORCE}"', 'forced push')
 
     def test_but_the_sql_and_rm_rules_are_NOT_scoped(self):
         # The asymmetry is real and worth knowing before someone "fixes" it: an
@@ -132,6 +133,18 @@ class Heredocs(unittest.TestCase):
     def test_a_quoted_heredoc_tag_is_recognised(self):
         script = f"cat <<'END'\ngit commit {NO_VERIFY}\nEND"
         self.assertIsNone(guard.verdict(script))
+
+    def test_a_here_string_is_not_a_heredoc(self):
+        # F-002: `<<<foo` was read as a heredoc tagged `foo`, so every later line was stripped unjudged.
+        self.assertIn('forced push', guard.verdict(f'cat <<<foo\n{PUSH} {FORCE}') or 'NOT blocked')
+        self.assertEqual(['cat <<<foo', 'next'], guard.without_heredocs('cat <<<foo\nnext').splitlines())
+
+    def test_a_heredoc_that_only_WRITES_a_recursive_delete_is_still_blocked(self):
+        # F-041, a decision (14/11/2026), not an oversight: the rm and SQL rules read heredoc bodies on purpose, because
+        # `bash <<EOF` and `psql <<EOF` execute them and a body cannot be told from a note quoting it. Writing such text
+        # is done with an editor tool, not a shell heredoc.
+        self.assertIn('recursive delete', guard.verdict(f'cat > notes.md <<EOF\n{RM} /\nEOF') or 'NOT blocked')
+        self.assertIn('backup', guard.verdict(f"cat > notes.md <<'EOF'\n{DROP} {TABLE} t;\nEOF") or 'NOT blocked')
 
 
 class FailClosed(unittest.TestCase):

@@ -1,6 +1,7 @@
 import importlib.util
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -224,6 +225,28 @@ class DocCheck(unittest.TestCase):
         subprocess.run(['git', '-C', root, 'add', '-A'], check=True)
         os.remove(os.path.join(root, 'gone.md'))
         self.assertEqual(dc.run(root), [])
+
+
+class CommandLine(unittest.TestCase):
+    """The real script, as pre-commit.sh runs it: its exit code is what blocks a commit."""
+    SCRIPT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'doc-check.py'))
+
+    def run_cli(self, root):
+        done = subprocess.run([sys.executable, self.SCRIPT, root], capture_output=True, text=True)
+        return done.returncode, done.stdout + done.stderr
+
+    def test_a_finding_exits_1_and_is_printed(self):
+        files = consistent()
+        files['standards/00-a.md'] += ' [gone](02-missing.md)'
+        code, out = self.run_cli(build(files))
+        self.assertEqual(1, code, out)
+        self.assertIn('✗ standards/00-a.md: broken link -> 02-missing.md', out)
+        self.assertIn('1 finding(s)', out)
+
+    def test_a_consistent_tree_exits_0(self):
+        code, out = self.run_cli(build(consistent()))
+        self.assertEqual(0, code, out)
+        self.assertIn('documentation consistent', out)
 
 
 if __name__ == '__main__':

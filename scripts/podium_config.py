@@ -15,21 +15,25 @@
     podium_config.py notify <event>             hook: tells the running session when a setting changed (stdin: the payload)
 
 Layers, lowest first: defaults/podium.json (shipped with the plugin) < ~/.claude/podium.json (the user's own
-defaults) < <project>/.claude/podium.json (committed, like .claude/mode) < the session's own layer (podium_session.py:
-what the rail boxes change; gone with the session). The user changes them with the
-`podium:config` skill; Claude never asks what a setting already answers (global rule #34).
+defaults) < <project>/.claude/podium.json (committed; the project's .claude/mode and .claude/mode-model are read into
+this layer as `mode` and `mode_model` where the file does not set them; a letter with no mode-model is `keep`) < the
+session's own layer (podium_session.py: what the rail boxes change; gone with the session). The user changes them with
+the `podium:config` skill; Claude never asks what a setting already answers (global rule #34).
 
 Keys are dotted (`push.prod`); files hold them nested. A key is validated against SCHEMA, a file that does not
-parse is reported and ignored (the layer below wins) - the SessionStart hook must never fail a session.
-Exit codes: 0 done · 1 a configuration file is unreadable (set/unset/apply refuse to overwrite it) ·
+parse or holds one invalid value is reported (show, get on stderr, context) and ignored as a whole (the layer below
+wins) - the SessionStart hook must never fail a session.
+Exit codes: 0 done · 1 a configuration file is unreadable, or holds a single value where a group of settings belongs
+(set/unset/apply refuse to overwrite it) ·
 2 bad usage, unknown key or invalid value (nothing is written).
 """
 import json
 import os
 import sys
+import tempfile
 
-# The schema and the layers live beside this file (split so no file passes 300 lines, rule #9); every name they hold is
-# re-exported here, so callers keep reading them from podium_config.
+# The schema, the layers and the text live beside this file (split so no file passes 300 lines, rule #9); every name
+# they hold is re-exported here, so callers keep reading them from podium_config.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import podium_session as sessions  # noqa: E402
 from podium_schema import (  # noqa: E402,F401
@@ -38,91 +42,9 @@ from podium_schema import (  # noqa: E402,F401
     MODE_ROLES, POD_FORMATS, REPLY_LENGTHS, RETIRED_KEYS, ROOT, SCHEMA,
     SPECS, TARGETS, agents, defined_model, effective_model, front_matter, gate_steps_off)
 from podium_layers import (  # noqa: E402,F401
-    ConfigError, check, flatten, load, locked, nest,
-    project_file, read_layer, user_file, write_layer)
-
-
-def shown(value):
-    return 'yes' if value is True else 'no' if value is False else str(value)
-
-
-def render(effective, problems):
-    lines = []
-    group = None
-    for spec in SCHEMA:
-        if spec['group'] != group:
-            group = spec['group']
-            lines.append(group)
-        value, source = effective[spec['key']]
-        lines.append('  %-34s %-8s %s' % (spec['key'], shown(value), '' if source == 'default' else '(%s)' % source))
-    lines.extend('! ' + problem for problem in problems)
-    return '\n'.join(lines)
-
-
-# What each reply length asks of Claude, printed at session start (standards/00-working-method.md §5a). Whatever the
-# length, a red test, a skipped step, an open finding and what waits on the user are said: shorter, never left out.
-REPLY_MEANING = {
-    'short': 'the important points first and, said plainly, what the user must do or decide; no long back-and-forth. '
-             'Anything long (evidence, per-step detail, logs, long tables, the end-of-turn completeness block) goes '
-             'inside a collapsed <details><summary>...</summary>...</details> section, never left out. Still said at every '
-             'length: a red test, a skipped step, an open finding, what waits on the user, the long-run table, the #28 '
-             'handoff line and end-of-turn block, the #24 deferred list, the #27 agent count and cost (standards/00 §5a)',
-    'normal': 'the result and the reasoning that matters, short lists where they help (standards/00 §5a)',
-}
-
-
-def context(effective, problems, session=None):
-    """The compact block a session starts with: the effective values, what they mean, how to change them."""
-    value = lambda key: effective[key][0]  # noqa: E731
-    steps = []
-    for target in TARGETS:
-        steps.append('%s: merge %s, gates before push %s, coverage before push %s, push %s, CI after push %s' % (
-            target, shown(value('merge.' + target)), shown(value('gates_before_push.' + target)),
-            shown(value('coverage_before_push.' + target)), shown(value('push.' + target)),
-            shown(value('ci_after_push.' + target))))
-        off = gate_steps_off({key: pair[0] for key, pair in effective.items()}, target)
-        if off and value('gates_before_push.' + target):     # an unticked step is waived and named (02/11/2026)
-            steps[-1] += ', gate steps off (waived, named in Gate-Waived): %s' % ', '.join(off)
-    steps.append('e2e before deploy: ' + ', '.join(
-        'on %s before deploying %s %s' % (on, after, shown(value('e2e_before_deploy.' + after))) for on, after in E2E_STAGES))
-    lines = ['podium configuration (effective; global rule #34 - follow it, do not ask what it answers):',
-             '  for code work: changing a project repository\'s files. A no-code task (a question, research, Claude\'s own '
-             'bookkeeping in ~/.claude) makes no branch or commit and runs no merge, push, gate, coverage, CI, deploy, e2e, '
-             'test writing or agent; replies, the Status box and #14/#15/#24 still apply (standards/13 §8a).',
-             '  mode %s, model for the Opus agents: %s' % (value('mode'), value('mode_model')),
-             '  replies: %s - %s' % (value('reply.length'), REPLY_MEANING.get(value('reply.length'), REPLY_MEANING['short'])),
-             '  pod: connect %s, message format %s (stored only; nothing acts on it)' % (
-                 shown(value('pod.connect')), value('pod.message_format')),
-             '  write unit tests: %s, write e2e: %s' % (shown(value('write.unit_tests')), shown(value('write.e2e')))]
-    if not value('write.unit_tests'):
-        lines.append('    tests: do not write; suites/gates/coverage/CI/e2e: run only where the keys below say yes, '
-                     'else "not run (configuration)" (neither pass nor fail); global #8/#31/#32 are HOW, never a trigger '
-                     '- they do not start test work (#34).')
-    active = agents({k: v[0] for k, v in effective.items()})
-    lines.append('  agents: %s' % (', '.join('%s (%s)' % (row['role'], row['runs_on']) for row in active) or 'none'))
-    lines.extend('  ' + step for step in steps)
-    lines.append('  change it with the podium:config skill; the mode may also be set per session or per project.')
-    if sessions.valid(session):
-        lines.append('  this session is %s: what the rail boxes change applies to it only (podium_config.py set --session %s '
-                     '<key> <value>); a new session starts from the saved defaults.' % (session, session))
-        lines.append('  status box and steps (steps.enforce: %s): analyse every task first and write its steps, in order, '
-                     'before acting: python3 "%s" --session %s step "<n. short name>" "<state>" <percent> [--blocker "<what>"] '
-                     '[--after "<step>"] [--note "<details>"]; a new request mid-work goes in as steps with --after. Keep state (not started, '
-                     'running, done, blocked, did not run) and %% current; now|next <text> say what runs. The hooks set now '
-                     'on each message and "waiting for you" at each turn\'s end (standards/00 §1a, §10d).'
-                     % (value('steps.enforce'), os.path.join(ROOT, 'scripts', 'podium_status.py'), session))
-    lines.extend('  ! ' + problem for problem in problems)
-    return '\n'.join(lines)
-
-
-def render_agents(values):
-    rows = agents(values)
-    if not rows:
-        return 'mode %s runs no agents.' % values['mode']
-    lines = ['mode %s - %d agent(s); Opus agents run on: %s (a per-agent model beats it)' % (values['mode'], len(rows), values['mode_model'])]
-    lines.extend('  %-18s defined %-7s runs on %s%s' % (r['role'], r['defined'], r['runs_on'],
-                 '' if r['enabled'] == 'auto' else '   [%s]' % r['enabled']) for r in rows)
-    return '\n'.join(lines)
+    MODE_FILES, ConfigError, check, flatten, load, locked, nest,
+    project_file, read_layer, read_mode_files, user_file, write_layer)
+from podium_render import REPLY_MEANING, context, render, render_agents, shown  # noqa: E402,F401
 
 
 def seen_dir():
@@ -137,7 +59,7 @@ def notify(event, payload_text):
         session = str(json.loads(payload_text).get('session_id') or '')
     except (ValueError, AttributeError):
         session = ''
-    if not session or not all(ch.isalnum() or ch in '-_' for ch in session):
+    if not sessions.valid(session):         # the one rule for a session id that becomes a file name (F-032)
         return None
     effective, problems = load(session=session)
     values = {key: value[0] for key, value in effective.items()}
@@ -148,12 +70,18 @@ def notify(event, payload_text):
     except (OSError, ValueError):
         before = None
     def remember():
+        """A temporary file renamed over: a reader never sees a half-written seen-file (F-032)."""
+        temp = None
         try:
             os.makedirs(seen_dir(), exist_ok=True)
-            with open(path, 'w', encoding='utf-8') as handle:
+            fd, temp = tempfile.mkstemp(dir=seen_dir(), prefix='.%s-' % session, suffix='.tmp')
+            with os.fdopen(fd, 'w', encoding='utf-8') as handle:
                 json.dump(values, handle)
+            os.replace(temp, path)
             return True
         except OSError:
+            if temp and os.path.exists(temp):
+                os.remove(temp)
             return False
 
     changes = []
@@ -228,7 +156,6 @@ def main(argv):
                 print(render_agents(values))
             return 0
         if command == 'reset-agents':
-            effective, _ = load()
             write(path, {}, [key for key in SPECS if key.startswith('agents.')])
             print('every agents.* setting removed from %s' % path)
             return 0
@@ -248,9 +175,11 @@ def main(argv):
             print(json.dumps(SCHEMA, indent=2))
             return 0
         if command == 'get' and len(args) == 2:
-            effective, _ = load(session=session)
+            effective, problems = load(session=session)
             if args[1] not in effective:
                 raise ConfigError("unknown setting '%s'" % args[1])
+            for problem in problems:              # a dropped layer is said, on stderr: stdout stays the one value (F-028)
+                sys.stderr.write('! %s\n' % problem)
             print(shown(effective[args[1]][0]))
             return 0
         if command == 'set' and len(args) == 3:
@@ -265,7 +194,16 @@ def main(argv):
             print('%s removed from %s' % (check_key, path))
             return 0
         if command == 'apply' and len(args) == 2:
-            raw = sys.stdin.read() if args[1] == '-' else open(args[1], encoding='utf-8').read()
+            if args[1] == '-':
+                data = sys.stdin.buffer.read()
+            else:
+                with open(args[1], 'rb') as handle:
+                    data = handle.read()
+            try:      # read as bytes and decoded here: text in another code page is exit 1, never a traceback (F-047)
+                raw = data.decode('utf-8')
+            except UnicodeDecodeError as error:
+                raise ConfigError('%s is not UTF-8 text (%s); nothing written' % (
+                    'stdin' if args[1] == '-' else args[1], error), 1)
             try:
                 incoming = json.loads(raw)
             except ValueError as error:

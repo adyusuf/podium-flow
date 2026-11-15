@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { donePercent, groupState, noteOf, parseStatus, splitSteps, splitState, statusBody, stepGroups, statusDir, statusScript, statusStep } from './status'
+import { noteOf, parseStatus, splitState, statusBody, stepGroups, statusDir, statusScript, statusStep } from './status'
 
 // A recording factory: an element is { type, props, children }, so the tests read what the box would draw.
 type Node = { type: unknown; props: Record<string, any>; children: unknown[] }
@@ -43,21 +43,21 @@ test('the status file is read as text: only strings are kept, anything else is n
   expect(parseStatus(JSON.stringify({ rows: [{ item: 'a', percent: '45' }, { item: 'b', percent: '45%' }, { item: 'c', percent: 7 }] }))!.rows.map(row => row.percent)).toEqual(['45', '', ''])
 })
 
-test('the body shows the agents (not now and next), its To do branch and step · state · % · note (no heading row), -> blocker under the step', () => {
+test('the body shows the state groups and agents (not now and next), then step · state · % · note (no heading row), -> blocker under the step', () => {
   const texts = (body: unknown) => shown(body).map(words)
-  // An older row: its state has no short word, so the whole state goes to the note with the measured figure.
+  // An older row: its state has no short word, so it is in To do and the whole state goes to the note with the measured figure.
   expect(texts(statusBody(ui, parseStatus(FILE)))).toEqual([
-    // Every label carries its (i): the agent, the branch, and a step row with a note (user decision 09/11/2026).
-    'this session', '(i)', 'todo', 'To do', '(i)', '(2)', 'dev', '', '', 'pushed · 4a45bda (promote.log)', '(i)', 'prod', '', '',
+    // Every label carries its (i): the group, the agent, and a step row with a note (user decision 09/11/2026).
+    'To do', '(i)', '(2)', 'this session', '(i)', '(2)', 'dev', '', '', 'pushed · 4a45bda (promote.log)', '(i)', 'prod', '', '',
     'gate running · coverage step (gate-prod.log)', '(i)', '-> promote.sh'])
   const steps = statusBody(ui, parseStatus(JSON.stringify({ rows: [
     { item: '1. data', state: 'done', percent: '100' },
     { item: '2. pane', state: 'running: 3 of 8 files', percent: '40', blocker: 'qa review', note: 'tabs first' }] })))
-  // The running step is in To do, the finished one in Completed (closed at start, so its row is not drawn).
-  expect(texts(steps)).toEqual(['this session', '(i)', 'run · 70%', 'To do', '(i)', '(1)', '2. pane', 'run', '40%',
-    '3 of 8 files · tabs first', '(i)', '-> qa review', 'Completed', '(i)', '(1)'])
-  expect(shown(steps).filter(node => node.props.bold).map(words)).toEqual(['this session', 'To do', '2. pane', 'run', '40%',
-    '3 of 8 files · tabs first', 'Completed'])
+  // The running step is in Running, the finished one in Done (closed at start, so its row is not drawn).
+  expect(texts(steps)).toEqual(['Running', '(i)', '(1)', 'this session', '(i)', '(1)', '2. pane', 'run', '40%',
+    '3 of 8 files · tabs first', '(i)', '-> qa review', 'Done', '(i)', '(1)'])
+  expect(shown(steps).filter(node => node.props.bold).map(words)).toEqual(['Running', 'this session', '2. pane', 'run', '40%',
+    '3 of 8 files · tabs first', 'Done'])
   expect(all(steps, 'Box').filter(node => node.props.marginLeft === 2).map(words)).toContain('-> qa review')
 })
 
@@ -129,44 +129,41 @@ test('the status script sits beside the configuration script the pane found; non
   expect(statusScript('/elsewhere/other.py')).toBe('')
 })
 
-test('steps group by who runs them, this session first; each group is an accordion with its state and %', () => {
+test('inside a state group the steps group by who runs them, this session first; each agent is an accordion with its count', () => {
   const data = parseStatus(JSON.stringify({ rows: [
     { item: '1. plan', state: 'done', percent: '100' }, { item: 'review', state: 'running', percent: '50', agent: 'qa a9f3c2' },
     { item: '2. build', state: 'running', percent: '20' }, { item: 'scan', state: 'not started', percent: '0', agent: 'qa a9f3c2' }] }))!
   expect(stepGroups(data.rows).map(group => [group.agent, group.rows.map(row => row.item)])).toEqual([
     ['', ['1. plan', '2. build']], ['qa a9f3c2', ['review', 'scan']]])
-  expect([donePercent(data.rows.slice(0, 1)), donePercent([]), donePercent(stepGroups(data.rows)[1]!.rows)]).toEqual(['100%', '', '25%'])
-  // The mean is rounded, not cut (62.5 -> 63); this session's group comes first even when a subagent wrote first.
-  const half = parseStatus(JSON.stringify({ rows: [{ item: 'a', agent: 'qa x', percent: '50' }, { item: 'b', agent: 'qa x', percent: '75' }, { item: 'c', percent: '0' }] }))!
-  expect(donePercent(half.rows.slice(0, 2))).toBe('63%')
-  expect(stepGroups(half.rows).map(group => group.agent)).toEqual(['', 'qa x'])
+  // This session's group comes first even when a subagent wrote first.
+  const later = parseStatus(JSON.stringify({ rows: [{ item: 'a', agent: 'qa x' }, { item: 'c' }] }))!
+  expect(stepGroups(later.rows).map(group => group.agent)).toEqual(['', 'qa x'])
   const body = statusBody(ui, data)
   const names = shown(body).filter(node => node.props.bold).map(words)
-  expect(names).toEqual(['this session', 'To do', '2. build', 'run', '20%', '', 'Completed', 'qa a9f3c2', 'To do', 'review', 'run', '50%', ''])
-  expect(shown(body).map(words).filter(text => text.includes(' · '))).toEqual(['run · 60%', 'run · 25%'])
-  // Agents and To do open, Completed closed at start; a subagent with nothing over has no Completed branch.
-  expect(all(body, 'Button').map(words)).toEqual(['▾', '▾', '▸', '▾', '▾'])
-  expect(shown(body).map(words)).not.toContain('1. plan')
+  expect(names).toEqual(['Running', 'this session', '2. build', 'run', '20%', '', 'qa a9f3c2', 'review', 'run', '50%', '', 'To do', 'qa a9f3c2',
+    'Done'])
+  // Running and To do open with their agents, Done closed at start.
+  expect(all(body, 'Button').map(words)).toEqual(['▾', '▾', '▾', '▾', '▾', '▸'])
+  expect(shown(body).map(words).includes('1. plan')).toBe(false)
 })
 
-test('an agent and its branches fold: every id is its own, Completed starts closed, a closed agent hides its branches', () => {
+test('a group and an agent in it fold: every id is its own, a closed group hides its agents, a closed agent its steps', () => {
   const data = parseStatus(JSON.stringify({ rows: [{ item: '1. plan', state: 'done', percent: '100' }, { item: '2. build', state: 'running', percent: '20' }] }))!
   const pressed: string[] = []
   const folds = (open: string[]) => ({ folded: (id: string) => !open.includes(id), toggle: (id: string) => () => void pressed.push(id) })
   const texts = (body: unknown) => shown(body).map(words)
-  const all3 = statusBody(ui, data, folds(['agent:this session', 'agent:this session:todo', 'agent:this session:done']))
-  expect(texts(all3)).toContain('1. plan')
-  expect(texts(all3)).toContain('2. build')
-  all(all3, 'Button').forEach(button => (button.props.onPress as () => void)())
-  expect(pressed).toEqual(['agent:this session', 'agent:this session:todo', 'agent:this session:done'])
+  const open = statusBody(ui, data, folds(['state:run', 'state:run:this session', 'state:done', 'state:done:this session']))
+  expect(texts(open).includes('1. plan') && texts(open).includes('2. build')).toBe(true)
+  all(open, 'Button').forEach(button => (button.props.onPress as () => void)())
+  expect(pressed).toEqual(['state:run', 'state:run:this session', 'state:done', 'state:done:this session'])
+  const agentShut = statusBody(ui, data, folds(['state:run']))
+  expect(texts(agentShut).filter(text => ['this session', '2. build'].includes(text))).toEqual(['this session'])
   const shut = statusBody(ui, data, folds([]))
-  expect(texts(shut).filter(text => ['To do', 'Completed', '2. build'].includes(text))).toEqual([])
-  expect(all(shut, 'Button').map(words)).toEqual(['▸'])
-  expect(splitSteps(data.rows).todo.map(row => row.item)).toEqual(['2. build'])
-  expect(splitSteps(data.rows).done.map(row => row.item)).toEqual(['1. plan'])
+  expect(texts(shut).filter(text => ['this session', '2. build', '1. plan'].includes(text))).toEqual([])
+  expect(all(shut, 'Button').map(words)).toEqual(['▸', '▸'])
 })
 
-test('a state is a short word and its detail; a group runs while a step runs, is stuck while one is blocked, else done or todo', () => {
+test('a state is a short word and its detail; the note holds the detail, the note and an older row figure', () => {
   expect(['not started', 'running', 'done', 'blocked', 'did not run', 'in progress', 'pending'].map(state => splitState(state).short))
     .toEqual(['todo', 'run', 'done', 'stuck', 'skip', 'run', 'todo'])
   expect(splitState('running: 3 of 8')).toEqual({ short: 'run', detail: '3 of 8' })
@@ -174,16 +171,8 @@ test('a state is a short word and its detail; a group runs while a step runs, is
   expect(splitState('gate running')).toEqual({ short: '', detail: 'gate running' })
   expect(splitState('doneish')).toEqual({ short: '', detail: 'doneish' })
   const row = (state: string) => ({ item: 'x', state, figure: '', waiting: '', percent: '', blocker: '', agent: '', note: '' })
-  expect(groupState([row('done'), row('running')])).toBe('run')
-  expect(groupState([row('done'), row('blocked')])).toBe('stuck')
-  expect(groupState([row('done'), row('did not run')])).toBe('done')
-  expect(groupState([row('done'), row('not started')])).toBe('todo')
-  // A failed step (a subagent that ended in error) is its own state and stays in the open branch, never in Completed.
+  // A failed step (a subagent that ended in error) is its own state.
   expect(splitState('failed').short).toBe('fail')
-  expect(groupState([row('done'), row('failed')])).toBe('fail')
-  expect(groupState([row('failed'), row('blocked')])).toBe('stuck')
-  expect(groupState([row('failed'), row('running')])).toBe('run')
-  expect(splitSteps([row('failed'), row('done')]).todo.map(one => one.state)).toEqual(['failed'])
   expect(noteOf({ ...row('running: half'), note: 'n', figure: '3/8' })).toBe('half · n · 3/8')
   expect(noteOf({ ...row('done'), percent: '100', figure: '100%' })).toBe('')
 })
@@ -197,4 +186,30 @@ test('the budget line is drawn first, with or without a step, and read as untrus
   expect(JSON.stringify(idle)).toContain('budget: $1.00 spent · no budget set')
   expect(JSON.stringify(idle)).toContain('nothing running')
   expect(JSON.stringify(statusBody(ui, parseStatus(JSON.stringify({ rows: [] }))))).toContain('nothing running')
+})
+
+test('a percent over 100 is drawn as 100, as podium_status.py stores it (F-038)', () => {
+  const rows = parseStatus(JSON.stringify({ rows: [{ item: 'a', percent: '150' }, { item: 'b', percent: '999' }, { item: 'c', percent: '100' }, { item: 'd', percent: '45' }] }))!.rows
+  expect(rows.map(row => row.percent)).toEqual(['100', '100', '100', '45'])
+})
+
+test('past 50 rows the box drops the same rows as podium_status.py: finished subagent steps first, the plan last (F-038)', () => {
+  const plan = Array.from({ length: 50 }, (_, at) => ({ item: `s${at}`, state: 'not started', agent: '' }))
+  const extra = [{ item: 'a-done', state: 'done', agent: 'qa' }, { item: 'a-run', state: 'running', agent: 'qa' },
+    { item: 'a-fail', state: 'failed', agent: 'qa' }, { item: 'me-done', state: 'done', agent: '' }]
+  // The extra rows sit among the plan's: a cut of the oldest rows would drop s0..s3 instead.
+  const kept = parseStatus(JSON.stringify({ rows: [...plan.slice(0, 10), ...extra, ...plan.slice(10)] }))!.rows.map(row => row.item)
+  expect(kept).toEqual(plan.map(row => row.item))
+  // A failed subagent step goes before a skipped step of this session, which goes before the plan.
+  const second = parseStatus(JSON.stringify({ rows: [...plan, { item: 'a-fail', state: 'failed', agent: 'qa' },
+    { item: 'me-skip', state: 'did not run', agent: '' }] }))!.rows.map(row => row.item)
+  expect(second).toEqual(plan.map(row => row.item))
+  // A failed subagent step stays longer than a running one: it must stay in view until someone looks at it.
+  const third = parseStatus(JSON.stringify({ rows: [{ item: 'a-fail', state: 'failed', agent: 'qa' }, { item: 'a-run', state: 'running', agent: 'qa' },
+    ...plan.slice(1)] }))!.rows.map(row => row.item)
+  expect(third).toEqual(['a-fail', ...plan.slice(1).map(row => row.item)])
+  // A finished subagent step goes before a running one that was written earlier.
+  const fourth = parseStatus(JSON.stringify({ rows: [{ item: 'a-run', state: 'running', agent: 'qa' }, { item: 'a-done', state: 'done', agent: 'qa' },
+    ...plan.slice(1)] }))!.rows.map(row => row.item)
+  expect(fourth).toEqual(['a-run', ...plan.slice(1).map(row => row.item)])
 })

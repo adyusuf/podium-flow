@@ -142,5 +142,49 @@ class SdlcSettings(unittest.TestCase):
         self.assertEqual(2, self.run_tool()[1])
 
 
+class Waived(SdlcSettings):
+    """F-016: `waived` prints what the COMMITTED file turns off for a target (CI prints it on every run, sdlc.yml), so a
+    pull request that commits coverage or a gate step off is seen. Only an explicit false counts; a locked step stays on.
+    It reads the file, never the panel: a broken panel file must not hide it."""
+
+    def commit_file(self, text):
+        os.makedirs(os.path.dirname(self.file), exist_ok=True)
+        with open(self.file, 'w', encoding='utf-8') as handle:
+            handle.write(text)
+
+    def test_it_names_every_value_that_turns_something_off_for_the_target(self):
+        with open(self.user, 'w') as handle:
+            handle.write('{ not json')   # the panel's file is not read
+        self.commit_file(json.dumps({'settings': {
+            'coverage_before_push': {'dev': False, 'test': True}, 'gates_before_push': {'dev': False},
+            'gate_steps': {'lint': {'dev': False}, 'unit': {'dev': 0, 'test': False}, 'secrets': {'dev': False}, '*': {'dev': False}}}}))
+        out, code = self.run_tool('waived', '--project', self.project, '--target', 'dev')
+        self.assertEqual(0, code, out)
+        self.assertIn('coverage_before_push.dev = false: coverage is WAIVED in CI too', out)
+        self.assertIn('gates_before_push.dev = false: the local gate is off; CI ignores it and runs the gate', out)
+        self.assertIn('gate_steps.lint.dev = false: lint is WAIVED in CI too', out)
+        self.assertIn('gate_steps.secrets.dev = false: IGNORED: secrets is locked and always runs (rule #19)', out)
+        self.assertNotIn('unit', out)   # 0 is not false, and test is another target
+        self.assertNotIn('gate_steps.*', out)
+
+    def test_nothing_off_and_no_file_say_so_and_pass(self):
+        out, code = self.run_tool('waived', '--project', self.project, '--target', 'test')
+        self.assertEqual(0, code, out)
+        self.assertIn('is not committed: nothing is turned off for test', out)
+        self.commit_file('{"settings": {"coverage_before_push": {"dev": false}}}')
+        out, code = self.run_tool('waived', '--project', self.project, '--target', 'test')
+        self.assertEqual(0, code, out)
+        self.assertIn('turns nothing off for test', out)
+
+    def test_an_unreadable_file_or_a_bad_target_is_an_error(self):
+        for text in ('{ broken', '[]', '{"settings": {"gate_steps": []}}'):
+            self.commit_file(text)
+            out, code = self.run_tool('waived', '--project', self.project, '--target', 'dev')
+            self.assertEqual(1, code, text + out)
+            self.assertIn('cannot be read', out)
+        self.assertEqual(2, self.run_tool('waived', '--project', self.project)[1])
+        self.assertEqual(2, self.run_tool('waived', '--project', self.project, '--target', 'main')[1])
+
+
 if __name__ == '__main__':
     unittest.main()

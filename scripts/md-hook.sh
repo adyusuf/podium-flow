@@ -62,9 +62,9 @@ if printf '%s' "$output" | grep -qi 'no CLAUDE.md budget is installed'; then
   exit 0
 fi
 
-if printf '%s' "$output" | grep -qi 'CEILING EXCEEDED\|NO BUDGET\|FILE MISSING'; then
+if printf '%s' "$output" | grep -qi 'CEILING EXCEEDED\|NO BUDGET\|FILE MISSING\|BAD BUDGET ROW'; then
   echo "⚠️ A CLAUDE.md budget was exceeded — a new permanent decision belongs in docs/<topic>.md, not in the root file:"
-  printf '%s\n' "$output" | grep -Ei 'CEILING EXCEEDED|NO BUDGET|FILE MISSING'
+  printf '%s\n' "$output" | grep -Ei 'CEILING EXCEEDED|NO BUDGET|FILE MISSING|BAD BUDGET ROW'
   echo "   If you simplified it:  bash scripts/md-size-gate.sh --update"
 fi
 

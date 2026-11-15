@@ -30,13 +30,18 @@ export function enabledFor(want: boolean, inMode: boolean): 'auto' | 'on' | 'off
   return want ? 'on' : 'off'
 }
 
-/** `<short sha> <gates> (neden: ...)` for every `Gate-Waived:` line of a `git log --format=@@%h%n%B` output. */
+/**
+ * The `git log` format the Promotion box reads: a NUL, the short sha, then the message. Git refuses a NUL in a commit
+ * message, so a body line can never pass for the start of a commit (a `@@` marker could, F-036).
+ */
+export const WAIVED_LOG_FORMAT = '%x00%h%n%B'
+
+/** `<short sha> <gates> (neden: ...)` for every `Gate-Waived:` line of a `git log --format=<WAIVED_LOG_FORMAT>` output. */
 export function waivedLines(log: string): string[] {
   const out: string[] = []
-  let sha = ''
-  for (const line of log.split('\n')) {
-    if (line.startsWith('@@')) sha = line.slice(2)
-    else if (line.startsWith('Gate-Waived:')) out.push(`${sha} ${line.slice('Gate-Waived:'.length).trim()}`)
+  for (const commit of log.split('\0').slice(1)) {
+    const [sha, ...body] = commit.split('\n')
+    for (const line of body) if (line.startsWith('Gate-Waived:')) out.push(`${sha} ${line.slice('Gate-Waived:'.length).trim()}`)
   }
   return out
 }
@@ -126,7 +131,7 @@ export function plannedStages(have: Set<string>, order: readonly string[] = ['de
   return out
 }
 
-/** The git range of commits that reached `branch`'s origin from its previous stage's origin ('' for the first stage). */
+/** The git range of the commits waiting to come in to `branch`'s origin from its previous stage's origin ('' for the first stage). */
 export function waivedRange(stage: PlannedStage): string {
   return stage.previous ? `origin/${stage.branch}..origin/${stage.previous}` : ''
 }
