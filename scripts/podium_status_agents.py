@@ -22,6 +22,7 @@ from podium_status_rows import CLOSED, clip, one_row, put_row
 AGENT_STEP = 'task'            # the one step the hooks write for an agent
 FAILED_STATUS = ('failed', 'error', 'errored', 'cancelled', 'canceled', 'interrupted', 'aborted')
 MAX_TRANSCRIPT = 64 * 1024 * 1024     # also the budget line's cap (podium_budget.py)
+MAX_META = 64 * 1024                  # an agent's meta file is a few hundred bytes
 
 
 def agent_name(payload):
@@ -42,9 +43,9 @@ def meta_of(payload):
         meta = os.path.join(session[:-len('.jsonl')], 'subagents', 'agent-%s.meta.json' % agent)
     try:
         with open(meta, encoding='utf-8') as handle:
-            found = json.load(handle)
+            found = json.loads(handle.read(MAX_META))      # a few hundred bytes from the harness; never a whole huge file
         return found if isinstance(found, dict) else {}
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):           # RecursionError: a deeply nested file (QA 16/11/2026)
         return {}
 
 
@@ -110,7 +111,8 @@ def transcript_facts(path):
                     continue
                 if entry.get('type') == 'assistant':
                     error = str(entry.get('error') or entry.get('apiError') or 'error') if entry.get('isApiErrorMessage') else ''
-                    model = str(message.get('model') or model)
+                    # `<synthetic>` is the model of a line the harness wrote itself (a usage limit): no model ran it.
+                    model = model if str(message.get('model') or '<').startswith('<') else str(message['model'])
                 for block in message.get('content') if isinstance(message.get('content'), list) else []:
                     if isinstance(block, dict) and block.get('type') == 'tool_use':
                         calls.add(block.get('id') or len(calls))
@@ -198,6 +200,8 @@ def measured(payload, row, now, facts=None):
     counted = None if facts is None else (facts['calls'], facts['out'])
     millis, calls, out = number(payload, 'duration_ms'), number(payload, 'tool_uses'), number(payload, 'output_tokens')
     run = millis / 1000 if millis is not None else (now - int(row['since']) if hooked(row) else None)
+    if hooked(row) and row.get('state') != 'running':      # a second stop with no start between: no new run (QA 16/11/2026)
+        run = 0
     seconds = None if run is None else whole(row.get('spent')) + run
     if whole(row.get('resumed')):
         calls = counted[0] if counted else (whole(row.get('tools')) or calls)
@@ -219,7 +223,8 @@ def stop(data, payload, now):
     state, percent = ('failed', '') if why else ('done', '')
     at = one_row(data['rows'], AGENT_STEP, agent)
     row = dict(data['rows'][at]) if at is not None else {'item': AGENT_STEP, 'agent': agent, 'waiting': '', 'since': '', 'tools': ''}
-    model = clip(payload.get('model')) or short_model((facts or {}).get('model')) or row.get('model', '')
+    # The transcript's model is measured; the payload's or the start's may be the alias asked for (`sonnet`).
+    model = short_model((facts or {}).get('model')) or clip(payload.get('model')) or row.get('model', '')
     seconds, calls, out = measured(payload, row, now, facts)
     label = label_of(meta_of(payload), model) or row.get('label', '')
     row.update(state=state, percent=percent, blocker=why, model=model, label=label, figure='',

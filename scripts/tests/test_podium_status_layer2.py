@@ -112,6 +112,35 @@ class Layer2(unittest.TestCase):
         self.assertIn('5 tool uses', row['note'])                   # the transcript holds every run; the payload one
         self.assertIn('resumed ×1', row['note'])
 
+    def test_a_nested_or_huge_meta_file_leaves_no_label_but_the_row_opens_and_closes(self):
+        # QA 16/11/2026: a deeply nested meta file raised RecursionError and no row opened at all.
+        payload, _ = self.session_files()
+        meta = os.path.join(self.dir, 'proj', SESSION, 'subagents', 'agent-%s.meta.json' % QA['agent_id'])
+        for text in ('[' * 100000, '{"description": "' + 'x' * 200000 + '"}'):
+            with self.subTest(size=len(text)):
+                with open(meta, 'w', encoding='utf-8') as handle:
+                    handle.write(text)
+                self.run_hook('subagent', payload)
+                self.assertEqual(('running', ''), (self.rows(QA_NAME)[0]['state'], self.rows(QA_NAME)[0]['label']))
+                self.run_hook('subagent-stop', payload)
+                self.assertEqual('done', self.rows(QA_NAME)[0]['state'])
+
+    def test_a_second_stop_with_no_start_between_adds_no_time(self):
+        self.run_hook('subagent', QA)
+        self.age(QA_NAME, 10)
+        self.run_hook('subagent-stop', QA)
+        first = self.rows(QA_NAME)[0]['note']
+        self.age(QA_NAME, 100)                                      # since moves back; a new run would add it
+        self.run_hook('subagent-stop', QA)
+        self.assertEqual(first, self.rows(QA_NAME)[0]['note'])
+
+    def test_the_measured_model_wins_over_the_alias_a_payload_names_and_a_limit_line_names_none(self):
+        payload, transcript = self.session_files()
+        self.run_hook('subagent', payload)
+        self.write_transcript(transcript, [answer(tool='t1'), RATE_LIMIT])
+        self.run_hook('subagent-stop', dict(payload, agent_transcript_path=transcript, model='sonnet'))
+        self.assertEqual('QA review of ti-batch (Sonnet 5.5)', self.rows(QA_NAME)[0]['label'])
+
     def test_fifteen_agents_at_once_keep_fifteen_rows_apart(self):
         agents = [dict(QA, agent_type='podium:developer', agent_id='%02dabcdef' % n) for n in range(15)]
         for agent in agents:
