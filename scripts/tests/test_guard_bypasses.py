@@ -1,5 +1,5 @@
 """The bypasses of the destructive-command guard found by the test inventory (14/11/2026, F-001 and F-002; F-045 in
-phase 2), as one table.
+phase 2; the QA pass of 16/11/2026), as one table.
 
 Each row runs twice: through `verdict()` in scripts/guard-inspect.py (the reason it gives) and through the real hook,
 `bash scripts/guard-destructive.sh` with a PreToolUse payload on stdin (the exit code the harness reads). The wrapper run
@@ -98,6 +98,28 @@ BYPASSES = [
     ('rm build -rf .', 'recursive delete'),
     ('/bin/rm -rf ~', 'recursive delete'),
     ('git rm -rf .', 'recursive delete'),
+    # QA 16/11/2026: an option closed by a quote, `)`, `}` or `;`, or standing in quotes itself
+    ('bash -c "git push --force"', 'forced push'),
+    ("sh -c 'git push -f'", 'forced push'),
+    ('(git push -f)', 'forced push'),
+    ('$(git push -f)', 'forced push'),
+    ('{ git push -f; }', 'forced push'),
+    ('git push "-f"', 'forced push'),
+    ("git push 'origin' '-f'", 'forced push'),
+    ('git push origin main;', 'straight to main'),
+    ('bash -c "git push --mirror"', 'mirror'),
+    # QA 16/11/2026: a ; or & inside a quoted message is text, it no longer hides the option after it
+    ('git commit -m "a; b" --no-verify', 'gitleaks'),
+    ('git commit -m "x & y" -n', '-n (--no-verify)'),
+    ('git push -o "a;b" --force', 'forced push'),
+    # QA 16/11/2026: rm targets ending in /, /. or /*, the parent, an abbreviated --recursive, rm in a subshell
+    ('rm -rf "$HOME"/', 'recursive delete'),
+    ('rm -rf ~/.', 'recursive delete'),
+    ('rm -rf /.', 'recursive delete'),
+    ('rm -rf ../*', 'recursive delete'),
+    ('rm --recur /', 'recursive delete'),
+    ('(rm -rf /)', 'recursive delete'),
+    ('rm -rf ~;', 'recursive delete'),
 ]
 
 NEAR_MISSES = [
@@ -112,6 +134,9 @@ NEAR_MISSES = [
     'git push --all origin', 'git push --dry-run origin dev', 'git commit --no-verbose -m x', 'git commit --no-edit',
     'git push origin "feature/main-x"', "git push origin 'main-menu'", 'rm -rf ./build ./dist', 'rm -rf build dist/*',
     'git rm -r --cached .', 'terraform fmt -recursive .', 'npm run confirm -r .',
+    # QA 16/11/2026 near misses: --no-verify-signatures is another option, safe dot-names and subfolders, a quoted push
+    'git merge --no-verify-signatures feature/x', 'rm -rf ~/.cache', 'rm -rf .git', 'rm -rf ./x/', 'rm -rf ..foo',
+    'git commit -m "fix (git push)"', 'git push origin main-x',
 ]
 
 

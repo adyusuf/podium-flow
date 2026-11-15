@@ -39,10 +39,25 @@ class ScalarWhereAGroupBelongs(base.Tool):
     def test_a_group_where_a_single_value_belongs_is_refused_too(self):
         self.refused(self.user, '{"mode": {"x": 1}}', 'set', 'mode', 'B')
 
-    def test_reading_such_a_file_still_works(self):
+    def test_reading_such_a_file_still_works_and_says_what_is_ignored(self):
+        # The rest of the file still counts; the misshapen value is left out and said on stderr (QA 16/11/2026).
+        for text, said in (('{"push": true, "mode": "B"}', 'push is a group of settings'),
+                           ('{"mode": "B", "push": {"prod": false}, "agents": {"qa": {"x": 1}}}', None)):
+            with self.subTest(text=text):
+                with open(self.user, 'w', encoding='utf-8') as handle:
+                    handle.write(text)
+                out, err, code = self.run_tool('get', 'mode')
+                self.assertEqual(('B\n', 0), (out, code))
+                if said:
+                    self.assertIn(said, err)
+                    self.assertIn('this value is ignored', err)
+
+    def test_a_group_where_one_value_belongs_is_said_on_reading(self):
         with open(self.user, 'w', encoding='utf-8') as handle:
-            handle.write('{"push": true, "mode": "B"}')
-        self.assertEqual(('B\n', '', 0), self.run_tool('get', 'mode'))   # 'push' is an unknown key: left out
+            handle.write('{"mode": {"x": 1}, "push": {"prod": false}}')
+        out, err, code = self.run_tool('get', 'push.prod')
+        self.assertEqual(('no\n', 0), (out, code))
+        self.assertIn('mode is one value, not a group - mode.x is ignored', err)
 
 
 class DroppedLayerIsSaid(base.Tool):

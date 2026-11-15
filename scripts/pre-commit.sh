@@ -82,7 +82,8 @@ if [ -f "$root/scripts/md-size-gate.sh" ]; then
   if ! output="$(MD_ROOT="$root" bash "$root/scripts/md-size-gate.sh" 2>&1)"; then
     printf '%s\n' "$output"
     echo "✗ commit STOPPED — CLAUDE.md budget (standards/00-working-method.md §6a)."
-    echo "  Move the rule to docs/decision-log.md, or raise the ceiling with a written reason."
+    echo "  Fix what the gate printed above: a missing scripts/md-budget.tsv or a bad row in it, a budgeted CLAUDE.md"
+    echo "  that is gone - or, over the ceiling, move the rule to docs/decision-log.md or raise the ceiling with a reason."
     failed=1
   fi
 fi

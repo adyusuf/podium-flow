@@ -169,7 +169,8 @@ export function createGlue() {
   // Clicks run one after another: two settings changed quickly must not race each other's read-modify-write. A press
   // queued right behind this one (a gate step writes this session and the saved defaults) is written before the read, so
   // one read announces the change once (F-031); each written press then gets its override note. A press that fails (the
-  // script cannot be spawned) is said in a toast and the log, never dropped (F-030); the next one still runs.
+  // script cannot be spawned) is said in a toast and the log, never dropped (F-030); the next one still runs, and when the
+  // failing press is the last one queued, the presses written before it still get their read and notes (QA 16/11/2026).
   const clicks = serial()
   let waiting = 0
   let touched = false
@@ -178,24 +179,34 @@ export function createGlue() {
     waiting += 1
     return clicks(async () => {
       waiting -= 1
-      const done = await writeSetting($, key, value, scope)
-      if (done !== 'skipped') touched = true
-      if (done === 'written') written.push({ key, value, scope })
-      if (waiting > 0 || !touched) return
-      const notes = written
-      written = []
-      touched = false
-      await refreshSettings($)
-      const { value: now = null } = await $.state.get(settings)
-      for (const one of notes) {
-        const layer = one.scope === 'saved' ? now?.saved : now
-        const note = layer ? overrideNote(one.key, one.value, layer.values[one.key], layer.sources[one.key]) : ''
-        if (note) await $.ui.toast(note)
+      let failure: { error: unknown } | null = null
+      try {
+        const done = await writeSetting($, key, value, scope)
+        if (done !== 'skipped') touched = true
+        if (done === 'written') written.push({ key, value, scope })
+      } catch (error) {
+        failure = { error }
       }
+      if (waiting === 0 && touched) await announce($)
+      if (failure) throw failure.error
     }).catch(error => {
       $.ui.log(`podium: a press in the Settings box failed: ${String(error).slice(0, 200)}`)
       $.ui.toast(`The change could not be made: ${String(error).slice(0, 160)}`)
     })
+  }
+
+  // The one read after the last queued press, and the override note of each press written since the last read.
+  async function announce($: Engine): Promise<void> {
+    const notes = written
+    written = []
+    touched = false
+    await refreshSettings($)
+    const { value: now = null } = await $.state.get(settings)
+    for (const one of notes) {
+      const layer = one.scope === 'saved' ? now?.saved : now
+      const note = layer ? overrideNote(one.key, one.value, layer.values[one.key], layer.sources[one.key]) : ''
+      if (note) await $.ui.toast(note)
+    }
   }
 
   // An interrupted turn fires no Stop hook, so the pane marks the Status box as waiting itself (qa, 02/11/2026). With no

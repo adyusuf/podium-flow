@@ -158,6 +158,14 @@ class ShellCoverageRunsEndToEnd(Repo):
         self.assertEqual(0, code, out)
 
     @KCOV_RUN
+    def test_a_bare_name_two_scripts_share_proves_neither(self):
+        # Standards check 16/11/2026: with scripts/thing.sh and scripts/sub/thing.sh, a report naming `thing.sh` cannot
+        # say which one ran, so the one no test runs must not hide behind it.
+        out, code = self.build(hits_second_line=1, bare=True, extra=('scripts/sub/thing.sh',))
+        self.assertIn('NOT MEASURED: no test runs scripts/sub/thing.sh', out)
+        self.assertEqual(3, code, out)
+
+    @KCOV_RUN
     def test_the_traced_run_count_is_reported(self):
         # It is the evidence that the shim was actually reached. A report with no
         # runs behind it would be a number with nothing under it.

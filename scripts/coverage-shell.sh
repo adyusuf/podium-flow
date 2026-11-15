@@ -56,7 +56,12 @@ set -uo pipefail
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not inside a git repository" >&2; exit 2; }
 cd "$root" || exit 2
 min="${COVERAGE_MIN:-80}"
-# Rule #29: 80 is a floor (as in gate-core.sh). A higher value applies; a lower one, or anything but a whole number, is raised to 80.
+# Rule #29: 80 is a floor (as in gate-core.sh). A higher value applies; a lower one, or anything but a number, is raised to 80.
+# A decimal is rounded UP to a whole number (85.5 -> 86: never below what was asked; the comparisons are whole).
+if [[ "$min" =~ ^[0-9]+\.[0-9]+$ ]]; then
+  whole="${min%%.*}"; [[ "${min#*.}" =~ ^0+$ ]] || whole=$((10#$whole + 1))
+  echo "COVERAGE_MIN=$min is a decimal - rounded up to $whole"; min="$whole"
+fi
 if ! [[ "$min" =~ ^[0-9]+$ ]] || [ "$min" -lt 80 ]; then
   echo "COVERAGE_MIN=$min is not a whole number of at least 80 (the floor of rule #29) - raised to 80"; min=80
 fi
@@ -188,9 +193,13 @@ for name in sorted(known):
 
 # A script in no report was never traced: NOT MEASURED, which blocks like a failure (#29).
 # kcov names a file relative to its source folder (the bare `gate-core.sh`, batch run 15/11/2026), so a report name
-# matches a script by its full relative path, a path ending in it, or - a bare name - by the file name.
+# matches a script by its full relative path, a path ending in it, or - a bare name - by the file name, only while no
+# other expected script shares that file name (two `x.sh` in two folders: a bare `x.sh` proves neither; standards check
+# 16/11/2026).
+bases = [os.path.basename(rel) for rel in expected]
 def reported(rel):
-    return any(name == rel or name.endswith('/' + rel) or ('/' not in name and name == os.path.basename(rel))
+    base = os.path.basename(rel)
+    return any(name == rel or name.endswith('/' + rel) or ('/' not in name and name == base and bases.count(base) == 1)
                for name in known)
 never = [rel for rel in expected if not reported(rel)]
 for rel in never:

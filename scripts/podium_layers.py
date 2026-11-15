@@ -180,6 +180,30 @@ def read_layer(path, keep_unknown=False):
         return {}, '%s: %s' % (path, error)
 
 
+def misplaced(path):
+    """Problem lines for a hand-edited file's values in the wrong shape: a single value where this schema has a group
+    (`{"push": true}`) or a group where it has a single value (`{"mode": {"x": 1}}`). read_layer leaves such a key out
+    like a newer plugin's key, so the rest of the file still counts; these lines say it instead of hiding it (QA
+    16/11/2026, after F-027). A file read_layer already reports as a problem gives none."""
+    try:
+        with open(path, encoding='utf-8') as handle:
+            tree = json.load(handle)
+    except (OSError, ValueError):
+        return []
+    if not isinstance(tree, dict):
+        return []
+    lines = []
+    for key in flatten(tree):
+        if key in SPECS or key in RETIRED_KEYS:
+            continue
+        if any(known.startswith(key + '.') for known in SPECS):
+            lines.append('%s: %s is a group of settings (%s.<name>), not one value - this value is ignored' % (path, key, key))
+        elif any(key.startswith(known + '.') for known in SPECS):
+            group = next(known for known in SPECS if key.startswith(known + '.'))
+            lines.append('%s: %s is one value, not a group - %s is ignored' % (path, group, key))
+    return lines
+
+
 def load(user_path=None, session=None, project=True):
     """(effective {key: (value, source)}, problems [str]). `user_path` replaces the user's file (the installer's --home);
     `session` adds that session's layer on top (an unusable id adds nothing). `project=False` leaves the project's layer out."""
@@ -197,6 +221,8 @@ def load(user_path=None, session=None, project=True):
         if problem:
             # One bad value drops the whole file (fail-closed: never half a project file), so the problem says so (F-028).
             problems.append('%s - the whole file is ignored, the layers below it apply' % problem)
+        elif os.path.exists(path):
+            problems.extend(misplaced(path))
         if source == 'project':
             files, trouble = read_mode_files(os.path.dirname(path))
             problems.extend(trouble)

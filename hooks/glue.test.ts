@@ -156,6 +156,20 @@ test('a press whose run is rejected says so in a toast and the log, and the next
   expect(commands($).filter(one => one.startsWith('set')).length).toBe(2)
 })
 
+test('a press written before a failing last press still gets its read (QA 16/11/2026)', async () => {
+  const script = configScript(layers())
+  let sets = 0
+  const $ = fake(argv => {
+    if (argv[2] === 'set' && ++sets === 2) throw new Error('spawn python3 ENOENT')
+    return script(argv)
+  })
+  const glue = createGlue()
+  void glue.click($, 'mode', 'B', 'session')
+  await glue.click($, 'push.prod', 'no', 'session')
+  expect(commands($)).toEqual(['set --session s1 mode B', 'set --session s1 push.prod no', ...READ])
+  expect($.toasts).toEqual(['The change could not be made: Error: spawn python3 ENOENT'])
+})
+
 test('a gate step press writes this session and the saved defaults, then one read announces the change once (F-031)', async () => {
   const config = layers()
   const $ = fake(configScript(config))

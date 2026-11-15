@@ -111,7 +111,8 @@ class CoverageOnly(GateProject):
         # F-013, rule #29: 80 is a floor. A lower value from the conf or the environment, or one that is not a whole
         # number, becomes 80 - and the coverage command measures against the threshold the gate printed.
         conf = "COVERAGE_CMD='echo threshold=$COVERAGE_MIN'\n"
-        for where, value, expected in (('conf', '10', '80'), ('env', '79', '80'), ('env', 'abc', '80'), ('env', '90', '90')):
+        for where, value, expected in (('conf', '10', '80'), ('env', '79', '80'), ('env', 'abc', '80'), ('env', '90', '90'),
+                                      ('env', '85.5', '86')):  # a decimal rounds up, never down (QA 16/11/2026)
             with self.subTest(where=where, value=value):
                 out, code = self.gate(conf + (f'COVERAGE_MIN={value}\n' if where == 'conf' else ''), '--coverage-only',
                                       env={'COVERAGE_MIN': value} if where == 'env' else None)
