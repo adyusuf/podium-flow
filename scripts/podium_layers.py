@@ -1,7 +1,8 @@
 """The podium configuration's layers on disk: where each file is, how a file is read, merged and written.
 
 Split out of podium_config.py so no file passes 300 lines (rule #9); podium_config.py re-exports every name here.
-Layers, lowest first: the shipped defaults < the user's file < the project's file < the session's own layer.
+Layers, lowest first: the shipped defaults < the user's file < the project's file (with its .claude/mode and
+.claude/mode-model, which the file itself beats) < the session's own layer.
 """
 import contextlib
 import hashlib
@@ -66,6 +67,35 @@ def project_file():
         top = os.getcwd()
     path, older = os.path.join(top, '.claude', 'podium.json'), os.path.join(top, '.claude', LEGACY + '.json')
     return older if not os.path.exists(path) and os.path.isfile(older) else path
+
+
+# The project's one-word files /podium:working-mode writes beside its podium.json, and the setting each one holds. The
+# rules rank them above the configuration's own `mode` (CLAUDE.md #27, modes/README.md), so they are read as part of the
+# project layer: one source for the mode (F-026, 14/11/2026). The project's podium.json beats them when it sets the key.
+MODE_FILES = (('mode', 'mode'), ('mode-model', 'mode_model'))
+
+
+def read_mode_files(folder):
+    """({setting: value}, problems) from <folder>/mode and <folder>/mode-model. The first non-empty line is the value,
+    checked like a `set` (a letter A-E in any case; a model of MODELS); anything else is a problem line and that file is
+    ignored, while the other file and the project's podium.json still count. A missing file sets nothing.
+
+    A valid letter with no usable mode-model beside it means every agent on its defined model (CLAUDE.md #27, "the letter
+    alone"; modes/README.md): `mode_model` is then `keep`, so the user's or the shipped override never leaks under it."""
+    values, problems = {}, []
+    for name, key in MODE_FILES:
+        path = os.path.join(folder, name)
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, encoding='utf-8') as handle:
+                word = next((line.strip() for line in handle if line.strip()), '')
+            values[key] = check(key, word)
+        except (OSError, ValueError, ConfigError) as error:
+            problems.append('%s: %s (this file is ignored)' % (path, error))
+    if 'mode' in values:
+        values.setdefault('mode_model', 'keep')
+    return values, problems
 
 
 def flatten(tree, prefix=''):
@@ -150,6 +180,30 @@ def read_layer(path, keep_unknown=False):
         return {}, '%s: %s' % (path, error)
 
 
+def misplaced(path):
+    """Problem lines for a hand-edited file's values in the wrong shape: a single value where this schema has a group
+    (`{"push": true}`) or a group where it has a single value (`{"mode": {"x": 1}}`). read_layer leaves such a key out
+    like a newer plugin's key, so the rest of the file still counts; these lines say it instead of hiding it (QA
+    16/11/2026, after F-027). A file read_layer already reports as a problem gives none."""
+    try:
+        with open(path, encoding='utf-8') as handle:
+            tree = json.load(handle)
+    except (OSError, ValueError):
+        return []
+    if not isinstance(tree, dict):
+        return []
+    lines = []
+    for key in flatten(tree):
+        if key in SPECS or key in RETIRED_KEYS:
+            continue
+        if any(known.startswith(key + '.') for known in SPECS):
+            lines.append('%s: %s is a group of settings (%s.<name>), not one value - this value is ignored' % (path, key, key))
+        elif any(key.startswith(known + '.') for known in SPECS):
+            group = next(known for known in SPECS if key.startswith(known + '.'))
+            lines.append('%s: %s is one value, not a group - %s is ignored' % (path, group, key))
+    return lines
+
+
 def load(user_path=None, session=None, project=True):
     """(effective {key: (value, source)}, problems [str]). `user_path` replaces the user's file (the installer's --home);
     `session` adds that session's layer on top (an unusable id adds nothing). `project=False` leaves the project's layer out."""
@@ -165,7 +219,14 @@ def load(user_path=None, session=None, project=True):
     for source, path in layers:
         values, problem = read_layer(path)
         if problem:
-            problems.append(problem)
+            # One bad value drops the whole file (fail-closed: never half a project file), so the problem says so (F-028).
+            problems.append('%s - the whole file is ignored, the layers below it apply' % problem)
+        elif os.path.exists(path):
+            problems.extend(misplaced(path))
+        if source == 'project':
+            files, trouble = read_mode_files(os.path.dirname(path))
+            problems.extend(trouble)
+            values = dict(files, **values)
         for key, value in values.items():
             effective[key] = (value, source)
     return effective, problems
@@ -191,8 +252,15 @@ def write_layer(path, changes, removals=()):
         if problem:
             raise ConfigError('refusing to overwrite an unreadable configuration file - ' + problem, 1)
         current.update(changes)
+        # e.g. {"push": true} written by hand where the group push.* lives: nest() cannot hold both, and an unset of
+        # push.prod there would rewrite a file that is wrong about that group (F-027): refused, the file left as it was.
+        named = set(current) | set(removals)
+        groups = sorted({other for other in current for key in named if key.startswith(other + '.')})
         for key in removals:
             current.pop(key, None)
+        if groups:
+            raise ConfigError("refusing to write %s: it would hold '%s' both as a single value and as a group of settings "
+                              "- fix or remove it by hand" % (path, "', '".join(groups)), 1)
         temp = '%s.%d.tmp' % (path, os.getpid())
         try:
             with open(temp, 'w', encoding='utf-8') as handle:

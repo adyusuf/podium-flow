@@ -2,8 +2,9 @@ import { expect, test } from 'claude-code/testing'
 
 import {
   countOf, enabledFor, installPathOf, isWanted, newestLiveDir, overrideNote, parseDiscovery, plannedStages, refSet, scriptDir,
-  settingGroups, waivedLines, waivedRange,
+  settingGroups, WAIVED_LOG_FORMAT, waivedLines, waivedRange,
 } from './choose'
+import { SECTION_HELP, STAGE_TAIL } from './help'
 
 const ID = 'podium@podium-marketplace'
 
@@ -51,9 +52,22 @@ test('a click that a higher layer overrides says which layer wins', () => {
 })
 
 test('every Gate-Waived line is listed with the commit it came from', () => {
-  const log = '@@abc1234\nmerge\n\nGate-Waived: unit, e2e (neden: configuration)\n@@def5678\nplain commit\n@@0a0a0a0\nGate-Waived: unit (neden: x)\n'
+  const log = '\0abc1234\nmerge\n\nGate-Waived: unit, e2e (neden: configuration)\n\0def5678\nplain commit\n\0' +
+    '0a0a0a0\nGate-Waived: unit (neden: x)\n'
   expect(waivedLines(log)).toEqual(['abc1234 unit, e2e (neden: configuration)', '0a0a0a0 unit (neden: x)'])
   expect(waivedLines('')).toEqual([])
+  expect(WAIVED_LOG_FORMAT).toBe('%x00%h%n%B')
+})
+
+test('a commit body cannot fake the commit a waived gate came from: a line starting with @@ is body text (F-036)', () => {
+  const log = '\0abc1234\nmerge\n\n@@fake999\nGate-Waived: unit (neden: configuration)\n\0def5678\n@@\n'
+  expect(waivedLines(log)).toEqual(['abc1234 unit (neden: configuration)'])
+})
+
+test('the Promotion texts agree on what the waived range is: the commits waiting to come in (F-036)', () => {
+  expect(STAGE_TAIL).toContain('waiting to come in')
+  expect(SECTION_HELP.promotion).toContain('waiting to come in')
+  expect(STAGE_TAIL.includes('came in')).toBe(false)
 })
 
 test('the script folder is the recorded one, else the newest copy that is not marked as replaced', () => {

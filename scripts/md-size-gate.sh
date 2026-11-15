@@ -8,11 +8,11 @@
 #
 # Usage:
 #   scripts/md-size-gate.sh            # audit (the gate)
-#   scripts/md-size-gate.sh --update   # pull the ceilings down to TODAY's size
+#   scripts/md-size-gate.sh --update   # pull the ceilings down to TODAY's size (refused while a row is bad)
 #   scripts/md-size-gate.sh --init     # no budget yet: write one, ceiling = TODAY's size
 #
-# Exit code: 0 = passed, 1 = a budget was exceeded or a file has no budget
-# (--init: 1 = a budget already exists and was left untouched).
+# Exit code: 0 = passed, 1 = a budget was exceeded, a file has no budget or a budget row is malformed
+# (also with --hook; --init: 1 = a budget already exists and was left untouched).
 set -uo pipefail
 
 # ⚠️ ROOT and BUDGET can be supplied from outside. Reason: the CANONICAL copy of
@@ -105,6 +105,7 @@ fi
 
 
 FAILED=0
+BAD_ROWS=0
 LISTED=""
 # Project-specific discovery exclusions: `# exclude:<relative-path>` in the budget
 # file. Why in the tsv: an exclusion is project data (in the configuration repository
@@ -123,9 +124,20 @@ done < "$BUDGET"
 printf '%-28s %7s %7s %7s  %s\n' FILE NOW CEILING TARGET STATUS
 printf '%.0s─' {1..78}; echo
 
-while IFS=$'\t' read -r path ceiling target note; do
+while IFS= read -r row; do
+  IFS=$'\t' read -r path ceiling target note <<<"$row"
   case "$path" in ''|\#*) continue ;; esac
-  LISTED="$LISTED|$path"
+  LISTED="$LISTED$path"$'\n'
+  # ⚠️ A ceiling or target that is not a whole number used to PASS (found 14/11/2026): `[ "$now" -gt abc ]`
+  # errors, the error is false, and the row printed "under the ceiling" with exit 0. A row must carry both
+  # numbers; surrounding whitespace (a CR from a CRLF checkout included) is trimmed, as the old test did.
+  bad=0
+  if [[ $ceiling =~ ^[[:space:]]*([0-9]+)[[:space:]]*$ ]]; then ceiling=$((10#${BASH_REMATCH[1]})); else bad=1; fi
+  if [[ $target =~ ^[[:space:]]*([0-9]+)[[:space:]]*$ ]]; then target=$((10#${BASH_REMATCH[1]})); else bad=1; fi
+  if [ "$bad" -eq 1 ]; then
+    printf '%-28s %7s %7s %7s  %s\n' "$path" "-" "-" "-" "✗ BAD BUDGET ROW (ceiling and target must be whole numbers): ${row//$'\t'/\\t}"
+    FAILED=1; BAD_ROWS=1; continue
+  fi
   full="$ROOT/$path"
   if [ ! -f "$full" ]; then
     printf '%-28s %7s %7s %7s  %s\n' "$path" "-" "$ceiling" "$target" "✗ FILE MISSING"
@@ -164,7 +176,9 @@ while IFS= read -r file; do
   case "$rel" in .claude/*|**/node_modules/*|docs/claude-md-archive/*) continue ;; esac
   skip=0; for d in "${EXCLUDE[@]+"${EXCLUDE[@]}"}"; do case "$rel" in "$d"/*|"$d") skip=1 ;; esac; done
   [ "$skip" -eq 1 ] && continue
-  if ! echo "$LISTED" | grep -q "|$rel"; then
+  # Fixed-string, whole-line match: as a regex an unbudgeted `a.b/CLAUDE.md` matched the row for
+  # `axb/CLAUDE.md`, and as a prefix the row for `x/CLAUDE.md.old` covered `x/CLAUDE.md`.
+  if ! printf '%s' "$LISTED" | grep -qxF -- "$rel"; then
     printf '%-28s %7s %7s %7s  %s\n' "$rel" "$(kb "$file")" "-" "-" "✗ NO BUDGET"
     FAILED=1
   fi
@@ -173,6 +187,12 @@ done < <(claude_md_files)
 echo
 
 if [ "$UPDATE" -eq 1 ]; then
+  # A bad row (printed above) used to be written back as it was, with exit 0 (F-046): the budget is
+  # now left untouched until the row is fixed by hand.
+  if [ "$BAD_ROWS" -eq 1 ]; then
+    echo "✗ Budget NOT updated: fix the BAD BUDGET ROW line(s) above in $BUDGET first."
+    exit 1
+  fi
   # Only ever LOWERS the ceiling. Raising it is done by hand, with a reason —
   # an automatic raise cancels the ratchet and makes the gate decorative.
   tmp="$(mktemp)"

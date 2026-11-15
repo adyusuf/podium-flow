@@ -56,6 +56,11 @@ set -uo pipefail
 root="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "not inside a git repository" >&2; exit 2; }
 cd "$root" || exit 2
 min="${COVERAGE_MIN:-80}"
+# Rule #29: 80 is a floor (as in gate-core.sh). A higher value applies; a lower one, or anything but a number, is raised to 80.
+if [[ "$min" =~ ^([0-9]+)\.([0-9]+)$ ]]; then   # a decimal rounds UP, never down (85.5 -> 86)
+  w=$((10#${BASH_REMATCH[1]} + (10#${BASH_REMATCH[2]} > 0))); echo "COVERAGE_MIN=$min is a decimal - rounded up to $w"; min=$w; fi
+if ! [[ "$min" =~ ^[0-9]+$ ]] || [ "$min" -lt 80 ]; then
+  echo "COVERAGE_MIN=$min is not a whole number of at least 80 (the floor of rule #29) - raised to 80"; min=80; fi
 
 kcov_bin="$(command -v kcov 2>/dev/null)" || true
 [ -n "$kcov_bin" ] || {
@@ -141,10 +146,16 @@ fi
 runs="$(find "$work/out" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')"
 [ "$runs" != 0 ] || { echo "  NOT MEASURED: the shim was never reached — no test ran one of our scripts"; exit 3; }
 
-python3 - "$work/out" "$min" "$runs" <<'REPORT'
-import glob, sys, xml.etree.ElementTree as ET
+# The denominator is every shell script here, not only the ones a test happened to run: kcov reports only what it
+# traced, so a script no test runs would leave the figure silently (JS and TS report it, coverage.sh). Only the tests
+# are left out - the same exclusion as .coveragerc (Python) and scripts/coverage.sh (JavaScript, TypeScript).
+expected="$(find scripts -name '*.sh' -not -path '*/tests/*' 2>/dev/null | sort)"
+
+python3 - "$work/out" "$min" "$runs" "$expected" <<'REPORT'
+import glob, os, sys, xml.etree.ElementTree as ET
 
 out_dir, minimum, runs = sys.argv[1], float(sys.argv[2]), sys.argv[3]
+expected = [line for line in sys.argv[4].splitlines() if line]
 
 # A TRUE union across runs, not an approximation: kcov's cobertura.xml carries
 # per-line hit counts, so a line covered by any one test counts as covered.
@@ -175,6 +186,22 @@ for name in sorted(known):
     covered_sum += covered
     total_sum += total
     print(f"    {name.split('/')[-1]:<26} {covered:>4}/{total:<4} {100.0*covered/total:>6.1f}%")
+
+# A script in no report was never traced: NOT MEASURED, which blocks like a failure (#29).
+# kcov names a file relative to its source folder (the bare `gate-core.sh`, batch run 15/11/2026), so a report name
+# matches a script by its full relative path, a path ending in it, or - a bare name - by the file name, only while no
+# other expected script shares that file name (two `x.sh` in two folders: a bare `x.sh` proves neither; standards check
+# 16/11/2026).
+bases = [os.path.basename(rel) for rel in expected]
+def reported(rel):
+    base = os.path.basename(rel)
+    return any(name == rel or name.endswith('/' + rel) or ('/' not in name and name == base and bases.count(base) == 1)
+               for name in known)
+never = [rel for rel in expected if not reported(rel)]
+for rel in never:
+    print(f"  NOT MEASURED: no test runs {rel} - it is in no kcov report")
+if never:
+    raise SystemExit(3)
 
 pct = 100.0 * covered_sum / total_sum
 print(f"    {'TOTAL':<26} {covered_sum:>4}/{total_sum:<4} {pct:>6.1f}%   ({runs} traced runs)")

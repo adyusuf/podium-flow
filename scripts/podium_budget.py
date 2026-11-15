@@ -6,7 +6,8 @@ is a figure the user follows in the Status box: what this session has spent so f
 
 The spend is the session's transcript plus its subagents' transcripts (`<transcript without .jsonl>/subagents/*.jsonl`),
 tokens x the API LIST price (step_stats_transcripts.measure) - a proxy for consumption, not a subscription bill, and the
-line says so. A transcript that cannot be read gives no figure rather than a guess (rule #15).
+line says so. A transcript that cannot be read gives no figure rather than a guess (rule #15), and so does one over
+the agent counter's size cap (F-039, 14/11/2026): this runs on every prompt and stop, and a partial sum would be a guess.
 """
 import glob
 import os
@@ -14,6 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import step_stats_transcripts as transcripts  # noqa: E402
+from podium_status_agents import MAX_TRANSCRIPT  # noqa: E402
 
 BUDGETS = ('none', '200', '500', '1000')     # user decision 09/11/2026
 LEGACY_BUDGETS = ('25', '50', '100')          # still shown as set, from a file written before then (rule #4)
@@ -34,6 +36,8 @@ def spent(path):
     if not paths:
         return None
     try:
+        if any(os.path.getsize(one) > MAX_TRANSCRIPT for one in paths):
+            return None
         measured = transcripts.measure(paths)
     except OSError:
         return None

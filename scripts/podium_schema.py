@@ -122,15 +122,30 @@ def gate_steps_off(values, target):
     return [step for step, _, _ in GATE_STEPS if values.get('gate_steps.%s.%s' % (step, target)) is False]
 
 
+BLOCK_MARKS = ('>', '>-', '>+', '|', '|-', '|+')     # a YAML folded (>) or literal (|) value, with its chomping mark
+
+
 def front_matter(role, field, missing):
-    """One front-matter line of an agent file (`model:`, `description:`), or `missing` when the file or line is absent."""
+    """One front-matter value of an agent file (`model:`, `description:`), or `missing` when the file or line is absent.
+
+    A folded (`description: >`) or literal (`|`) value is the indented lines under it: folded joined by spaces, literal
+    by newlines (F-034: the line alone read as `>`)."""
     try:
         with open(os.path.join(AGENTS_DIR, role + '.md'), encoding='utf-8') as handle:
-            for line in handle:
-                if line.startswith(field + ':'):
-                    return line.split(':', 1)[1].strip()
+            lines = handle.read().splitlines()
     except OSError:
-        pass
+        return missing
+    for at, line in enumerate(lines):
+        if line.startswith(field + ':'):
+            value = line.split(':', 1)[1].strip()
+            if value not in BLOCK_MARKS:
+                return value
+            block = []
+            for more in lines[at + 1:]:
+                if more.strip() and not more[:1].isspace():
+                    break
+                block.append(more.strip())
+            return ' '.join(part for part in block if part) if value[0] == '>' else '\n'.join(block).strip('\n')
     return missing
 
 

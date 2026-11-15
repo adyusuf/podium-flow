@@ -17,12 +17,21 @@ ACCEPTED=()
 # was quietly losing: several projects listed `coverage` as an accepted gap and
 # their gates printed GREEN while nothing measured coverage at all. Measured on
 # It was measured across the projects carrying this gate.
+# Rule #19 locks the secret scan and SAST the same way: the locked rows of GATE_STEPS (below) are appended to this
+# pattern, and a skip under a locked step's heading is refused whatever its label says ("gitleaks is not installed").
 NEVER_ACCEPTABLE='coverage'
+GATE_STEP_CURRENT=""   # the step whose heading gate_step printed last
 skip() {
   local what="$1"
+  # An empty branch (`a|`, `|a`, `a||b`, `(|a)`) matches every label: that is a switch, not a written acceptance.
+  # Checked before the match: some greps refuse such a pattern and others match everything with it.
+  if [ -n "${ACCEPTED_GAPS:-}" ] && [ -n "${ACCEPTED_GAPS_REASON:-}" ] && printf '%s' "$ACCEPTED_GAPS" | grep -qE '^\||\|$|\|\||\(\||\|\)'; then
+    printf '  \033[33m·\033[0m SKIPPED (ACCEPTED_GAPS has an empty branch, which matches every step — not accepted): %s\n' "$what"; SKIP+=("$what"); return 0
+  fi
   if [ -n "${ACCEPTED_GAPS:-}" ] && [ -n "${ACCEPTED_GAPS_REASON:-}" ] && printf '%s' "$what" | grep -qiE "${ACCEPTED_GAPS}"; then
-    if printf '%s' "$what" | grep -qiE "$NEVER_ACCEPTABLE"; then
-      printf '  \033[33m·\033[0m SKIPPED (this gap CANNOT be accepted — rule #29): %s\n' "$what"; SKIP+=("$what"); return 0
+    if printf '%s' "$what" | grep -qiE "$NEVER_ACCEPTABLE" || step_locked "$GATE_STEP_CURRENT"; then
+      local rule='#19, the secret scan and SAST are locked'; printf '%s' "$what" | grep -qi 'coverage' && rule='#29'
+      printf '  \033[33m·\033[0m SKIPPED (this gap CANNOT be accepted — rule %s): %s\n' "$rule" "$what"; SKIP+=("$what"); return 0
     fi
     printf '  \033[33m~\033[0m ACCEPTED GAP: %s\n' "$what"; ACCEPTED+=("$what"); return 0
   fi
@@ -152,6 +161,9 @@ compat|compat|backward compatibility
 md|md size|CLAUDE.md gates
 documents|docs|project documents (rule #16 — fail closed)
 e2e_specs|e2e|e2e specs — CHECK ONLY, nothing is run here'
+# step_locked <id>: 0 when the row of <id> carries `locked`. The never-acceptable pattern takes those rows' names too.
+step_locked() { printf '%s\n' "$GATE_STEPS" | awk -F'|' -v id="$1" '$1 == id && $4 == "locked" { found = 1 } END { exit !found }'; }
+NEVER_ACCEPTABLE="$NEVER_ACCEPTABLE$(printf '%s\n' "$GATE_STEPS" | awk -F'|' '$4 == "locked" { printf "|%s|%s", $2, $3 }')"
 # The ids unticked for $TARGET, read once from the panel's settings in the project. Only an explicit `false` unticks a
 # step; a missing file or key runs it, and an unreadable file runs every step with a warning (fail closed).
 GATE_STEPS_OFF=""; GATE_STEPS_READ=0
@@ -175,7 +187,7 @@ print(" ".join(sorted(i for i, t in steps.items()
   # A locked step runs whatever the file says: a pull request that commits it off changes nothing, and the gate says so.
   local id kept=""
   for id in $GATE_STEPS_OFF; do
-    if printf '%s\n' "$GATE_STEPS" | awk -F'|' -v id="$id" '$1 == id && $4 == "locked" { found = 1 } END { exit !found }'; then
+    if step_locked "$id"; then
       warn "gate_steps.$id.$TARGET = no in ${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE} was IGNORED: $id is locked and always runs (rule #19)"
     else kept="$kept $id"; fi
   done
@@ -187,47 +199,10 @@ step_on() { gate_steps_off; case " $GATE_STEPS_OFF " in *" $1 "*) return 1 ;; es
 gate_step() {
   local heading; heading="$(printf '%s\n' "$GATE_STEPS" | awk -F'|' -v id="$1" '$1 == id { print $3 }')"
   say "${heading:-$1}"
+  GATE_STEP_CURRENT="$1"
   step_on "$1" && return 0
   printf '  \033[33m-\033[0m WAIVED: %s (gate_steps.%s.%s = no in %s)\n' "$1" "$1" "$TARGET" "${SDLC_SETTINGS_LABEL:-$SDLC_SETTINGS_FILE}"
   WAIVED+=("$1"); return 1
-}
-
-# The e2e spec check: a WARNING in both directions, it blocks nothing (#33). Moved here from gate-core.sh unchanged, so
-# that file stays under 300 lines (rule #9).
-gate_e2e_specs() {
-  missing=0
-  if [ "$LIST_ONLY" = 1 ]; then
-    printf '  → %-42s %s\n' "e2e spec check" "git diff --name-only <base>..HEAD (no e2e run)"
-    PASS+=("e2e spec check")
-    return 0
-  fi
-  if [ "$HAS_E2E_WEB" = 1 ] || [ "$HAS_E2E_MOBILE" = 1 ]; then
-    base="$(git merge-base HEAD "origin/$TARGET" 2>/dev/null || git rev-parse HEAD~1 2>/dev/null)"
-    changed="$(git diff --name-only "$base"..HEAD 2>/dev/null)"
-    behaviour="$(printf '%s\n' "$changed" | grep -Ev '^(docs/|\.github/|scripts/|e2e/|[^/]+/e2e/|.*\.md$)' | grep -E '\.(cs|ts|tsx|js|jsx|kt|swift)$' || true)"
-    specs_touched="$(printf '%s\n' "$changed" | grep -E '^(e2e/|tests/e2e/|[^/]+/e2e/|.*\.maestro/|.*\.spec\.ts)' || true)"
-    if [ -n "$behaviour" ] && [ -z "$specs_touched" ]; then
-      missing=1
-      warn "behaviour changed in $(printf '%s\n' "$behaviour" | wc -l | tr -d ' ') file(s) but no e2e spec was touched"
-      printf '%s\n' "$behaviour" | head -8 | sed 's/^/      /'
-    else
-      ok "e2e specs: nothing missing for this change"
-    fi
-  else
-    skip "e2e spec check: this project has no e2e suite"
-  fi
-  # A missing spec is a WARNING in both directions and blocks nothing. It used to
-  # fail the dev -> test promotion, which put the whole e2e backlog in front of an
-  # integration merge and stopped work that had nothing to do with e2e. #33 moved
-  # the writing to the pre-prod gate, where a spec can actually be verified
-  # against a deployed test environment — writing it earlier means writing it
-  # blind. The gap is NOT dropped: step 2 of the test -> prod gate writes every
-  # missing spec before the suite runs, and that gate does block. The gate still
-  # SAYS it on every run, so the backlog stays visible rather than silent.
-  # User decision.
-  if [ "$missing" = 1 ] && [ "$TARGET" = "test" ]; then
-    warn "the missing spec(s) above are a reminder only: e2e is optional (#33); dev -> test is not blocked"
-  fi
 }
 
 # ── The verdict ──────────────────────────────────────────────────────────────

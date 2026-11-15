@@ -37,11 +37,11 @@ class GateProject(unittest.TestCase):
             shutil.copy(os.path.join(SCRIPTS, name), os.path.join(self.project, 'scripts'))
         self.marker = os.path.join(self.project, 'coverage-ran')
 
-    def gate(self, conf, *args, target='dev'):
+    def gate(self, conf, *args, target='dev', env=None):
         with open(os.path.join(self.project, 'scripts', 'merge-gate.conf'), 'w', encoding='utf-8') as handle:
             handle.write(conf)
         done = subprocess.run(['bash', 'scripts/gate-core.sh', target, *args], cwd=self.project,
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, env=dict(os.environ, **(env or {})))
         return ANSI.sub('', done.stdout + done.stderr), done.returncode
 
     def measured(self, code=0):
@@ -106,6 +106,20 @@ class CoverageOnly(GateProject):
         out, _ = self.gate(self.measured(0), '--list')
         self.assertIn('coverage (>= 80% lines, per codebase)', out)
         self.assertFalse(os.path.exists(self.marker), 'a listing ran the coverage command')
+
+    def test_a_threshold_below_80_is_raised_to_80_and_a_higher_one_applies(self):
+        # F-013, rule #29: 80 is a floor. A lower value from the conf or the environment, or one that is not a whole
+        # number, becomes 80 - and the coverage command measures against the threshold the gate printed.
+        conf = "COVERAGE_CMD='echo threshold=$COVERAGE_MIN'\n"
+        for where, value, expected in (('conf', '10', '80'), ('env', '79', '80'), ('env', 'abc', '80'), ('env', '90', '90'),
+                                      ('env', '85.5', '86')):  # a decimal rounds up, never down (QA 16/11/2026)
+            with self.subTest(where=where, value=value):
+                out, code = self.gate(conf + (f'COVERAGE_MIN={value}\n' if where == 'conf' else ''), '--coverage-only',
+                                      env={'COVERAGE_MIN': value} if where == 'env' else None)
+                self.assertEqual(0, code, out)
+                self.assertIn(f'coverage (>= {expected}% lines', out)
+                self.assertIn(f'threshold={expected}', out)
+                self.assertEqual(expected == '80', 'raised to 80' in out, out)
 
 
 class CoverageSetting(GateProject):
