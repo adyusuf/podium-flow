@@ -2367,3 +2367,32 @@ reports `answers its own command: command.run{command=podium:panels}`.
 **Open (qa, out of scope).** `refreshSettings` is not serialised like `refreshStatus`: an immediate run can now overlap the
 turn-end refresh (the same race a box click already has); its own branch.
 
+
+## Test inventory phase 2: every finding fixed; the decisions behind them (14-15/11/2026, user decisions)
+
+**Decision.** *"/podium:test-inventory 2 hepsini düzelt"* ("fix all of them"): the 42 phase-1 findings and the 6 found
+while fixing (F-043 to F-048) are fixed with a regression test each, proven red with the fix reverted
+([`test-inventory/findings.md`](test-inventory/findings.md)). Where a finding needed a choice, the one the written rules
+point to was taken, and the user may reverse any of them:
+- **The guards** (F-001, F-002, F-045): forced, mirrored, deleting and pruning pushes, a push to main in any spelling,
+  `git commit -n`, abbreviated long options, git options before the verb and a recursive `rm` with a dangerous target
+  anywhere are blocked; a here-string is not a heredoc. The rm/DROP rules keep reading heredoc bodies (F-041): a
+  heredoc that only writes such text is blocked too, which fails safe.
+- **The steps guard** (F-003, F-004, F-005): bookkeeping is matched by whole path components, a git work tree under a
+  temp folder is code work, a `git commit` is seen behind wrappers and control words, Bash file writes stay out of scope;
+  under `block` a payload it cannot judge is refused, a call without a session id runs (`standards/00` §1a).
+- **The gate** (F-012, F-013, F-016): the secret scan and SAST can never be an accepted gap; `COVERAGE_MIN` below 80 is
+  raised to 80; CI prints what a committed settings file waives and never fails on it (#34) (`standards/13` §8a).
+  Projects whose `merge-gate.conf` accepted SAST or gitleaks now end GATE INCOMPLETE until they measure them.
+- **Commit-time, not gate steps** (F-023, F-024): `doc-check.py` reads this rule set's own layout, so it stays in
+  pre-commit; `evidence-check.py` runs on demand on a role's report.
+- **One source for the mode** (F-026): the session layer > the project's `.claude/podium.json` > its `.claude/mode` and
+  `.claude/mode-model` (a letter alone = `keep`) > the user > the defaults, read by one engine (`modes/README.md`).
+- **Not a twin** (F-025): `md-gate-triage.json` is per-project data; two projects carry their own, so listing it in
+  `twins.txt` would raise false drift.
+- **The Status box** (user decision 15/11/2026, *"önce status sonra agenta göre kırıl … herkeste böyle çalışsın"*): the
+  rows are grouped by state first (Running · Stuck · Failed · To do · Done · Skipped; Done and Skipped closed at start),
+  then by agent; it ships in the plugin, so every install gets it.
+**Measured.** Coverage before the batch: Python 90 %, shell 81.0 %, TypeScript not measured (the shim lacked `.not`,
+F-042); the batch figures are in `docs/coverage-gap.md`. Each package's narrow run and the batch's full run are in the
+register.
