@@ -198,3 +198,29 @@ test('the budget line is drawn first, with or without a step, and read as untrus
   expect(JSON.stringify(idle)).toContain('nothing running')
   expect(JSON.stringify(statusBody(ui, parseStatus(JSON.stringify({ rows: [] }))))).toContain('nothing running')
 })
+
+test('a percent over 100 is drawn as 100, as podium_status.py stores it (F-038)', () => {
+  const rows = parseStatus(JSON.stringify({ rows: [{ item: 'a', percent: '150' }, { item: 'b', percent: '999' }, { item: 'c', percent: '100' }, { item: 'd', percent: '45' }] }))!.rows
+  expect(rows.map(row => row.percent)).toEqual(['100', '100', '100', '45'])
+})
+
+test('past 50 rows the box drops the same rows as podium_status.py: finished subagent steps first, the plan last (F-038)', () => {
+  const plan = Array.from({ length: 50 }, (_, at) => ({ item: `s${at}`, state: 'not started', agent: '' }))
+  const extra = [{ item: 'a-done', state: 'done', agent: 'qa' }, { item: 'a-run', state: 'running', agent: 'qa' },
+    { item: 'a-fail', state: 'failed', agent: 'qa' }, { item: 'me-done', state: 'done', agent: '' }]
+  // The extra rows sit among the plan's: a cut of the oldest rows would drop s0..s3 instead.
+  const kept = parseStatus(JSON.stringify({ rows: [...plan.slice(0, 10), ...extra, ...plan.slice(10)] }))!.rows.map(row => row.item)
+  expect(kept).toEqual(plan.map(row => row.item))
+  // A failed subagent step goes before a skipped step of this session, which goes before the plan.
+  const second = parseStatus(JSON.stringify({ rows: [...plan, { item: 'a-fail', state: 'failed', agent: 'qa' },
+    { item: 'me-skip', state: 'did not run', agent: '' }] }))!.rows.map(row => row.item)
+  expect(second).toEqual(plan.map(row => row.item))
+  // A failed subagent step stays longer than a running one: it must stay in view until someone looks at it.
+  const third = parseStatus(JSON.stringify({ rows: [{ item: 'a-fail', state: 'failed', agent: 'qa' }, { item: 'a-run', state: 'running', agent: 'qa' },
+    ...plan.slice(1)] }))!.rows.map(row => row.item)
+  expect(third).toEqual(['a-fail', ...plan.slice(1).map(row => row.item)])
+  // A finished subagent step goes before a running one that was written earlier.
+  const fourth = parseStatus(JSON.stringify({ rows: [{ item: 'a-run', state: 'running', agent: 'qa' }, { item: 'a-done', state: 'done', agent: 'qa' },
+    ...plan.slice(1)] }))!.rows.map(row => row.item)
+  expect(fourth).toEqual(['a-run', ...plan.slice(1).map(row => row.item)])
+})

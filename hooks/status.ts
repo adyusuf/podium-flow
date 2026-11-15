@@ -67,13 +67,37 @@ export function parseStatus(text: string): StatusData | null {
   const one = raw as Record<string, unknown>
   const rows = (Array.isArray(one.rows) ? one.rows : [])
     .filter((row): row is Record<string, unknown> => typeof row === 'object' && row !== null && !Array.isArray(row))
-    .slice(-MAX_ROWS)
     .map(row => ({
       item: clean(row.item), state: clean(row.state), figure: clean(row.figure), waiting: clean(row.waiting),
-      percent: /^\d{1,3}$/.test(clean(row.percent)) ? clean(row.percent) : '', blocker: clean(row.blocker), agent: clean(row.agent),
-      note: clean(row.note),
+      // Over 100 reads as 100, as the script stores it (F-038).
+      percent: /^\d{1,3}$/.test(clean(row.percent)) ? String(Math.min(100, Number(clean(row.percent)))) : '', blocker: clean(row.blocker),
+      agent: clean(row.agent), note: clean(row.note),
     }))
-  return { now: clean(one.now), next: clean(one.next), rows, updated: clean(one.updated), budget: clean(one.budget) }
+  return { now: clean(one.now), next: clean(one.next), rows: trim(rows), updated: clean(one.updated), budget: clean(one.budget) }
+}
+
+/** The states of a step that is over, as podium_status_rows.py's CLOSED. */
+const CLOSED = ['done', 'did not run']
+/** Which row goes first past MAX_ROWS, in podium_status_rows.py's order: a finished subagent step, any other subagent
+ *  step but a failed one, any subagent step, a finished step of this session, then the oldest row (F-038). */
+const DROP_FIRST: Array<(row: StatusRow) => boolean> = [
+  row => row.agent !== '' && CLOSED.includes(row.state), row => row.agent !== '' && row.state !== 'failed', row => row.agent !== '',
+  row => CLOSED.includes(row.state), () => true,
+]
+
+/** At most MAX_ROWS, dropping the same rows as the script's trim, so a foreign file shows what the script would keep. */
+export function trim(rows: StatusRow[]): StatusRow[] {
+  const out = [...rows]
+  while (out.length > MAX_ROWS) {
+    for (const pick of DROP_FIRST) {
+      const at = out.findIndex(pick)
+      if (at >= 0) {
+        out.splice(at, 1)
+        break
+      }
+    }
+  }
+  return out
 }
 
 /** The short state words (user decision 02/11/2026), so the State column stays narrow: a state is one of these. */
