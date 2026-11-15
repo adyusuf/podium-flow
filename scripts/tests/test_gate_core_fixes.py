@@ -140,11 +140,13 @@ class CoverageCannotBeAccepted(unittest.TestCase):
         # Outside a locked step's heading the label decides: the locked rows' names come from GATE_STEPS, not a copy.
         self.root = tempfile.mkdtemp()
         subprocess.run(['git', 'init', '-q', self.root], check=True)
-        script = ('TARGET=dev; LIST_ONLY=0; ROOT="$PWD"; . "$1"; echo "pattern=$NEVER_ACCEPTABLE"\n'
+        # The library path goes in through the environment, not as an argument: under scripts/coverage-shell.sh a bash
+        # call naming one of our scripts is handed to kcov, which cannot run `bash -c` (batch run 15/11/2026).
+        script = ('TARGET=dev; LIST_ONLY=0; ROOT="$PWD"; . "$GATE_LIB"; echo "pattern=$NEVER_ACCEPTABLE"\n'
                   'ACCEPTED_GAPS="SAST|secret scan|backward"; ACCEPTED_GAPS_REASON=r\n'
                   'skip "SAST: elsewhere"; skip "secret scan: elsewhere"; skip "backward: elsewhere"\n')
-        done = subprocess.run(['bash', '-c', script, 'x', os.path.join(SCRIPTS, 'gate-lib.sh')], cwd=self.root,
-                              capture_output=True, text=True)
+        done = subprocess.run(['bash', '-c', script], cwd=self.root, capture_output=True, text=True,
+                              env=dict(os.environ, GATE_LIB=os.path.join(SCRIPTS, 'gate-lib.sh')))
         out = ANSI.sub('', done.stdout)
         self.assertIn('pattern=coverage|secrets|secret scan|SAST|SAST', out)
         self.assertIn('CANNOT be accepted — rule #19, the secret scan and SAST are locked): SAST: elsewhere', out)
