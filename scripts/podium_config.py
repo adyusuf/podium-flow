@@ -15,13 +15,16 @@
     podium_config.py notify <event>             hook: tells the running session when a setting changed (stdin: the payload)
 
 Layers, lowest first: defaults/podium.json (shipped with the plugin) < ~/.claude/podium.json (the user's own
-defaults) < <project>/.claude/podium.json (committed, like .claude/mode) < the session's own layer (podium_session.py:
+defaults) < <project>/.claude/podium.json (committed; the project's .claude/mode and .claude/mode-model are read into
+this layer as `mode` and `mode_model` where the file does not set them) < the session's own layer (podium_session.py:
 what the rail boxes change; gone with the session). The user changes them with the
 `podium:config` skill; Claude never asks what a setting already answers (global rule #34).
 
 Keys are dotted (`push.prod`); files hold them nested. A key is validated against SCHEMA, a file that does not
-parse is reported and ignored (the layer below wins) - the SessionStart hook must never fail a session.
-Exit codes: 0 done · 1 a configuration file is unreadable (set/unset/apply refuse to overwrite it) ·
+parse or holds one invalid value is reported (show, get on stderr, context) and ignored as a whole (the layer below
+wins) - the SessionStart hook must never fail a session.
+Exit codes: 0 done · 1 a configuration file is unreadable, or holds a single value where a group of settings belongs
+(set/unset/apply refuse to overwrite it) ·
 2 bad usage, unknown key or invalid value (nothing is written).
 """
 import json
@@ -39,8 +42,8 @@ from podium_schema import (  # noqa: E402,F401
     MODE_ROLES, POD_FORMATS, REPLY_LENGTHS, RETIRED_KEYS, ROOT, SCHEMA,
     SPECS, TARGETS, agents, defined_model, effective_model, front_matter, gate_steps_off)
 from podium_layers import (  # noqa: E402,F401
-    ConfigError, check, flatten, load, locked, nest,
-    project_file, read_layer, user_file, write_layer)
+    MODE_FILES, ConfigError, check, flatten, load, locked, nest,
+    project_file, read_layer, read_mode_files, user_file, write_layer)
 from podium_render import REPLY_MEANING, context, render, render_agents, shown  # noqa: E402,F401
 
 
@@ -172,9 +175,11 @@ def main(argv):
             print(json.dumps(SCHEMA, indent=2))
             return 0
         if command == 'get' and len(args) == 2:
-            effective, _ = load(session=session)
+            effective, problems = load(session=session)
             if args[1] not in effective:
                 raise ConfigError("unknown setting '%s'" % args[1])
+            for problem in problems:              # a dropped layer is said, on stderr: stdout stays the one value (F-028)
+                sys.stderr.write('! %s\n' % problem)
             print(shown(effective[args[1]][0]))
             return 0
         if command == 'set' and len(args) == 3:

@@ -35,30 +35,34 @@ Rules: `${CLAUDE_PLUGIN_ROOT}/modes/README.md` › *Session start*.
 
 ## 1. Read the current mode
 
-Priority order: **session-scoped selection** → project file → the configuration (`mode`, default C).
+Priority order: **the session's choice** → the project's `.claude/mode` → the configuration (`mode`, default C).
+One script answers it: `podium_config.py` reads the session layer, then the project's `.claude/podium.json` with its
+`.claude/mode` and `.claude/mode-model` (the project's `podium.json` beats them when it sets the key), then the user's
+file and the shipped defaults.
 
 ```bash
-S="<the Scratchpad Directory from the system prompt>"   # session-scoped, survives compaction
-root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+SID="<this session's id: the 'this session is <id>' line of the start-of-session block; empty if there is none>"
 cfg="${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py"
-if [ -f "$S/mode" ]; then d="$S"; elif [ -f "$root/.claude/mode" ]; then d="$root/.claude"; else d=""; fi
-echo "mode: $( [ -n "$d" ] && cat "$d/mode" || python3 "$cfg" get mode )"
-echo "opus agents run on: $( if [ -n "$d" ]; then cat "$d/mode-model" 2>/dev/null || echo 'their defined model'; else python3 "$cfg" get mode_model; fi )"
+echo "mode: $(python3 "$cfg" get mode ${SID:+--session "$SID"})"
+echo "opus agents run on: $(python3 "$cfg" get mode_model ${SID:+--session "$SID"})"   # keep = their defined model
 ```
 
-The model override is read **from the layer that supplied the letter** — a session
-or project letter without its own `mode-model` means "defined models", even if the
-configuration has an override. Rules: `${CLAUDE_PLUGIN_ROOT}/modes/README.md` › *Model override*.
+`show --json` (same `--session`) names the layer each value came from (`session`, `project`, `user`, `default`). A
+problem line on stderr (`! ...`) names a file that was ignored: a `.claude/mode` that is not one letter A-E, a
+`.claude/mode-model` that is not one of keep/sonnet/haiku/fable, or a settings file with a bad value. Say it to the user.
 
-If none of them exists the configuration's mode applies (default **C**, `podium:config`); its agents are approved
+If none of them sets the mode the configuration's mode applies (default **C**, `podium:config`); its agents are approved
 by the default itself. Propose a lower or higher mode in one line only if the work clearly deserves it - never switch on
 your own (README › "If no mode is given").
 
-⚠️ A mode chosen with `--once` is written **to the scratchpad** (`$S/mode`), not
-to `.claude/mode`. Reason: if "apply this for this session only" relies on
-memory, it is **forgotten** after context compaction and the project file's mode
-silently takes over again. The scratchpad is session-scoped and disappears with
-the session — exactly the lifetime required.
+⚠️ A mode chosen with `--once` is written **to this session's layer** (`set --session <id>`), not to `.claude/mode`.
+Reason: if "apply this for this session only" relies on memory, it is **forgotten** after context compaction and the
+project file's mode silently takes over again. The session layer lives as long as the session id (a resumed session
+keeps it, `/clear` starts a new one) - exactly the lifetime required.
+
+History: before 14/11/2026 `--once` wrote `$S/mode` and `$S/mode-model` in the scratchpad. Such a file is never
+written again and no script reads it; it stays as a read-only record. A session that still has one and wants that
+choice kept runs §4 with `--once` once.
 
 ## 2. Load the mode definitions
 
@@ -94,24 +98,33 @@ name + agent set + who reviews + cost multiplier. Do not paste the whole matrix;
    written. The read command used to have a fallback while the write did not:
    the user was told "saved permanently" when nothing had been saved. **If the
    write fails, say so** — never confirm it.
-   If `--once` was given, do **not** write `.claude/mode`; write the scratchpad
-   instead: `printf '%s\n' "B" > "$S/mode"` (session-scoped; it overrides the
-   project file in the priority order of §1).
-2a. Write or clear the model override **in the same directory** as the letter
-   (`$root/.claude` or `$S`):
+   If `--once` was given, do **not** write `.claude/mode`; write this session's layer instead (it beats the project
+   file in the priority order of §1). The session id is on the `this session is <id>` line; without one `--once`
+   cannot be kept - say so and write nothing:
    ```bash
-   dir="$root/.claude"   # or "$S" with --once
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py" set --session "$SID" mode B
+   ```
+2a. Write or clear the model override **in the same layer** as the letter. Project (`$root/.claude`):
+   ```bash
+   dir="$root/.claude"
    if [ -n "$model" ] && [ "$model" != opus ]; then printf '%s\n' "$model" > "$dir/mode-model"; else rm -f "$dir/mode-model"; fi
+   ```
+   Session (`--once`): `opus` or no model word is `keep` (the defined models):
+   ```bash
+   m="$model"; [ "$m" = opus ] && m=""
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py" set --session "$SID" mode_model "${m:-keep}"
    ```
    ⚠️ The letter alone **clears** the override — that is how the user returns to the
    defined models. Never keep an old `mode-model` next to a newly written letter.
-   `.claude/mode` stays a single letter (other readers parse it).
+   `.claude/mode` and `.claude/mode-model` stay a single word (the settings engine reads the first non-empty line;
+   anything else is reported and ignored).
 3. Read the new mode's file and **follow its rules from that point on**.
 4. Confirm to the user: old mode → new mode, and what changed (agent set, who
    reviews, approval policy, expected multiplier) **and the model line**: which
    agents are Opus by definition and what they run on now. 4-6 lines.
 5. **From then on**, every `Agent` call (and every `Workflow` `agent()`) passes `model: "<runs_on>"` for
-   its role as `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py agents --json` lists it: the mode's Opus
+   its role as `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/podium_config.py agents --json --session "$SID"` lists it (without
+   a session id, leave `--session` out): the mode's Opus
    override, or the model the user set for that one agent (`/podium:config`); an agent whose `runs_on` is its
    defined model gets no override, and a role that is not listed is not called. Report the model that actually ran. A role agent is always
    called by its plugin name, `subagent_type: "podium:<role>"`; a bare `<role>` is not found.
