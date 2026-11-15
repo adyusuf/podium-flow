@@ -5,12 +5,15 @@ of it is done and what blocks it; a subagent writes its own; a new request goes 
 Each test runs the scripts as commands with the status folder, the user's settings and the session layer in a temporary
 directory, so no real file is read or written.
 """
+import io
 import json
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr
+from unittest import mock
 
 SCRIPTS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(SCRIPTS, 'podium_status.py')
@@ -128,6 +131,63 @@ class Steps(unittest.TestCase):
         self.assertEqual(0, code('Write', {'file_path': os.path.join(SCRIPTS, '..', '.claude', 'mode')}))
         self.assertEqual(0, code('Write', {'file_path': os.path.join(tempfile.gettempdir(), 'claude-501', 'scratchpad', 'a.sh')}))
         self.assertEqual(2, code('Edit', {'file_path': os.path.expanduser('~/.claude/dev-mods/x/hooks/register.tsx')}))
+
+    def test_a_bookkeeping_folder_is_matched_by_whole_components_and_a_repository_in_temp_is_code_work(self):
+        code = lambda path: self.guard('Write', {'file_path': path})[2]     # noqa: E731
+        # F-003: a sibling that only starts like a bookkeeping folder is code work; the folder itself stays bookkeeping.
+        self.assertEqual(2, code(os.path.expanduser('~/.claude/plans-x/a.md')))
+        self.assertEqual(2, code(os.path.expanduser('~/.claude/projectsEVIL/a.py')))
+        self.assertEqual(0, code(os.path.expanduser('~/.claude/plans/a.md')))
+        # A temp folder stays scratch, but not a git work tree there (a .git folder, or a worktree's .git file).
+        os.makedirs(os.path.join(self.dir, 'repo', '.git'))
+        os.makedirs(os.path.join(self.dir, 'worktree'))
+        open(os.path.join(self.dir, 'worktree', '.git'), 'w').close()
+        self.assertEqual(2, code(os.path.join(self.dir, 'repo', 'src', 'a.py')))
+        self.assertEqual(2, code(os.path.join(self.dir, 'worktree', 'a.py')))
+        self.assertEqual(0, code(os.path.join(self.dir, 'scratch', 'a.py')))
+
+    def test_a_commit_is_seen_behind_control_words_wrappers_and_git_options_but_a_bash_write_is_out_of_scope(self):
+        code = lambda command: self.guard('Bash', {'command': command})[2]     # noqa: E731
+        # F-004: where a command starts inside a compound command, and what may stand in front of git.
+        for command in ('if true; then git commit -m x; fi', 'for f in a; do git commit -m x; done', '(git commit -m x)',
+                        'echo $(git commit -m x)', 'env A=1 git commit -m x', 'A=1 git commit -m x',
+                        'command git commit -m x', 'git -c user.name=x commit -m x', 'git --git-dir /r/.git commit -m x'):
+            self.assertEqual(2, code(command), command)
+        # By design (14/11/2026): a Bash file write is not judged by this guard; it holds Edit/Write/NotebookEdit and commits.
+        for command in ('sed -i s/a/b/ scripts/x.py', 'echo x > scripts/x.py', 'printf x | tee scripts/x.py'):
+            self.assertEqual(0, code(command), command)
+
+    def test_with_block_a_payload_the_guard_cannot_judge_is_refused_but_a_call_with_no_session_runs(self):
+        # F-005: fail closed under block; Claude Code always sends a session id, so a call without one is not a session's.
+        for payload in ('not json', '[1, 2]', json.dumps({'session_id': SESSION, 'tool_name': 'Edit', 'tool_input': 'x'}),
+                        json.dumps({'session_id': SESSION, 'tool_name': 'Bash', 'tool_input': ['git commit']})):
+            done = subprocess.run([sys.executable, SCRIPT, 'hook', 'guard'], env=self.env, capture_output=True,
+                                  input=payload.encode())
+            self.assertEqual(2, done.returncode, payload)
+            self.assertIn('could not judge this call', done.stderr.decode())
+        no_session = {'tool_name': 'Edit', 'tool_input': {'file_path': os.path.join(SCRIPTS, 'x.py')}}
+        _, err, code = self.run_hook('guard', no_session)
+        self.assertEqual((0, ''), (code, err))
+
+    def test_an_error_while_judging_is_a_refusal_under_block_and_a_stderr_line_under_remind(self):
+        sys.path.insert(0, SCRIPTS)
+        import podium_status_hooks as hooks
+        payload = json.dumps({'session_id': SESSION, 'tool_name': 'Edit', 'tool_input': {'file_path': 'x.py'}})
+
+        def run():
+            err = io.StringIO()
+            with mock.patch.dict(os.environ, self.env), mock.patch.object(hooks, 'blocked', side_effect=RuntimeError('a-b')):
+                with redirect_stderr(err):
+                    return hooks.hook('guard', payload), err.getvalue()
+        code, err = run()
+        self.assertEqual(2, code)
+        self.assertIn('could not judge this call (RuntimeError)', err)
+        self.assertNotIn('a-b', err)                        # the type only: a message may quote the payload
+        with open(os.path.join(self.dir, 'u.json'), 'w', encoding='utf-8') as handle:
+            json.dump({'steps': {'enforce': 'remind'}}, handle)
+        code, err = run()
+        self.assertEqual(0, code)
+        self.assertIn('steps.enforce is remind, so it runs', err)
 
     def test_a_subagent_goes_on_under_its_own_steps_and_is_told_to_sign_them(self):
         payload = {'session_id': SESSION, 'tool_name': 'Edit', 'tool_input': {'file_path': os.path.join(SCRIPTS, 'x.py')},

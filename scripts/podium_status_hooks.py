@@ -10,7 +10,9 @@ lines (rule #9). `podium_status.py hook EVENT` reads the hook payload on stdin a
     tool        a tool call returned: a subagent's row counts it (a call of this session itself changes nothing)
     guard       before an edit or a commit: with `steps.enforce` set to block, refused until the box holds steps
 
-A hook never fails a session: a bad payload or an unusable id does nothing. Only `guard` may refuse (exit code 2).
+A hook never fails a session: a bad payload or an unusable id does nothing. Only `guard` may refuse (exit code 2), and
+under `block` it fails closed: a payload it cannot judge is refused (F-005); a payload with no session id is not a
+session's call and runs.
 """
 import json
 import os
@@ -32,16 +34,23 @@ ANALYSING = 'analysing the request'        # a user's message has come in and it
 # The turns a person starts: a system-started turn (a task notification, a wake-up) must not replace the user's task.
 USER_SOURCES = (None, 'user', 'sdk')
 # Where an edit is Claude's own bookkeeping, never code work (standards/13 §8a): its notes and plans, the podium settings
-# and status files, a project's mode files, temp files. Code under ~/.claude (a mod, a plugin) is code work.
+# and status files, a project's mode files, temp files. Code under ~/.claude (a mod, a plugin) is code work. Folders are
+# compared by whole path components: `~/.claude/plans-x/` is not `~/.claude/plans/` (F-003).
 CLAUDE_HOME = os.path.join(os.path.expanduser('~'), '.claude')
 BOOKKEEPING = tuple(os.path.normcase(os.path.join(CLAUDE_HOME, name)) for name in (
-    'projects', 'plans', 'todos', 'podium-status', 'podium-session', 'podium-seen')) + tuple(
-    os.path.normcase(path) + os.sep for path in {os.path.realpath(tempfile.gettempdir()), '/tmp', '/private/tmp', '/var/folders',
-                                                 '/private/var/folders'})
+    'projects', 'plans', 'todos', 'podium-status', 'podium-session', 'podium-seen'))
+# Temp folders hold scratch files, bookkeeping too - but not a file of a git work tree checked out there (F-003).
+TEMP_ROOTS = tuple(os.path.normcase(path) for path in {os.path.realpath(tempfile.gettempdir()), '/tmp', '/private/tmp',
+                                                        '/var/folders', '/private/var/folders'})
 # <any>/.claude/<name>: a project's mode and settings files, and the user's own ~/.claude/podium.json (adyusuf.json before).
 PROJECT_BOOKKEEPING = ('mode', 'mode-model', 'podium.json', 'adyusuf.json')
-# `git commit` where a command starts (after ;, &, |, a newline or the line's start), options such as -C <dir> allowed.
-COMMIT = re.compile(r'(?:^|[;&|\n])\s*git(?:\s+(?:-[Cc]\s+\S+|-\S+))*\s+commit(?![-\w])')
+# `git commit` where a command starts: the line's start, after ;, &, |, a newline, `(`, `$(`, a backtick, or `then`, `do`,
+# `else`, `elif`; behind `env [VAR=…]`, `command` or a VAR=value; git options such as -C <dir> or -c k=v allowed (F-004).
+# Bash file writes (sed -i, >, tee) are left out on purpose: the guard holds Edit/Write/NotebookEdit and commits, and a
+# test pins that scope.
+COMMIT = re.compile(r'(?:^|[;&|\n(`]|\b(?:then|do|else|elif)\s)\s*'
+                    r'(?:(?:env|command)(?:\s+-\S+)*\s+|\w+=\S*\s+)*'
+                    r'git(?:\s+(?:-[Cc]\s+\S+|--(?:git-dir|work-tree|namespace)\s+\S+|-\S+))*\s+commit(?![-\w])')
 
 
 def hook_text(event, payload, data=None):
@@ -78,10 +87,30 @@ def open_steps(session, agents):
                for row in rows)
 
 
+def under(path, folder):
+    return path == folder or path.startswith(folder.rstrip(os.sep) + os.sep)
+
+
+def in_work_tree(path, root):
+    """Whether a folder from `path`'s own up to `root` holds `.git` (a folder, or a worktree's file)."""
+    folder = os.path.dirname(path)
+    while under(folder, root):
+        if os.path.exists(os.path.join(folder, '.git')):
+            return True
+        if os.path.dirname(folder) == folder:
+            break
+        folder = os.path.dirname(folder)
+    return False
+
+
 def bookkeeping(path):
     path = os.path.normcase(path)
     parent, name = os.path.split(path)
-    return path.startswith(BOOKKEEPING) or (os.path.basename(parent) == '.claude' and name in PROJECT_BOOKKEEPING)
+    if any(under(path, folder) for folder in BOOKKEEPING):
+        return True
+    if os.path.basename(parent) == '.claude' and name in PROJECT_BOOKKEEPING:
+        return True
+    return any(under(path, root) and not in_work_tree(path, root) for root in TEMP_ROOTS)
 
 
 def reminder(session):
@@ -100,15 +129,20 @@ def subagent_note(name):
 
 
 def blocked(payload):
-    """Why an edit or a commit is refused, or '' to let it run: with `block`, code work waits for the steps."""
+    """Why an edit or a commit is refused, or '' to let it run: with `block`, code work waits for the steps. Raises
+    TypeError on a payload or `tool_input` that is not an object; `guard` turns that into a refusal under `block`."""
+    if not isinstance(payload, dict):
+        raise TypeError('the payload is not an object')
     session = str(payload.get('session_id') or '')
-    tool, given = str(payload.get('tool_name') or ''), payload.get('tool_input') or {}
+    tool, given = str(payload.get('tool_name') or ''), payload.get('tool_input', {})
+    if not isinstance(given, dict):
+        raise TypeError('tool_input is not an object')
     if tool == 'Bash':
         work = bool(COMMIT.search(str(given.get('command') or '')))
     else:
         given_path = str(given.get('file_path') or given.get('notebook_path') or '')
         work = given_path != '' and not bookkeeping(os.path.abspath(given_path))
-    if not work or not valid(session):
+    if not work or not valid(session):     # no id: not a session's call (Claude Code always sends one), let it run
         return ''
     # A subagent may go on under its own row (the hooks open it at SubagentStart) or the session's steps.
     name = agent_name(payload) if payload.get('agent_id') else ''
@@ -122,6 +156,29 @@ def blocked(payload):
     return ('podium steps (steps.enforce: block): no step of this task is open. Analyse the work and write its steps into '
             'the Status box first: python3 "%s" --session %s step "<n. step>" "not started" 0%s. Then retry.'
             % (SCRIPT, session, sign))
+
+
+def guard(payload_text):
+    """The `guard` hook's exit code. Under `block` it fails CLOSED (F-005): a payload that does not parse, a `tool_input`
+    that is not an object, or an error while judging refuses the call (exit 2) with a short reason; under `remind` it
+    says so on stderr and lets the call run."""
+    session = ''
+    try:
+        payload = json.loads(payload_text)
+        session = str(payload.get('session_id') or '') if isinstance(payload, dict) else ''
+        reason = blocked(payload)
+    except Exception as error:  # noqa: BLE001 - judged below: a refusal under block, a stderr line under remind
+        problem = '%s: %s' % (type(error).__name__, error) if isinstance(error, TypeError) else type(error).__name__
+        if enforce(session if valid(session) else None) != 'block':
+            print('podium steps: the guard could not judge this call (%s); steps.enforce is remind, so it runs.' % problem,
+                  file=sys.stderr)
+            return 0
+        reason = ('podium steps (steps.enforce: block): the guard could not judge this call (%s), so it is refused. '
+                  'Retry the call; if this repeats, report it.' % problem)
+    if reason:
+        print(reason, file=sys.stderr)
+        return 2
+    return 0
 
 
 def spend(session, payload):
@@ -156,15 +213,11 @@ def write(session, change):
 
 def hook(event, payload_text):
     """Run one hook; returns the exit code (2 only when `guard` refuses). Never raises."""
+    if event == 'guard':
+        return guard(payload_text)
     try:
         payload = json.loads(payload_text)
         session = str(payload.get('session_id') or '')
-        if event == 'guard':
-            reason = blocked(payload)
-            if reason:
-                print(reason, file=sys.stderr)
-                return 2
-            return 0
         if not valid(session):
             return 0
         if event == 'subagent':
