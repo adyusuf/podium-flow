@@ -167,7 +167,8 @@ This is the part that does the work — a rule nothing executes is documentation
    are this repository's own, not twins).
 
    `ACCEPTED_GAPS` is the **only** way a missing step stops failing the gate, and it is ignored unless a reason is set
-   with it. `coverage` cannot be accepted at all — the core refuses it by name (#29).
+   with it. `coverage` (#29) and the locked steps, the secret scan and SAST (#19), cannot be accepted at all, and a
+   pattern with an empty branch (`a|`, `|a`, `a||b`) accepts nothing.
 3. **Dry-run it before you trust it:** `bash scripts/gate-core.sh dev --list` prints every step and runs none;
    `bash scripts/gate-core.sh dev` is the real thing, and its exit code is the gate.
 4. **Install the commit hooks** — the `CLAUDE.md` size gate plus a secret scan over staged content:

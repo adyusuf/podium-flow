@@ -97,15 +97,18 @@ class CoverageCannotBeAccepted(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(getattr(self, 'root', ''), ignore_errors=True)
 
-    def build(self, accepted):
+    def build(self, accepted, without=()):
         root = tempfile.mkdtemp()
         subprocess.run(['git', 'init', '-q', root], check=True)
         os.makedirs(os.path.join(root, 'scripts'))
         with open(os.path.join(root, 'scripts', 'merge-gate.conf'), 'w', encoding='utf-8') as handle:
             handle.write(f'ACCEPTED_GAPS="{accepted}"\nACCEPTED_GAPS_REASON="a written reason"\n')
         self.root = root
-        result = subprocess.run(['bash', GATE, 'test'],
-                                cwd=root, capture_output=True, text=True)
+        # `without`: the PATH loses the directories holding these tools, so the gate finds them missing.
+        path = os.pathsep.join(d for d in os.environ['PATH'].split(os.pathsep)
+                               if not any(os.path.exists(os.path.join(d, tool)) for tool in without))
+        result = subprocess.run(['bash', GATE, 'test'], cwd=root, capture_output=True, text=True,
+                                env=dict(os.environ, PATH=path))
         return ANSI.sub('', result.stdout), result.returncode
 
     def test_coverage_is_not_accepted_even_when_listed(self):
@@ -115,8 +118,47 @@ class CoverageCannotBeAccepted(unittest.TestCase):
         self.assertNotEqual(0, code, 'an unmeasured coverage gate must not exit 0')
 
     def test_another_gap_is_still_acceptable(self):
-        out, _ = self.build('coverage|SAST')
-        self.assertIn('ACCEPTED GAP', out)  # SAST still accepted
+        out, _ = self.build('coverage|backward')
+        self.assertIn('ACCEPTED GAP: backward-compatibility scan', out)
+
+    # F-012: the secret scan and SAST are locked (rule #19), so they are never an accepted gap either.
+    def test_sast_cannot_be_accepted(self):
+        out, code = self.build('SAST')
+        self.assertIn('CANNOT be accepted — rule #19, the secret scan and SAST are locked): SAST', out)
+        self.assertNotIn('ACCEPTED GAP: SAST', out)
+        self.assertIn('GATE INCOMPLETE', out)
+        self.assertNotEqual(0, code)
+
+    def test_a_missing_gitleaks_cannot_be_accepted_whatever_its_label_says(self):
+        # "gitleaks is not installed" names no locked step: the refusal comes from the heading it is under.
+        out, code = self.build('gitleaks', without=('gitleaks',))
+        self.assertIn('CANNOT be accepted — rule #19, the secret scan and SAST are locked): gitleaks is not installed', out)
+        self.assertNotIn('ACCEPTED GAP: gitleaks', out)
+        self.assertNotEqual(0, code)
+
+    def test_the_never_acceptable_pattern_is_derived_from_the_locked_rows(self):
+        # Outside a locked step's heading the label decides: the locked rows' names come from GATE_STEPS, not a copy.
+        self.root = tempfile.mkdtemp()
+        subprocess.run(['git', 'init', '-q', self.root], check=True)
+        script = ('TARGET=dev; LIST_ONLY=0; ROOT="$PWD"; . "$1"; echo "pattern=$NEVER_ACCEPTABLE"\n'
+                  'ACCEPTED_GAPS="SAST|secret scan|backward"; ACCEPTED_GAPS_REASON=r\n'
+                  'skip "SAST: elsewhere"; skip "secret scan: elsewhere"; skip "backward: elsewhere"\n')
+        done = subprocess.run(['bash', '-c', script, 'x', os.path.join(SCRIPTS, 'gate-lib.sh')], cwd=self.root,
+                              capture_output=True, text=True)
+        out = ANSI.sub('', done.stdout)
+        self.assertIn('pattern=coverage|secrets|secret scan|SAST|SAST', out)
+        self.assertIn('CANNOT be accepted — rule #19, the secret scan and SAST are locked): SAST: elsewhere', out)
+        self.assertIn('CANNOT be accepted — rule #19, the secret scan and SAST are locked): secret scan: elsewhere', out)
+        self.assertIn('ACCEPTED GAP: backward: elsewhere', out)
+
+    # F-020: a pattern with an empty branch matches every label - a switch, not a written acceptance.
+    def test_an_empty_branch_accepts_nothing(self):
+        for accepted in ('backward|', '|backward', 'backward||e2e', '(|backward)'):
+            with self.subTest(accepted=accepted):
+                out, code = self.build(accepted)
+                self.assertIn('has an empty branch, which matches every step — not accepted', out)
+                self.assertNotIn('ACCEPTED GAP', out)
+                self.assertNotEqual(0, code)
 
 
 class CoverageWhenItIsActuallyMeasured(unittest.TestCase):

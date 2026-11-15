@@ -85,8 +85,8 @@
 #                                                       # Put it in merge-gate.conf as
 #                                                       #   GATE_PARALLEL_NODE="${GATE_PARALLEL_NODE:-1}"
 #                                                       # so the environment wins: =0 forces serial.
-#   ACCEPTED_GAPS="SAST|backward"                       # gaps the USER has accepted, with a reason
-#   ACCEPTED_GAPS_REASON="no SAST tooling yet; tracked in docs/gates.md, review 01/11/2026"
+#   ACCEPTED_GAPS="backward"                            # gaps the USER has accepted, with a reason
+#   ACCEPTED_GAPS_REASON="no public API yet; tracked in docs/gates.md, review 01/11/2026"
 #
 # ⚠️ ACCEPTED_GAPS is the only way a missing step stops failing the gate, and it is
 # not a silence: every accepted gap is printed as an ACCEPTED GAP with its reason
@@ -94,10 +94,10 @@
 # fails. This is the written, time-boxed risk acceptance the security standard asks
 # for, not a switch that turns a step off.
 #
-# ⚠️ ONE STEP CANNOT BE ACCEPTED AT ALL: coverage. Rule #29 grants it no
-# exceptions and says a project cannot override it, so listing it in
-# ACCEPTED_GAPS does nothing but print that it cannot be accepted, and the gate
-# stays INCOMPLETE. Install the measurement (scripts/coverage.sh) instead.
+# ⚠️ THREE STEPS CANNOT BE ACCEPTED AT ALL: coverage (rule #29 grants it no exceptions and
+# a project cannot override it) and the locked rows of GATE_STEPS, the secret scan and SAST
+# (rule #19: never switched off). Listing one in ACCEPTED_GAPS only prints that it cannot be
+# accepted, and the gate stays INCOMPLETE; so does a pattern with an empty branch (`a|`).
 #
 # The gate is split over five files so that none passes 300 lines (global rule #9): this one
 # orchestrates, gate-lib.sh holds the helpers, stack detection and the verdict, gate-lib-panel.sh where the panel's
@@ -226,7 +226,8 @@ if true; then
   if [ "$HAS_DOTNET" = 1 ]; then
     if have dotnet; then
       cve_limit="${GATE_CVE_TIMEOUT:-300}"; cve_timer=""
-      if have timeout; then cve_timer="timeout $cve_limit"; elif have gtimeout; then cve_timer="gtimeout $cve_limit"; fi
+      if have timeout; then cve_timer="timeout $cve_limit"; elif have gtimeout; then cve_timer="gtimeout $cve_limit"
+      else warn "dotnet vulnerable packages: neither timeout nor gtimeout is installed - the listing runs WITHOUT a time limit (brew install coreutils)"; fi
       cve_out="$($cve_timer dotnet list ${SLN:+"$SLN"} package --vulnerable 2>&1)"; cve_rc=$?
       if [ -n "$cve_timer" ] && [ "$cve_rc" = 124 ]; then
         bad "dotnet vulnerable packages: no answer in ${cve_limit}s (NuGet feed unreachable? on an IPv6 black hole run the listing with DOTNET_SYSTEM_NET_DISABLEIPV6=1)"
