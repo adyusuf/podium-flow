@@ -55,11 +55,28 @@ class AlreadyCurrent(Case):
         self.assertEqual(self.go(fake)[0], 0)
         self.assertIn(['claude', 'plugin', 'marketplace', 'add', f'{setup.REPO}#prod'], fake.commands)
 
+    def test_a_failing_link_back_is_exit_two_and_said(self):
+        fake = Fake(self.home, installed=NEW, fail=('claude plugin marketplace add',))
+        code, out, _ = self.go(fake)
+        self.assertEqual(2, code)
+        self.assertIn('✗ could not link the marketplace again', out)
+
     def test_the_short_version_alone_is_enough_to_recognise_the_commit(self):
         fake = Fake(self.home, installed=NEW, market=github_market())
         with open(fake.record, 'w', encoding='utf-8') as handle:
             json.dump({'plugins': {setup.PLUGIN_ID: {'version': NEW[:12]}}}, handle)    # a dict, not a list
         self.assertIn('✓ the installed plugin is the newest', self.go(fake)[1])
+
+
+class UnwritableLog(Case):
+    def test_an_unwritable_log_folder_is_one_warning_and_never_changes_the_exit_code(self):
+        with open(os.path.join(self.home, '.claude-standards'), 'w', encoding='utf-8') as handle:
+            handle.write('a file where the folder should be')
+        for fake, expected in ((Fake(self.home, installed=NEW, market=github_market()), 0),
+                               (Fake(self.home, installed=OLD, market=github_market(), fail=('git',)), 2)):
+            code, _, err = self.go(fake)
+            self.assertEqual(expected, code)
+            self.assertEqual(1, err.count('! the log could not be written'))
 
 
 class CheckOnly(Case):
