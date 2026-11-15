@@ -6,7 +6,7 @@ import { countOf, overrideNote, plannedStages, refSet, waivedLines, waivedRange 
 import { warnings } from './notices'
 import {
   type Engine, type Layer, promotion, scriptPath, sessionId, settings, settingsError, settingsProblems, type SettingsData,
-  type StageData, status,
+  serial, type StageData, status,
 } from './port'
 import { parseStatus, statusDir, statusScript, statusStep, type StatusProbe } from './status'
 
@@ -77,27 +77,25 @@ async function readPromotion($: Engine) {
   await $.state.set(promotion, { stages })
 }
 
+/** What became of one press: not tried (no script, no session id), refused by the script, or written. */
+type Written = 'skipped' | 'refused' | 'written'
+
 /** `session` writes this session's layer; `saved` writes the user's file, the defaults every new session starts from. */
-async function setSetting($: Engine, key: string, value: string, scope: Scope, refreshSettings: (one: Engine) => Promise<void>) {
+async function writeSetting($: Engine, key: string, value: string, scope: Scope): Promise<Written> {
   const script = await scriptPath($)
   if (!script) {
     await $.ui.toast('The podium plugin is not installed yet: /plugin install podium@podium-marketplace')
-    return
+    return 'skipped'
   }
   const id = scope === 'session' ? await sessionId($) : ''
   if (scope === 'session' && !id) {
     await $.ui.toast('Could not tell which session this is, so nothing was changed (the saved defaults stay as they are)')
-    return
+    return 'skipped'
   }
   const done = await $.process.run(['python3', script, 'set', ...(id ? ['--session', id] : []), key, value])
-  if (done.exitCode !== 0) await $.ui.toast(done.stderr.trim().slice(0, 200) || 'The change was refused')
-  await refreshSettings($)
-  const { value: now = null } = await $.state.get(settings)
-  const layer = scope === 'saved' ? now?.saved : now
-  if (done.exitCode === 0 && layer) {
-    const note = overrideNote(key, value, layer.values[key], layer.sources[key])
-    if (note) await $.ui.toast(note)
-  }
+  if (done.exitCode === 0) return 'written'
+  await $.ui.toast(done.stderr.trim().slice(0, 200) || 'The change was refused')
+  return 'refused'
 }
 
 /** This session's status file ('' when the engine will not say which session this is, or no folder is usable). */
@@ -137,13 +135,18 @@ async function readStatus($: Engine, memo: StatusMemo) {
   }
 }
 
-/** The pane's queues and what they remember, one set per process: register.tsx makes it once, a test makes its own. */
+/**
+ * The pane's queues and what they remember, one set per process: register.tsx makes it once, a test makes its own. The
+ * refreshes of one box run one after another (a press, the turn end, the poll and /podium:panels may overlap): an older
+ * read must not land after a newer one, and two reads must not both announce one change (F-031, F-036).
+ */
 export function createGlue() {
   const memo: StatusMemo = { stamp: -1, warned: false }
-  const refreshSettings = ($: Engine) => readSettings($)
-  const refreshPromotion = ($: Engine) => readPromotion($)
+  const settingsQueue = serial()
+  const promotionQueue = serial()
+  const refreshSettings = ($: Engine) => settingsQueue(() => readSettings($))
+  const refreshPromotion = ($: Engine) => promotionQueue(() => readPromotion($))
 
-  // Refreshes run one after another (trigger, poll and turn end may overlap): an older read must not land after a newer one.
   // `again` forgets the stamp first, so the file is read anew (/podium:panels).
   let statusQueue: Promise<void> = Promise.resolve()
   function refreshStatus($: Engine, again = false): Promise<void> {
@@ -153,14 +156,35 @@ export function createGlue() {
   }
 
   // Clicks run one after another: two settings changed quickly must not race each other's read-modify-write. A press
-  // that fails (the script cannot be spawned) is said in a toast and the log, never dropped (F-030); the next one still runs.
-  let queue: Promise<void> = Promise.resolve()
+  // queued right behind this one (a gate step writes this session and the saved defaults) is written before the read, so
+  // one read announces the change once (F-031); each written press then gets its override note. A press that fails (the
+  // script cannot be spawned) is said in a toast and the log, never dropped (F-030); the next one still runs.
+  const clicks = serial()
+  let waiting = 0
+  let touched = false
+  let written: Array<{ key: string; value: string; scope: Scope }> = []
   function click($: Engine, key: string, value: string, scope: Scope): Promise<void> {
-    queue = queue.then(() => setSetting($, key, value, scope, refreshSettings)).catch(error => {
+    waiting += 1
+    return clicks(async () => {
+      waiting -= 1
+      const done = await writeSetting($, key, value, scope)
+      if (done !== 'skipped') touched = true
+      if (done === 'written') written.push({ key, value, scope })
+      if (waiting > 0 || !touched) return
+      const notes = written
+      written = []
+      touched = false
+      await refreshSettings($)
+      const { value: now = null } = await $.state.get(settings)
+      for (const one of notes) {
+        const layer = one.scope === 'saved' ? now?.saved : now
+        const note = layer ? overrideNote(one.key, one.value, layer.values[one.key], layer.sources[one.key]) : ''
+        if (note) await $.ui.toast(note)
+      }
+    }).catch(error => {
       $.ui.log(`podium: a press in the Settings box failed: ${String(error).slice(0, 200)}`)
       $.ui.toast(`The change could not be made: ${String(error).slice(0, 160)}`)
     })
-    return queue
   }
 
   // An interrupted turn fires no Stop hook, so the pane marks the Status box as waiting itself (qa, 02/11/2026).

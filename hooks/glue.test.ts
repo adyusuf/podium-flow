@@ -155,3 +155,41 @@ test('a press whose run is rejected says so in a toast and the log, and the next
   await glue.click($, 'mode', 'B', 'session')
   expect(commands($).filter(one => one.startsWith('set')).length).toBe(2)
 })
+
+test('a gate step press writes this session and the saved defaults, then one read announces the change once (F-031)', async () => {
+  const config = layers()
+  const $ = fake(configScript(config))
+  const glue = createGlue()
+  await glue.refreshSettings($)
+  void glue.click($, 'gate_steps.sast.dev', 'no', 'session')
+  await glue.click($, 'gate_steps.sast.dev', 'no', 'saved')
+  expect(commands($).slice(READ.length)).toEqual(['set --session s1 gate_steps.sast.dev no', 'set gate_steps.sast.dev no', ...READ])
+  expect($.logs.length).toBe(1)
+  expect($.logs[0]).toContain('(saved defaults): SAST dev (gate_steps.sast.dev) unset → no')
+  expect($.toasts).toEqual([])
+})
+
+test('two refreshes that overlap (a press and the turn end) run one after another and announce a change once (F-031)', async () => {
+  const config = layers()
+  const script = configScript(config)
+  const $ = fake(async argv => { await later(); return script(argv) })
+  const glue = createGlue()
+  await glue.refreshSettings($)
+  config.project.mode = 'B'
+  await Promise.all([glue.refreshSettings($), glue.refreshSettings($)])
+  expect($.logs.length).toBe(1)
+  expect(commands($)).toEqual([...READ, ...READ, ...READ])
+})
+
+test('a refresh that fails reaches its caller and does not stop the next one', async () => {
+  const config = layers()
+  const script = configScript(config)
+  let broken = true
+  const $ = fake(argv => { if (broken) { broken = false; throw new Error('spawn failed') } return script(argv) })
+  const glue = createGlue()
+  let said = ''
+  await glue.refreshSettings($).catch(error => { said = String(error) })
+  expect(said).toBe('Error: spawn failed')
+  await glue.refreshSettings($)
+  expect($.store.get('settingsError')).toBe('')
+})

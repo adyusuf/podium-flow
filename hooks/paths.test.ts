@@ -115,3 +115,13 @@ test('after an interrupted turn the status script marks this session as waiting'
   expect($.runs.at(-1)).toEqual(['python3', STATUS_SCRIPT, 'hook', 'stop'])
   expect($.stdins).toEqual([JSON.stringify({ session_id: 's1' })])
 })
+
+test('two Promotion refreshes that overlap run one after another, never interleaved (F-036)', async () => {
+  const answer = git({ 'for-each-ref': () => ok('dev\norigin/dev\norigin/test\n') })
+  const $ = fake(async argv => { await new Promise(resolve => setTimeout(resolve, 3)); return answer(argv) })
+  const glue = createGlue()
+  await Promise.all([glue.refreshPromotion($), glue.refreshPromotion($)])
+  const one = ['for-each-ref --format=%(refname:short) refs/heads refs/remotes/origin', 'rev-parse --short origin/dev',
+    'rev-list --count origin/dev..dev', 'rev-parse --short origin/test']
+  expect(commands($).filter(word => !word.startsWith('log'))).toEqual([...one, ...one])
+})

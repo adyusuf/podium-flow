@@ -1,6 +1,6 @@
 // What the pane's data paths (glue.ts) need of the engine, typed as only the calls they make, so a test hands in a fake
-// `$` instead of the engine's: the state slots, the installed plugin's script and the session id. No import from the
-// engine; register.tsx hands its own `$` in.
+// `$` instead of the engine's: the state slots, the installed plugin's script, the session id and the queue the
+// refreshes run in. No import from the engine; register.tsx hands its own `$` in.
 import { DISCOVER_PY, IS_FILE_PY, parseDiscovery, scriptDir } from './choose'
 import type { StatusData } from './status'
 
@@ -71,5 +71,18 @@ export async function safely($: Engine, work: Promise<void>) {
     await work
   } catch (error) {
     await $.state.set(settingsError, `Could not read: ${String(error).slice(0, 200)}`)
+  }
+}
+
+/**
+ * One after another: a job starts when every job queued before it has ended. A failure reaches the job's own caller and
+ * never stops the jobs queued behind it (only the queue's tail lets it go; the caller's promise still rejects with it).
+ */
+export function serial() {
+  let tail: Promise<void> = Promise.resolve()
+  return <T>(job: () => Promise<T>): Promise<T> => {
+    const run = tail.then(job)
+    tail = run.then(() => undefined, () => undefined)
+    return run
   }
 }
