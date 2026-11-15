@@ -147,3 +147,22 @@ test('a failed git call with no error text still marks the stage "could not read
   await createGlue().refreshPromotion($)
   expect(stages($.store)).toEqual([{ branch: 'dev', origin: '', unpushed: 0, waived: [], unreadable: 'git rev-parse failed' }])
 })
+
+test('after an interrupted turn with no status script found nothing runs, and it is said once (F-037)', async () => {
+  const $ = fake(() => ok())
+  $.found = false
+  const glue = createGlue()
+  await glue.waitAfterInterrupt($)
+  await glue.waitAfterInterrupt($)
+  expect(commands($)).toEqual([])
+  expect($.logs).toEqual(['podium: no podium_status.py found, so the Status box was not marked as waiting after the interrupted turn'])
+})
+
+test('a status script that fails to mark the session as waiting is said in the log (F-037)', async () => {
+  const $ = fake(() => fail('Traceback: bad payload\n'))
+  await createGlue().waitAfterInterrupt($)
+  expect($.logs).toEqual(['podium: marking the Status box as waiting failed: Traceback: bad payload'])
+  const silent = fake(() => fail('', 3))
+  await createGlue().waitAfterInterrupt(silent)
+  expect(silent.logs).toEqual(['podium: marking the Status box as waiting failed: exit 3'])
+})

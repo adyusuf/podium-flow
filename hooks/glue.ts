@@ -193,10 +193,18 @@ export function createGlue() {
     })
   }
 
-  // An interrupted turn fires no Stop hook, so the pane marks the Status box as waiting itself (qa, 02/11/2026).
+  // An interrupted turn fires no Stop hook, so the pane marks the Status box as waiting itself (qa, 02/11/2026). With no
+  // status script found nothing runs (never `python3 ""`) and that is said once; a failed run is said too (F-037).
+  let noScriptSaid = false
   async function waitAfterInterrupt($: Engine) {
     const script = statusScript(await scriptPath($))
-    await $.process.run(['python3', script, 'hook', 'stop'], { stdin: JSON.stringify({ session_id: await sessionId($) }) })
+    if (!script) {
+      if (!noScriptSaid) $.ui.log('podium: no podium_status.py found, so the Status box was not marked as waiting after the interrupted turn')
+      noScriptSaid = true
+      return
+    }
+    const done = await $.process.run(['python3', script, 'hook', 'stop'], { stdin: JSON.stringify({ session_id: await sessionId($) }) })
+    if (done.exitCode !== 0) $.ui.log(`podium: marking the Status box as waiting failed: ${done.stderr.trim().slice(0, 200) || `exit ${done.exitCode}`}`)
   }
 
   return { refreshSettings, refreshPromotion, refreshStatus, click, waitAfterInterrupt }
