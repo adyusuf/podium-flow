@@ -193,9 +193,13 @@ for name in sorted(known):
 
 # A script in no report was never traced: NOT MEASURED, which blocks like a failure (#29).
 # kcov names a file relative to its source folder (the bare `gate-core.sh`, batch run 15/11/2026), so a report name
-# matches a script by its full relative path, a path ending in it, or - a bare name - by the file name.
+# matches a script by its full relative path, a path ending in it, or - a bare name - by the file name, only while no
+# other expected script shares that file name (two `x.sh` in two folders: a bare `x.sh` proves neither; standards check
+# 16/11/2026).
+bases = [os.path.basename(rel) for rel in expected]
 def reported(rel):
-    return any(name == rel or name.endswith('/' + rel) or ('/' not in name and name == os.path.basename(rel))
+    base = os.path.basename(rel)
+    return any(name == rel or name.endswith('/' + rel) or ('/' not in name and name == base and bases.count(base) == 1)
                for name in known)
 never = [rel for rel in expected if not reported(rel)]
 for rel in never:
