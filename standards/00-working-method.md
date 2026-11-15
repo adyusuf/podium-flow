@@ -398,9 +398,13 @@ deliverable.
   signal, and a blocked row there states the reason, not a percentage.
 - **A subagent's row is written by the hooks (user decision 05/11/2026): the subagent row is written by the hook, never
   by the agent or the orchestrator, and a percentage is only ever measured.** `SubagentStart` opens an `--agent`-labelled
-  `task` step (running, no %); each tool call of the agent refreshes its note (tool calls, time); `SubagentStop` makes it
-  `done` (100%) or `failed` (a failed row stays, never dropped) with the measured duration, tool calls and output
-  tokens, and closes the agent's other open steps. A figure with no signal is left out (`podium_status_agents.py`).
+  `task` step (running, no %), titled `<description> (<model>)` from the harness's meta file; each tool call of the agent
+  refreshes its note (tool calls, time); `SubagentStop` makes it `done` (no %: nothing measures an agent's progress) or
+  `failed` (a failed row stays, never dropped; a transcript ending on a usage limit is `failed: rate limit`, the agent's
+  own report never sets the state) with the measured duration, tool calls and output tokens, and closes the agent's
+  other open steps. A resumed agent (SendMessage) reopens its row with `resumed ×N`, its time and tool calls carried on.
+  The box groups by state, then by agent, then that agent's tasks (user decision 15-16/11/2026). A figure with no signal
+  is left out (`podium_status_agents.py`).
   `drop` and `--after` take an exact step name or a unique prefix, `rename OLD NEW` renames in place, and `now` is the name
   of the step at work, never the user's raw message.
 - **Every session, automatically (user decision 02/11/2026):** the plugin's hooks (`podium_status.py hook`) write
