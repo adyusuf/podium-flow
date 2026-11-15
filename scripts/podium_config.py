@@ -27,6 +27,7 @@ Exit codes: 0 done · 1 a configuration file is unreadable (set/unset/apply refu
 import json
 import os
 import sys
+import tempfile
 
 # The schema, the layers and the text live beside this file (split so no file passes 300 lines, rule #9); every name
 # they hold is re-exported here, so callers keep reading them from podium_config.
@@ -55,7 +56,7 @@ def notify(event, payload_text):
         session = str(json.loads(payload_text).get('session_id') or '')
     except (ValueError, AttributeError):
         session = ''
-    if not session or not all(ch.isalnum() or ch in '-_' for ch in session):
+    if not sessions.valid(session):         # the one rule for a session id that becomes a file name (F-032)
         return None
     effective, problems = load(session=session)
     values = {key: value[0] for key, value in effective.items()}
@@ -66,12 +67,18 @@ def notify(event, payload_text):
     except (OSError, ValueError):
         before = None
     def remember():
+        """A temporary file renamed over: a reader never sees a half-written seen-file (F-032)."""
+        temp = None
         try:
             os.makedirs(seen_dir(), exist_ok=True)
-            with open(path, 'w', encoding='utf-8') as handle:
+            fd, temp = tempfile.mkstemp(dir=seen_dir(), prefix='.%s-' % session, suffix='.tmp')
+            with os.fdopen(fd, 'w', encoding='utf-8') as handle:
                 json.dump(values, handle)
+            os.replace(temp, path)
             return True
         except OSError:
+            if temp and os.path.exists(temp):
+                os.remove(temp)
             return False
 
     changes = []
@@ -146,7 +153,6 @@ def main(argv):
                 print(render_agents(values))
             return 0
         if command == 'reset-agents':
-            effective, _ = load()
             write(path, {}, [key for key in SPECS if key.startswith('agents.')])
             print('every agents.* setting removed from %s' % path)
             return 0

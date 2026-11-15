@@ -12,6 +12,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_podium_config as base  # noqa: E402
+import test_podium_notify  # noqa: E402
 
 SCRIPTS = base.SCRIPTS
 
@@ -154,7 +155,7 @@ class SessionStorage(unittest.TestCase):
                 os.environ.pop('PODIUM_SESSION_DIR', None)
 
 
-class SessionNotify(base.Notify):
+class SessionNotify(test_podium_notify.NotifyTool):      # the helper only: the Notify tests run once, in their own file
     def test_a_session_change_is_announced_to_that_session_only(self):
         self.hook('sess-1')
         self.hook('sess-2')
