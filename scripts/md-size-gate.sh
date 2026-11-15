@@ -8,7 +8,7 @@
 #
 # Usage:
 #   scripts/md-size-gate.sh            # audit (the gate)
-#   scripts/md-size-gate.sh --update   # pull the ceilings down to TODAY's size
+#   scripts/md-size-gate.sh --update   # pull the ceilings down to TODAY's size (refused while a row is bad)
 #   scripts/md-size-gate.sh --init     # no budget yet: write one, ceiling = TODAY's size
 #
 # Exit code: 0 = passed, 1 = a budget was exceeded, a file has no budget or a budget row is malformed
@@ -105,6 +105,7 @@ fi
 
 
 FAILED=0
+BAD_ROWS=0
 LISTED=""
 # Project-specific discovery exclusions: `# exclude:<relative-path>` in the budget
 # file. Why in the tsv: an exclusion is project data (in the configuration repository
@@ -135,7 +136,7 @@ while IFS= read -r row; do
   if [[ $target =~ ^[[:space:]]*([0-9]+)[[:space:]]*$ ]]; then target=$((10#${BASH_REMATCH[1]})); else bad=1; fi
   if [ "$bad" -eq 1 ]; then
     printf '%-28s %7s %7s %7s  %s\n' "$path" "-" "-" "-" "✗ BAD BUDGET ROW (ceiling and target must be whole numbers): ${row//$'\t'/\\t}"
-    FAILED=1; continue
+    FAILED=1; BAD_ROWS=1; continue
   fi
   full="$ROOT/$path"
   if [ ! -f "$full" ]; then
@@ -186,6 +187,12 @@ done < <(claude_md_files)
 echo
 
 if [ "$UPDATE" -eq 1 ]; then
+  # A bad row (printed above) used to be written back as it was, with exit 0 (F-046): the budget is
+  # now left untouched until the row is fixed by hand.
+  if [ "$BAD_ROWS" -eq 1 ]; then
+    echo "✗ Budget NOT updated: fix the BAD BUDGET ROW line(s) above in $BUDGET first."
+    exit 1
+  fi
   # Only ever LOWERS the ceiling. Raising it is done by hand, with a reason —
   # an automatic raise cancels the ratchet and makes the gate decorative.
   tmp="$(mktemp)"

@@ -236,6 +236,21 @@ class UpdateIsARatchet(Gate):
         self.assertIn('CLAUDE.md\t2\t1\treason', kept)
         self.assertNotIn('\t5\t', kept)
 
+    def test_update_refuses_a_bad_row_and_leaves_the_budget_untouched(self):
+        # F-046: the bad row was written back as it was and --update exited 0.
+        self.write('CLAUDE.md', 'x' * 1000)                  # 1 KB: a good row would be lowered
+        self.write('web/CLAUDE.md', 'x')
+        path = self.budget('CLAUDE.md\t9\t1\treason', 'web/CLAUDE.md\tabc\t1\treason')
+        with open(path, 'rb') as handle:
+            before = handle.read()
+        out, code = self.run_gate('--update')
+        self.assertIn('BAD BUDGET ROW', out)
+        self.assertIn('NOT updated', out)
+        self.assertNotIn('Budget updated', out)
+        self.assertEqual(1, code, out)
+        with open(path, 'rb') as handle:
+            self.assertEqual(before, handle.read())
+
 
 class AGlobInTheRepositoryPATH(Gate):
     """A repository path containing glob characters must not change the verdict.
