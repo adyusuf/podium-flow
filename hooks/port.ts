@@ -8,7 +8,8 @@ export type Ran = { exitCode: number; stdout: string; stderr: string }
 export type Layer = { values: Record<string, boolean | string>; sources: Record<string, string> }
 /** What the Settings and Agents boxes read; ../types declares the same shapes for the engine. */
 export type SettingsData = Layer & { schema: Array<{ key: string; label: string }>; saved?: Layer; agents: unknown[] }
-export type StageData = { branch: string; origin: string; unpushed: number; waived: string[] }
+/** `unreadable`: why a git call for this stage failed; the box then says "could not read", never "pushed" (F-035). */
+export type StageData = { branch: string; origin: string; unpushed: number; waived: string[]; unreadable?: string }
 export type PromotionData = { stages: StageData[]; error?: string; outside?: boolean }
 
 type Slot<K extends string> = { readonly plugin: 'podium'; readonly key: K }

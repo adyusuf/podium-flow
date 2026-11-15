@@ -30,7 +30,7 @@ type AgentRow = {
 }
 type Layer = { values: Record<string, boolean | string>; sources: Record<string, string> }
 type SettingsData = Layer & { schema: Spec[]; saved?: Layer; agents: AgentRow[] }
-type Stage = { branch: string; origin: string; unpushed: number; waived: string[] }
+type Stage = { branch: string; origin: string; unpushed: number; waived: string[]; unreadable?: string }
 type PromotionData = { stages: Stage[]; error?: string; outside?: boolean }
 
 export const SECTIONS = ['status', 'settings', 'agents', 'promotion'] as const
@@ -276,11 +276,14 @@ export function promotionBody(ui: Ui, data: PromotionData | null) {
   return h(
     ui.Box,
     { flexDirection: 'column' },
+    // A stage git could not read says so in orange and nothing else: never "pushed" or "no waived gate" (F-035).
     data.stages.map(stage =>
       h(ui.Box, { flexDirection: 'column', marginBottom: 1 },
-        explained(ui, `stage-${stage.branch}`, h(ui.Text, { bold: true }, `${stage.branch.padEnd(5)} origin ${stage.origin}${stage.unpushed > 0 ? `  ${stage.unpushed} not pushed` : '  pushed'}`), stageCard(stage.branch)),
+        explained(ui, `stage-${stage.branch}`, stage.unreadable
+          ? h(ui.Text, { bold: true, color: WARN }, `${stage.branch.padEnd(5)} could not read: ${stage.unreadable}`)
+          : h(ui.Text, { bold: true }, `${stage.branch.padEnd(5)} origin ${stage.origin}${stage.unpushed > 0 ? `  ${stage.unpushed} not pushed` : '  pushed'}`), stageCard(stage.branch)),
         helpCard(ui, `stage-${stage.branch}`, stageCard(stage.branch)),
-        h(ui.Box, { flexDirection: 'column', marginLeft: INDENT },
+        stage.unreadable ? null : h(ui.Box, { flexDirection: 'column', marginLeft: INDENT },
           stage.waived.length === 0
             ? h(ui.Text, { dimColor: true }, 'no waived gate on the way in')
             : stage.waived.map(line => h(ui.Text, { color: WARN }, `waived ${line}`))))),

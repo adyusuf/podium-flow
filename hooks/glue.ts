@@ -5,7 +5,7 @@ import { outsideRepository, type Scope } from './boxes'
 import { countOf, overrideNote, plannedStages, refSet, waivedLines, waivedRange } from './choose'
 import { warnings } from './notices'
 import {
-  type Engine, type Layer, promotion, scriptPath, sessionId, settings, settingsError, settingsProblems, type SettingsData,
+  type Engine, type Layer, promotion, type Ran, scriptPath, sessionId, settings, settingsError, settingsProblems, type SettingsData,
   serial, type StageData, status,
 } from './port'
 import { parseStatus, statusDir, statusScript, statusStep, type StatusProbe } from './status'
@@ -49,6 +49,10 @@ async function readSettings($: Engine) {
   }
 }
 
+/** Why a git call failed, short ('' when it did not, or was not made); any failed call makes a stage "could not read" (F-035). */
+const failure = (name: string, ran: Ran | null) =>
+  (ran && ran.exitCode !== 0 ? `git ${name} failed${ran.stderr.trim() ? `: ${ran.stderr.trim().slice(0, 120)}` : ''}` : '')
+
 async function readPromotion($: Engine) {
   const git = (args: string[]) => $.process.run(['git', ...args])
   // The engine says whether the folder is in a repository; any other git failure is only an error, never "outside".
@@ -67,11 +71,13 @@ async function readPromotion($: Engine) {
     const ahead = stage.local ? await git(['rev-list', '--count', `origin/${stage.branch}..${stage.branch}`]) : null
     const range = waivedRange(stage)
     const log = range ? await git(['log', '--format=@@%h%n%B', range]) : null
+    const unreadable = failure('rev-parse', tip) || failure('rev-list', ahead) || failure('log', log)
     stages.push({
       branch: stage.branch,
-      origin: tip.stdout.trim(),
-      unpushed: ahead ? countOf(ahead.stdout) : 0,
-      waived: log && log.exitCode === 0 ? waivedLines(log.stdout) : [],
+      origin: tip.exitCode === 0 ? tip.stdout.trim() : '',
+      unpushed: ahead && !unreadable ? countOf(ahead.stdout) : 0,
+      waived: log && !unreadable ? waivedLines(log.stdout) : [],
+      ...(unreadable ? { unreadable } : {}),
     })
   }
   await $.state.set(promotion, { stages })

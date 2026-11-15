@@ -125,3 +125,25 @@ test('two Promotion refreshes that overlap run one after another, never interlea
     'rev-list --count origin/dev..dev', 'rev-parse --short origin/test']
   expect(commands($).filter(word => !word.startsWith('log'))).toEqual([...one, ...one])
 })
+
+for (const failing of ['rev-parse', 'rev-list', 'log']) {
+  test(`a failed git ${failing} marks the stage "could not read", never pushed or free of waived gates (F-035)`, async () => {
+    const $ = fake(git({
+      'for-each-ref': () => ok('dev\ntest\norigin/dev\norigin/test\n'),
+      'rev-parse': () => ok('abc1234\n'),
+      'rev-list': () => ok('3\n'),
+      log: () => ok('\0abc1234\nGate-Waived: e2e (neden: configuration)\n'),
+      [failing]: () => fail(`fatal: bad ${failing}\n`, 128),
+    }))
+    await createGlue().refreshPromotion($)
+    const test = stages($.store).find(stage => stage.branch === 'test')!
+    expect(test).toEqual({ branch: 'test', origin: failing === 'rev-parse' ? '' : 'abc1234', unpushed: 0, waived: [],
+      unreadable: `git ${failing} failed: fatal: bad ${failing}` })
+  })
+}
+
+test('a failed git call with no error text still marks the stage "could not read" (F-035)', async () => {
+  const $ = fake(git({ 'for-each-ref': () => ok('origin/dev\n'), 'rev-parse': () => fail('', 1) }))
+  await createGlue().refreshPromotion($)
+  expect(stages($.store)).toEqual([{ branch: 'dev', origin: '', unpushed: 0, waived: [], unreadable: 'git rev-parse failed' }])
+})
