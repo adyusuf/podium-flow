@@ -52,7 +52,7 @@ It opens no network connection. The code is split so the drawing and the data pa
 decisions), `notices.ts` (chat lines), `glue.ts` (the data paths: reading the settings, the branches and the status file,
 a press and its queue, the interrupted turn) and `port.ts` (the few engine calls they make, typed so a test hands in a fake
 `$`, plus the plugin-script lookup and the refresh queue); `register.tsx` is the engine glue: the hooks and the drawing.
-Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (146 tests; `fake.test.ts`
+Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (147 tests; `fake.test.ts`
 is the shared fake `$`, with no test of its own).
 
 ## The four boxes
