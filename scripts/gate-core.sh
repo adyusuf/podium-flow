@@ -127,14 +127,10 @@ cd "$ROOT" || exit 2
 [ -f scripts/merge-gate.conf ] && . scripts/merge-gate.conf
 COVERAGE_MIN="${COVERAGE_MIN:-80}"
 # Rule #29: 80 is a floor. A higher value applies; a lower one, or anything but a number, is raised to 80.
-# A decimal is rounded UP to a whole number (85.5 -> 86: never below what was asked; the comparisons are whole).
-if [[ "$COVERAGE_MIN" =~ ^[0-9]+\.[0-9]+$ ]]; then
-  whole="${COVERAGE_MIN%%.*}"; [[ "${COVERAGE_MIN#*.}" =~ ^0+$ ]] || whole=$((10#$whole + 1))
-  echo "COVERAGE_MIN=$COVERAGE_MIN is a decimal - rounded up to $whole"; COVERAGE_MIN="$whole"
-fi
+if [[ "$COVERAGE_MIN" =~ ^([0-9]+)\.([0-9]+)$ ]]; then   # a decimal rounds UP, never down (85.5 -> 86)
+  w=$((10#${BASH_REMATCH[1]} + (10#${BASH_REMATCH[2]} > 0))); echo "COVERAGE_MIN=$COVERAGE_MIN is a decimal - rounded up to $w"; COVERAGE_MIN=$w; fi
 if ! [[ "$COVERAGE_MIN" =~ ^[0-9]+$ ]] || [ "$COVERAGE_MIN" -lt 80 ]; then
-  echo "COVERAGE_MIN=$COVERAGE_MIN is not a whole number of at least 80 (the floor of rule #29) - raised to 80"; COVERAGE_MIN=80
-fi
+  echo "COVERAGE_MIN=$COVERAGE_MIN is not a whole number of at least 80 (the floor of rule #29) - raised to 80"; COVERAGE_MIN=80; fi
 export COVERAGE_MIN   # the coverage command measures against the same threshold
 
 # Fail closed: a copy of this file without its libraries must not run a partial gate.

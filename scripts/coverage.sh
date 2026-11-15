@@ -32,14 +32,10 @@ cd "$root" || exit 2
 venv="${COVERAGE_VENV:-$HOME/.cache/claude-standards/venv}"
 min="${COVERAGE_MIN:-80}"
 # Rule #29: 80 is a floor (as in gate-core.sh). A higher value applies; a lower one, or anything but a number, is raised to 80.
-# A decimal is rounded UP to a whole number (85.5 -> 86: never below what was asked; the comparisons are whole).
-if [[ "$min" =~ ^[0-9]+\.[0-9]+$ ]]; then
-  whole="${min%%.*}"; [[ "${min#*.}" =~ ^0+$ ]] || whole=$((10#$whole + 1))
-  echo "COVERAGE_MIN=$min is a decimal - rounded up to $whole"; min="$whole"
-fi
+if [[ "$min" =~ ^([0-9]+)\.([0-9]+)$ ]]; then   # a decimal rounds UP, never down (85.5 -> 86)
+  w=$((10#${BASH_REMATCH[1]} + (10#${BASH_REMATCH[2]} > 0))); echo "COVERAGE_MIN=$min is a decimal - rounded up to $w"; min=$w; fi
 if ! [[ "$min" =~ ^[0-9]+$ ]] || [ "$min" -lt 80 ]; then
-  echo "COVERAGE_MIN=$min is not a whole number of at least 80 (the floor of rule #29) - raised to 80"; min=80
-fi
+  echo "COVERAGE_MIN=$min is not a whole number of at least 80 (the floor of rule #29) - raised to 80"; min=80; fi
 export COVERAGE_MIN="$min"   # coverage-shell.sh below reads it
 status=0
 # A Windows venv keeps its executables in Scripts/, not bin/.
