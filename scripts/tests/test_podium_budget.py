@@ -53,6 +53,20 @@ class Budget(unittest.TestCase):
         self.assertIsNone(podium_budget.spent(''))
         self.assertEqual('', podium_budget.line(None, '100'))
 
+    def test_a_transcript_over_the_agent_counters_cap_is_no_figure(self):
+        # F-039 (14/11/2026): read on every prompt and stop, so a huge transcript is not read; a partial sum is a guess.
+        import podium_status_agents
+        self.assertIs(podium_status_agents.MAX_TRANSCRIPT, podium_budget.MAX_TRANSCRIPT)     # one cap, shared
+        agent = os.path.join(self.dir, 'sess', 'subagents', 'agent-1.jsonl')
+        with open(agent, 'r+b') as handle:          # sparse: no 64 MB written to the disk
+            handle.truncate(podium_budget.MAX_TRANSCRIPT + 1)
+        self.assertIsNone(podium_budget.spent(self.transcript))
+        self.hook('stop', {'session_id': SESSION, 'transcript_path': self.transcript})
+        self.assertEqual('', json.loads(self.show('--json'))['budget'])
+        with open(agent, 'r+b') as handle:          # at the cap it is still read
+            handle.truncate(podium_budget.MAX_TRANSCRIPT)
+        self.assertAlmostEqual(15.0, podium_budget.spent(self.transcript))
+
     def test_the_line_is_measured_and_never_a_stop(self):
         self.assertEqual('$15.00 spent of $100 (15%) · measured: tokens × API list price', podium_budget.line(15.0, '100'))
         over = podium_budget.line(150.0, '100')

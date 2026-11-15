@@ -41,11 +41,31 @@ class Steps(unittest.TestCase):
     def test_a_step_has_a_state_a_percentage_a_blocker_and_who_runs_it(self):
         self.run_tool('step', '1. plan', 'done', '100')
         self.run_tool('step', '2. build', 'running', '45%', '--blocker', 'qa review')
-        self.run_tool('step', 'review', 'running', '150', '--agent', 'qa a9f3c2')
-        self.run_tool('step', '3. ship', 'not started', 'soon')
+        self.run_tool('step', 'review', 'running', '100', '--agent', 'qa a9f3c2')
+        self.run_tool('step', '3. ship', 'not started', '0')
         self.assertEqual([(r['item'], r['state'], r['percent'], r['blocker'], r['agent']) for r in self.rows()], [
             ('1. plan', 'done', '100', '', ''), ('2. build', 'running', '45', 'qa review', ''),
-            ('review', 'running', '100', '', 'qa a9f3c2'), ('3. ship', 'not started', '', '', '')])
+            ('review', 'running', '100', '', 'qa a9f3c2'), ('3. ship', 'not started', '0', '', '')])
+
+    def test_a_percent_that_is_not_a_whole_number_0_to_100_is_refused_and_nothing_is_written(self):
+        # F-006 (14/11/2026): "3 of 8" was stored as no percent, and the guard then refused every edit of a running step.
+        for given in ('3 of 8', 'n/a', 'soon', '', '45.5', '150', '-5', '101%'):
+            _, err, code = self.run_tool('step', '1. build', 'running', given)
+            self.assertEqual(2, code, given)
+            self.assertIn('--note', err, given)
+        self.assertFalse(os.path.exists(os.path.join(self.dir, SESSION + '.json')))
+        # An older row with no percent is still read.
+        with open(os.path.join(self.dir, SESSION + '.json'), 'w', encoding='utf-8') as handle:
+            json.dump({'rows': [{'item': 'old', 'state': 'running', 'percent': ''}]}, handle)
+        self.assertEqual([('old', '')], [(r['item'], r['percent']) for r in self.rows()])
+        # A valid running step opens the guard with steps.enforce on block.
+        with open(os.path.join(self.dir, 'u.json'), 'w', encoding='utf-8') as handle:
+            json.dump({'steps': {'enforce': 'block'}}, handle)
+        code_file = {'file_path': os.path.join(SCRIPTS, 'x.py')}
+        self.assertEqual(2, self.guard('Edit', code_file)[2])
+        self.assertEqual(0, self.run_tool('step', '1. build', 'running', ' 3 % ')[2])
+        self.assertEqual('3', self.rows()[1]['percent'])
+        self.assertEqual(0, self.guard('Edit', code_file)[2])
 
     def test_a_step_keeps_a_short_name_and_its_details_as_a_note(self):
         self.run_tool('step', '1. build', 'running', '40', '--note', '3 of 8 files', '--blocker', 'qa')

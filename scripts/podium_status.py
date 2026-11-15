@@ -18,9 +18,10 @@ Usage:
                                                              add the row named ITEM, or replace it in place
     podium_status.py --session ID step ITEM STATE PERCENT [--blocker TEXT] [--agent NAME] [--after ITEM] [--note TEXT]
                                                              a step (02/11/2026): its state (STATES), how much is done
-                                                             (0-100), what blocks it, who runs it (a subagent; none =
-                                                             this session); --after puts a new step after that one,
-                                                             else it goes last. Replaced in place.
+                                                             (a whole number 0-100, else refused), what blocks it, who
+                                                             runs it (a subagent; none = this session); --after puts a
+                                                             new step after that one, else it goes last. Replaced in
+                                                             place.
     podium_status.py --session ID drop ITEM [--agent NAME]  remove the step named ITEM (a unique prefix of the name does too)
     podium_status.py --session ID rename OLD NEW [--agent NAME]
                                                              give a step a new name, in place (OLD may be a unique prefix)
@@ -28,7 +29,8 @@ Usage:
     podium_status.py --session ID show [--json]             print it
     podium_status.py hook EVENT                             the plugin's hooks (stdin: the hook payload), in
                                                              podium_status_hooks.py
-Exit codes: 0 done, 2 refused (an unusable session id or folder, an unreadable file, a failed write).
+Exit codes: 0 done, 2 refused (an unusable session id or folder, an unreadable file, a failed write, a step's percent
+that is not a whole number 0-100).
 """
 import argparse
 import contextlib
@@ -47,8 +49,8 @@ except ImportError:  # Windows: no advisory lock; one writer at a time is then t
 # The rows and what is done to them live in podium_status_rows.py (beside this file); the names are re-exported here.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from podium_status_rows import (CLOSED, CONTROL, FIELDS, MAX_ROWS, MAX_TEXT, OPEN, STATES, STEP_FIELDS,  # noqa: E402,F401
-                                StatusError, clip, drop_row, percent, put_row, rename_row, running_item, same,
-                                step_percent, trim)
+                                StatusError, clip, drop_row, given_percent, percent, put_row, rename_row,
+                                running_item, same, step_percent, trim)
 
 KEEP_DAYS = 14
 MAX_ID = 100
@@ -182,6 +184,7 @@ def render(data):
 
 def change(args):
     """One write under the lock. `clear` does not read the old file, so it also replaces a corrupt one."""
+    done = given_percent(args.percent) if args.action == 'step' else ''     # refused before anything is written
     with locked(args.session):
         data = dict(EMPTY, rows=[]) if args.action == 'clear' else load(args.session)
         if args.action in ('now', 'next'):
@@ -189,7 +192,7 @@ def change(args):
         elif args.action == 'row':
             data = put_row(data, args.item, args.state, args.figure, args.waiting)
         elif args.action == 'step':
-            step = {'percent': percent(args.percent), 'blocker': clip(args.blocker), 'agent': clip(args.agent), 'note': clip(args.note)}
+            step = {'percent': done, 'blocker': clip(args.blocker), 'agent': clip(args.agent), 'note': clip(args.note)}
             # The older fields carry the % and the blocker too, so an older writer's rewrite keeps them (rule #4).
             figure = step['percent'] + '%' if step['percent'] else ''
             data = put_row(data, args.item, args.state, figure, step['blocker'], step, args.after)
