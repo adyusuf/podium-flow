@@ -6,7 +6,6 @@ it reuses that file's Fleet fixture.
 """
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 
