@@ -46,10 +46,14 @@ What the mod runs and reads:
 - A press writes `~/.claude/podium-session/<session id>.json` (this session's layer) or, in the *System* column,
   `~/.claude/podium.json`.
 
-It opens no network connection. The code is split so the drawing can be tested without the engine: `boxes.ts` (Settings,
-Agents, Promotion), `controls.ts` (the shared icons, options, aligned lines and hover cards), `help.ts` (what the hover
-cards say), `gatesteps.ts` (the gate's step rows under Gates), `status.ts` (Status), `choose.ts` (pure decisions), `notices.ts` (chat lines); `register.tsx` is the
-engine glue. Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (96 tests).
+It opens no network connection. The code is split so the drawing and the data paths can be tested without the engine:
+`boxes.ts` (Settings, Agents, Promotion), `controls.ts` (the shared icons, options, aligned lines and hover cards), `help.ts`
+(what the hover cards say), `gatesteps.ts` (the gate's step rows under Gates), `status.ts` (Status), `choose.ts` (pure
+decisions), `notices.ts` (chat lines), `glue.ts` (the data paths: reading the settings, the branches and the status file,
+a press and its queue, the interrupted turn) and `port.ts` (the few engine calls they make, typed so a test hands in a fake
+`$`, plus the plugin-script lookup and the refresh queue); `register.tsx` is the engine glue: the hooks and the drawing.
+Tests: `deno test --sloppy-imports --import-map=scripts/ts-shim/import_map.json hooks/*.test.ts` (145 tests; `fake.test.ts`
+is the shared fake `$`, with no test of its own).
 
 ## The four boxes
 
@@ -112,9 +116,10 @@ reopening them.
   mode D; ticking one adds it to this session and marks it `(added)` at the end of its row. In mode A the box says it runs no agents.
 - **Promotion.** One block per `dev`/`test`/`prod` branch: the commit
   `origin` holds, then `pushed` or `N not pushed`, and below it any `Gate-Waived` line on the commits waiting to come in
-  from the stage before it; *no waived gate on the way in* means none.
-- **Colours.** Red: the configuration could not be read. Orange: a settings file that could not be read, or a waived
-  gate. Faded: waiting lines and options that are not chosen. Bold: titles and row labels. On the desktop a
+  from the stage before it; *no waived gate on the way in* means none. When one of the stage's git calls fails, the line
+  says *could not read* with the failing call, in orange, and nothing under it: a git error never reads as pushed.
+- **Colours.** Red: the configuration could not be read. Orange: a settings file that could not be read, a waived
+  gate, or a Promotion stage git could not read. Faded: waiting lines and options that are not chosen. Bold: titles and row labels. On the desktop a
   chosen option has a filled radio or checkbox icon; the terminal, which cannot draw SVG, shows it as `[C]`, `[dev]`.
 
 ## What runs only when you call it
