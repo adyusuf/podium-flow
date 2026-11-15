@@ -1,4 +1,5 @@
-"""The bypasses of the destructive-command guard found by the test inventory (14/11/2026, F-001 and F-002), as one table.
+"""The bypasses of the destructive-command guard found by the test inventory (14/11/2026, F-001 and F-002; F-045 in
+phase 2), as one table.
 
 Each row runs twice: through `verdict()` in scripts/guard-inspect.py (the reason it gives) and through the real hook,
 `bash scripts/guard-destructive.sh` with a PreToolUse payload on stdin (the exit code the harness reads). The wrapper run
@@ -71,6 +72,32 @@ BYPASSES = [
     # F-002: a here-string is not a heredoc, so the next line is still judged
     ('cat <<<foo\ngit push --force', 'forced push'),
     ('cat <<< foo\ngit push origin main', 'straight to main'),
+    # F-045: git takes any unique prefix of a long option
+    ('git push --fo origin dev', 'forced push'),
+    ('git push --forc origin dev', 'forced push'),
+    ('git push --force-w origin dev', 'forced push'),
+    ('git push --mi', 'mirror'),
+    ('git push --mirr origin', 'mirror'),
+    ('git push --de origin feature/x', 'deletes a remote branch'),
+    ('git push origin --delet feature/x', 'deletes a remote branch'),
+    ('git commit --no-v -m x', 'gitleaks'),
+    ('git commit --no-veri -m x', 'gitleaks'),
+    ('git push --no-verif origin dev', 'gitleaks'),
+    # F-045: --prune deletes the remote branches that are gone locally
+    ('git push --prune origin', '--prune'),
+    ('git push origin --pru refs/heads/*:refs/heads/*', '--prune'),
+    # F-045: main quoted
+    ('git push origin "main"', 'straight to main'),
+    ("git push origin 'main'", 'straight to main'),
+    ('git push origin "refs/heads/main"', 'straight to main'),
+    ('git push origin "HEAD:main"', 'straight to main'),
+    # F-045: a dangerous target anywhere among the targets, the option anywhere too
+    ('rm -rf build ~', 'recursive delete'),
+    ('rm -rf ./x "$HOME"', 'recursive delete'),
+    ('rm -rf node_modules dist /', 'recursive delete'),
+    ('rm build -rf .', 'recursive delete'),
+    ('/bin/rm -rf ~', 'recursive delete'),
+    ('git rm -rf .', 'recursive delete'),
 ]
 
 NEAR_MISSES = [
@@ -80,6 +107,11 @@ NEAR_MISSES = [
     'git commit -m "wip"', 'git commit -am "wip"', 'git commit --amend --no-edit', 'git -C repo commit -m x',
     'git merge -n feature/x', 'rm -rf ./build', 'rm --recursive build', 'rm -r -f node_modules', 'rm -f /tmp/x.log',
     'rm -rf "$HOME/tmp/x"', 'cat <<<foo',
+    # F-045 near misses: the other options sharing a prefix, --all, main inside a name, safe rm targets, rm in a word
+    'git push --follow-tags origin dev', 'git push --fol origin dev', 'git push --progress origin dev',
+    'git push --all origin', 'git push --dry-run origin dev', 'git commit --no-verbose -m x', 'git commit --no-edit',
+    'git push origin "feature/main-x"', "git push origin 'main-menu'", 'rm -rf ./build ./dist', 'rm -rf build dist/*',
+    'git rm -r --cached .', 'terraform fmt -recursive .', 'npm run confirm -r .',
 ]
 
 

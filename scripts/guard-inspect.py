@@ -61,27 +61,40 @@ def bundle(letter):
     return r"-[a-z0-9]*" + letter + r"[a-z0-9]*"
 
 
+def prefix(shortest, rest):
+    """A long option and every abbreviation git accepts for it: `prefix("--mi", "rror")` matches `--mi` ... `--mirror`
+    (git takes any unique prefix of a long option, F-045)."""
+    return shortest + "".join("(?:" + letter for letter in rest) + ")?" * len(rest)
+
+
 # Heredoc bodies are stripped for the GIT rules only — a heredoc that WRITES a
 # script containing "--no-verify" is not a commit. They are NOT stripped for the
 # rules below it, because `psql <<EOF ...` really does execute.
+# The shortest abbreviations blocked: `--fo` (ambiguous with --follow-tags, which git refuses anyway; `--fol` is not
+# matched), `--mi`, `--de`, `--pru` (`--pr` is also --progress), `--no-v`.
 GIT_RULES = (
-    (PUSH + r"([^;&|\n]*\s)?(" + bundle("f") + r"|--force[a-z-]*(=\S*)?)(\s|$)", "forced push"),
+    (PUSH + r"([^;&|\n]*\s)?(" + bundle("f") + r"|--fo(r(c(e[a-z-]*)?)?)?(=\S*)?)(\s|$)", "forced push"),
     (PUSH + r"[^;&|\n]*\s[\"\x27]?\+", "forced push (a + refspec)"),
-    (PUSH + r"([^;&|\n]*\s)?--mirror(\s|$)", "mirror push (overwrites and deletes remote branches)"),
-    (PUSH + r"([^;&|\n]*\s)?(" + bundle("d") + r"|--delete)(\s|$)", "deletes a remote branch"),
+    (PUSH + r"([^;&|\n]*\s)?" + prefix("--mi", "rror") + r"(\s|$)", "mirror push (overwrites and deletes remote branches)"),
+    (PUSH + r"([^;&|\n]*\s)?(" + bundle("d") + r"|" + prefix("--de", "lete") + r")(\s|$)", "deletes a remote branch"),
+    (PUSH + r"([^;&|\n]*\s)?" + prefix("--pru", "ne") + r"(\s|$)", "deletes remote branches (--prune)"),
     (PUSH + r"[^;&|\n]*\s[\"\x27]?:[^\s:]", "deletes a remote branch (a :branch refspec)"),
-    (PUSH + r"[^;&|\n]*(\s|:|refs/heads/)main(\s|$)", "push straight to main"),
-    (GIT + r"(commit|push|merge)[^;&|\n]*--no-verify", "--no-verify skips the pre-commit gitleaks hook"),
+    (PUSH + r"[^;&|\n]*(\s|:|refs/heads/)[\"\x27]?main[\"\x27]?(\s|$)", "push straight to main"),
+    (GIT + r"(commit|push|merge)[^;&|\n]*(--no-verify|\s" + prefix("--no-v", "erify") + r"(\s|$))",
+     "--no-verify skips the pre-commit gitleaks hook"),
     # `git commit -n` IS --no-verify (on push and merge -n means something else).
     (GIT + r"commit(?![-\w])([^;&|\n]*\s)?" + bundle("n") + r"(\s|$)", "-n (--no-verify) skips the pre-commit gitleaks hook"),
 )
-# rm: the recursive option anywhere among the options, short (`-r`, `-rf`, `-r -f`) or long (`--recursive --force`); the
-# target bare or quoted (`"$HOME"`, `'/'`) - F-001.
-RM_OPTION = r"\s+-\S+"
+# rm, as a command word (not `confirm`, `terraform`): a recursive option, short (`-r`, `-rf`, `-r -f`) or long
+# (`--recursive`), and a dangerous target, bare or quoted (`"$HOME"`, `'/'`), each ANYWHERE in the same command
+# (F-001, F-045: `rm -rf build ~`). `git rm -r --cached .` only untracks, and plain rm has no --cached: left alone.
+SEGMENT = r"[^;&|\n]*[ \t]"
+RM_RECURSIVE = SEGMENT + r"(" + bundle("r") + r"|--recursive)(\s|$)"
+RM_TARGET = SEGMENT + r"(--[ \t]+)?[\"\x27]?(/|~|\$HOME|\$\{HOME\}|\*|\.)/?\*?[\"\x27]?(\s|$)"
 ANY_RULES = (
     (r"(drop|truncate)\s+(table|database|schema)", "DROP/TRUNCATE (take a backup and get approval first)"),
-    (r"rm(" + RM_OPTION + r")*?\s+(" + bundle("r") + r"|--recursive)(" + RM_OPTION + r")*\s+(--\s+)?[\"\x27]?"
-     r"(/|~|\$HOME|\$\{HOME\}|\*|\.)/?\*?[\"\x27]?(\s|$)", "recursive delete of a root/home/working directory"),
+    (r"(?<![\w.-])rm(?=[ \t])(?=" + RM_RECURSIVE + r")(?=" + RM_TARGET + r")(?!" + SEGMENT + r"--cached(\s|$))",
+     "recursive delete of a root/home/working directory"),
 )
 
 

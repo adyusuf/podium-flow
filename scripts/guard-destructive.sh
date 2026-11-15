@@ -2,10 +2,11 @@
 # PreToolUse(Bash) hook: blocks the irreversible commands from the never-do list.
 #
 #   git push --force / -f / -fu / --force-with-lease / +refspec   git push ... main (any refspec, refs/heads/main)
-#   git push --mirror / --delete / -d / :branch                    git -C <dir> / -c k=v before any git verb
+#   git push --mirror / --delete / -d / :branch / --prune          git -C <dir> / -c k=v before any git verb
+#   (an abbreviated long option counts as the full one: --fo, --mi, --de, --no-v; main may be quoted)
 #   (a push to the prod branch is not judged here: the configuration decides, 17/10/2026)
 #   git commit/push/merge --no-verify, git commit -n               DROP|TRUNCATE  TABLE|DATABASE|SCHEMA
-#   rm -rf / -r -f / --recursive on / ~ $HOME . *, bare or quoted
+#   rm -rf / -r -f / --recursive on / ~ $HOME . *, bare or quoted, anywhere among the targets
 #
 # Exit 2 = the harness blocks the call and shows this message to the model. The
 # model cannot approve it; the user runs the command themselves, or rewords a
@@ -19,9 +20,10 @@
 # is therefore not inspected for git commands: this is a safety net against
 # accidents, not a sandbox.
 #
-# Cost: a grep prefilter runs on every Bash call (a few ms, ~93% of real calls
-# stop there before `commit` joined the keywords for `git commit -n`, 14/11/2026);
-# the JSON is parsed and the patterns applied only on a keyword hit.
+# Cost: a grep prefilter runs on every Bash call (a few ms); the JSON is parsed and
+# the patterns applied only on a keyword hit. 86% of real calls stop at the grep
+# (measured 15/11/2026 on 28,015 Bash calls of local transcripts; 90.5% before
+# `commit` joined the keywords for `git commit -n`).
 set -uo pipefail
 
 payload="$(cat 2>/dev/null || true)"

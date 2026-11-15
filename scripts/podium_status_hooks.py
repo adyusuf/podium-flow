@@ -44,12 +44,12 @@ TEMP_ROOTS = tuple(os.path.normcase(path) for path in {os.path.realpath(tempfile
                                                         '/var/folders', '/private/var/folders'})
 # <any>/.claude/<name>: a project's mode and settings files, and the user's own ~/.claude/podium.json (adyusuf.json before).
 PROJECT_BOOKKEEPING = ('mode', 'mode-model', 'podium.json', 'adyusuf.json')
-# `git commit` where a command starts: the line's start, after ;, &, |, a newline, `(`, `$(`, a backtick, or `then`, `do`,
-# `else`, `elif`; behind `env [VAR=…]`, `command` or a VAR=value; git options such as -C <dir> or -c k=v allowed (F-004).
-# Bash file writes (sed -i, >, tee) are left out on purpose: the guard holds Edit/Write/NotebookEdit and commits, and a
-# test pins that scope.
-COMMIT = re.compile(r'(?:^|[;&|\n(`]|\b(?:then|do|else|elif)\s)\s*'
-                    r'(?:(?:env|command)(?:\s+-\S+)*\s+|\w+=\S*\s+)*'
+# `git commit` where a command starts: the line's start, after ;, &, |, a newline, `(`, `$(`, a backtick, `{`, `!`, or
+# `then`, `do`, `else`, `elif`; behind `env [-u NAME] [VAR=…]`, `command`, `sudo`, `exec`, `time`, `nohup` or a VAR=value;
+# git options such as -C <dir> or -c k=v allowed (F-004, F-045). Bash file writes (sed -i, >, tee) are left out on
+# purpose: the guard holds Edit/Write/NotebookEdit and commits, and a test pins that scope.
+COMMIT = re.compile(r'(?:^|[;&|\n(`{!]|\b(?:then|do|else|elif)\s)\s*'
+                    r'(?:(?:env|command|sudo|exec|time|nohup)(?:\s+-u\s+\S+|\s+-\S+)*\s+|\w+=\S*\s+)*'
                     r'git(?:\s+(?:-[Cc]\s+\S+|--(?:git-dir|work-tree|namespace)\s+\S+|-\S+))*\s+commit(?![-\w])')
 
 

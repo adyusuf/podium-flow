@@ -151,8 +151,14 @@ class Steps(unittest.TestCase):
         # F-004: where a command starts inside a compound command, and what may stand in front of git.
         for command in ('if true; then git commit -m x; fi', 'for f in a; do git commit -m x; done', '(git commit -m x)',
                         'echo $(git commit -m x)', 'env A=1 git commit -m x', 'A=1 git commit -m x',
-                        'command git commit -m x', 'git -c user.name=x commit -m x', 'git --git-dir /r/.git commit -m x'):
+                        'command git commit -m x', 'git -c user.name=x commit -m x', 'git --git-dir /r/.git commit -m x',
+                        # F-045: more wrappers and command starts
+                        'sudo git commit -m x', 'sudo -u bob git commit -m x', 'exec git commit -m x',
+                        'time git commit -m x', 'nohup git commit -m x', '! git commit -m x', '{ git commit -m x; }',
+                        'env -u GIT_DIR git commit -m x', 'env -u X A=1 git commit -m x'):
             self.assertEqual(2, code(command), command)
+        for command in ('echo "time to git commit"', 'echo "sudo git commit later"'):     # a mention is not a commit
+            self.assertEqual(0, code(command), command)
         # By design (14/11/2026): a Bash file write is not judged by this guard; it holds Edit/Write/NotebookEdit and commits.
         for command in ('sed -i s/a/b/ scripts/x.py', 'echo x > scripts/x.py', 'printf x | tee scripts/x.py'):
             self.assertEqual(0, code(command), command)
