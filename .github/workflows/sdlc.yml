@@ -63,7 +63,10 @@ jobs:
             echo "::warning::$file is missing - running the checks (the panel's settings were never written to this project)"
             ci="true"; deploy="test"
           else
-            ci="$(python3 -c "import json,sys; s=json.load(open('$file'))['settings']; print(str(s['ci_after_push']['$target']).lower())")"
+            # Only an explicit boolean false turns CI off, as in the local gate: a missing key or any other value runs the
+            # checks (fail closed) - a skipped gate job reads green. A file that does not parse fails this job (red).
+            ci="$(python3 -c "import json; v=json.load(open('$file'))['settings']['ci_after_push']['$target']; print('false' if v is False else 'true')" 2>/dev/null)" || ci=unreadable
+            if [ "$ci" = unreadable ]; then echo "::warning::$file has no readable ci_after_push.$target - running the checks"; ci="true"; fi
             # deploy_after_push is {"test": bool, "prod": bool} (checkboxes); a file written before 30/10/2026 holds one string.
             deploy="$(python3 -c "
           import json
@@ -79,6 +82,8 @@ jobs:
     if: needs.plan.outputs.ci == 'true'
     runs-on: ${{ fromJSON(inputs.runner-labels) }}
     timeout-minutes: 60
+    env:
+      STANDARDS_REPO: https://github.com/adyusuf/podium-flow.git
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -103,6 +108,30 @@ jobs:
         if: inputs.setup-command != ''
         shell: bash
         run: ${{ inputs.setup-command }}
+      # A report, never a verdict (#34: the configuration is the switch): what the committed .claude/sdlc-settings.json
+      # turns off for this target, so a pull request that commits a step or coverage off is seen on every run.
+      - name: Turned off by the committed settings (report only, never fails the job)
+        continue-on-error: true
+        shell: bash
+        env:
+          TARGET: ${{ needs.plan.outputs.target }}
+          STANDARDS_REF: ${{ inputs.standards-ref }}
+        run: |
+          set -uo pipefail
+          std="$RUNNER_TEMP/sdlc-standards-report"
+          rm -rf "$std"
+          if ! { git init -q "$std" && git -C "$std" fetch -q --depth 1 "$STANDARDS_REPO" "$STANDARDS_REF" \
+                 && git -C "$std" checkout -q FETCH_HEAD; }; then
+            echo "::warning::the standards could not be fetched - the waivers are NOT reported"; exit 0
+          fi
+          if ! out="$(python3 "$std/scripts/sdlc_settings.py" waived --project . --target "$TARGET" 2>&1)"; then
+            echo "::warning::the waivers could not be read - NOT reported: $out"; exit 0
+          fi
+          printf '%s\n' "$out"
+          { echo "### Turned off by the committed settings"; printf '%s\n' "$out"; } >> "$GITHUB_STEP_SUMMARY"
+          if printf '%s' "$out" | grep -q 'WAIVED'; then
+            echo "::warning::.claude/sdlc-settings.json waives coverage or gate steps for $TARGET - see the step summary"
+          fi
       - name: Gate
         shell: bash
         env:
@@ -124,7 +153,7 @@ jobs:
             # scanned the standards repository too (first pilot run, 29/10/2026).
             std="$RUNNER_TEMP/sdlc-standards"
             rm -rf "$std" && git init -q "$std"
-            git -C "$std" fetch -q --depth 1 https://github.com/adyusuf/podium-flow.git "$STANDARDS_REF"
+            git -C "$std" fetch -q --depth 1 "$STANDARDS_REPO" "$STANDARDS_REF"
             git -C "$std" checkout -q FETCH_HEAD
             bash "$std/scripts/gate-core.sh" "$TARGET"
           fi
