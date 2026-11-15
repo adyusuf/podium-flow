@@ -121,6 +121,25 @@ class DotnetCveStep(unittest.TestCase):
         self.assertNotIn('✓ dotnet packages', step)
         self.assertIn('no answer in 2s', step)
 
+    def test_without_a_timer_the_listing_warns_that_it_has_no_time_limit(self):
+        # F-020: no timeout/gtimeout (default macOS) used to run the listing unbounded without a word. BASE_PATH may
+        # hold a timeout (Linux, newer macOS), so it is rebuilt from links to everything in it except the two timers.
+        tools = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tools, ignore_errors=True)
+        for directory in BASE_PATH.split(':'):
+            for name in os.listdir(directory):
+                if name not in ('timeout', 'gtimeout') and not os.path.lexists(os.path.join(tools, name)):
+                    os.symlink(os.path.join(directory, name), os.path.join(tools, name))
+        install(self.shims, 'dotnet', stub(f"echo '{CLEAN}'; exit 0"))
+        run_env = dict(os.environ, PATH=self.shims + ':' + tools)
+        result = subprocess.run(['bash', GATE, 'dev'], cwd=self.root, capture_output=True, text=True, env=run_env, timeout=120)
+        out = ANSI.sub('', result.stdout)
+        self.assertIn('neither timeout nor gtimeout is installed - the listing runs WITHOUT a time limit', out)
+        self.assertIn('✓ dotnet packages', out)   # a warning, not a failure: the listing itself answered
+        timer = shutil.which('timeout') or shutil.which('gtimeout')
+        if timer:   # and with one, it does not warn
+            self.assertNotIn('WITHOUT a time limit', self.listing(f"echo '{CLEAN}'; exit 0", extra_path=os.path.dirname(timer)))
+
     def test_a_missing_dotnet_is_reported_as_skipped(self):
         # No stub at all: the step must SAY it did not run, not vanish.
         step = cve_step(self.root, self.shims)

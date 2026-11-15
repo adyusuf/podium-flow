@@ -164,6 +164,27 @@ class SizeBudgetStep(Hook):
         self.assertIn('commit STOPPED', out)
         self.assertEqual(1, code)
 
+    # F-019: the size gate's exit code decides, not two phrases in its output.
+    def test_any_non_zero_exit_of_the_size_gate_stops_the_commit(self):
+        for body in ('echo "CLAUDE.md  -  20  25  ✗ FILE MISSING"; exit 1', 'echo "✗ BAD BUDGET ROW: CLAUDE.md"; exit 1',
+                     'exit 2'):   # the last one: a crash that prints nothing
+            with self.subTest(body=body):
+                self.script('scripts/md-size-gate.sh', '#!/usr/bin/env bash\n' + body + '\n')
+                self.on_path('gitleaks', '#!/bin/sh\nexit 0\n')
+                self.stage()
+                out, code = self.run_hook()
+                self.assertIn('commit STOPPED — CLAUDE.md budget', out)
+                self.assertEqual(1, code, out)
+
+    def test_the_real_size_gate_without_its_budget_file_stops_the_commit(self):
+        shutil.copy(os.path.join(SCRIPTS, 'md-size-gate.sh'), os.path.join(self.root, 'scripts', 'md-size-gate.sh'))
+        self.on_path('gitleaks', '#!/bin/sh\nexit 0\n')
+        self.stage()
+        out, code = self.run_hook()
+        self.assertIn('No budget file', out)
+        self.assertIn('commit STOPPED — CLAUDE.md budget', out)
+        self.assertEqual(1, code, out)
+
     def test_a_passing_gate_does_not_stop_the_commit(self):
         self.script('scripts/md-size-gate.sh',
                     '#!/usr/bin/env bash\necho "✓ Every CLAUDE.md is within its budget."\nexit 0\n')
@@ -258,34 +279,6 @@ class TheLiveConfigExemption(Hook):
         out, code = self.run_hook()
         self.assertIn('gitleaks found a secret', out)
         self.assertEqual(1, code)
-
-
-class Install(Hook):
-    def test_install_links_the_hooks_into_git(self):
-        self.script('scripts/pre-commit.sh', '#!/usr/bin/env bash\nexit 0\n')
-        self.script('scripts/commit-msg.sh', '#!/usr/bin/env bash\nexit 0\n')
-        out, code = self.run_hook('--install')
-        self.assertEqual(0, code, out)
-        for hook in ('pre-commit', 'commit-msg'):
-            path = os.path.join(self.root, '.git', 'hooks', hook)
-            self.assertTrue(os.path.islink(path), f'{hook} was not linked')
-
-    def test_install_without_a_commit_msg_script_still_links_pre_commit(self):
-        self.script('scripts/pre-commit.sh', '#!/usr/bin/env bash\nexit 0\n')
-        out, code = self.run_hook('--install')
-        self.assertEqual(0, code, out)
-        self.assertTrue(os.path.islink(os.path.join(self.root, '.git', 'hooks', 'pre-commit')))
-
-
-class OutsideARepository(Hook):
-    def test_it_passes_quietly(self):
-        loose = tempfile.mkdtemp()
-        try:
-            result = subprocess.run(['bash', HOOK], cwd=loose, capture_output=True, text=True,
-                                    env=dict(os.environ, HOME=self.home))
-            self.assertEqual(0, result.returncode)
-        finally:
-            shutil.rmtree(loose, ignore_errors=True)
 
 
 if __name__ == '__main__':

@@ -212,6 +212,44 @@ class NodeTrack(GateProject):
                 ran = [line for line in done.stdout.splitlines() if line.startswith('RAN-')]
                 self.assertEqual(['RAN-' + step for step in steps if step != off], ran, done.stdout + done.stderr)
 
+    def track(self, npm):
+        """The real gate with GATE_PARALLEL_NODE=1: a stub dotnet and npm/npx (the Node steps run in the track),
+        every other step passing, so only the track decides the verdict (F-017)."""
+        files = {'App.sln': '', 'SETUP.md': '# Setup\n## Secret inventory\n', '.env.example': '', 'web/tsconfig.json': '{}',
+                 'web/package.json': '{"name":"w","scripts":{"lint":"x","build":"x","test":"x"}}',
+                 'scripts/md-size-gate.sh': 'exit 0\n', 'scripts/md-rule-gate.py': '',
+                 '.bin/dotnet': '#!/bin/sh\necho "The given project has no vulnerable packages"\n',
+                 '.bin/npx': '#!/bin/sh\nexit 0\n', '.bin/npm': '#!/bin/sh\n' + npm + '\nexit 0\n'}
+        for name, text in files.items():
+            os.makedirs(os.path.dirname(os.path.join(self.project, name)), exist_ok=True)
+            with open(os.path.join(self.project, name), 'w', encoding='utf-8') as handle:
+                handle.write(text)
+        for name in ('.bin/dotnet', '.bin/npx', '.bin/npm', 'scripts/md-size-gate.sh'):
+            os.chmod(os.path.join(self.project, name), 0o755)
+        conf = (self.measured() + 'SECRET_CMD="true"\nSAST_CMD="true"\nBACKCOMPAT_CMD="true"\nGATE_PARALLEL_NODE=1\n'
+                'ACCEPTED_GAPS="e2e spec check"\nACCEPTED_GAPS_REASON="no e2e suite in the fixture"\n')
+        return self.gate(conf, env={'PATH': os.path.join(self.project, '.bin') + os.pathsep + os.environ['PATH']})
+
+    def test_a_green_track_is_replayed_and_the_gate_passes(self):
+        out, code = self.track('')
+        self.assertIn('node track started beside the .NET steps', out)
+        self.assertIn('✓ lint (web)', out)
+        self.assertEqual(0, code, out)
+
+    def test_a_track_that_dies_without_reporting_closes_the_gate(self):
+        # The track is killed in the middle of its lint step: no DONE marker, so it did not pass.
+        out, code = self.track('case "$*" in *"run lint"*) kill -9 $PPID ;; esac')
+        self.assertIn('✗ node track did not report a result', out)
+        self.assertIn('GATE CLOSED', out)
+        self.assertEqual(1, code, out)
+
+    def test_a_failing_step_in_the_track_closes_the_gate(self):
+        out, code = self.track('case "$*" in *"run build"*) echo BUILD_BROKE; exit 1 ;; esac')
+        self.assertIn('✗ build (web)', out)
+        self.assertIn('BUILD_BROKE', out)
+        self.assertNotIn('node track did not report', out)
+        self.assertEqual(1, code, out)
+
 
 class TheOneList(unittest.TestCase):
     """The pane reads the steps from gate-lib.sh: the same ids the gate checks, none written twice (rule #2)."""
