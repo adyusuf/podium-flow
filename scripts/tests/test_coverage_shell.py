@@ -42,7 +42,7 @@ class ShellCoverageRunsEndToEnd(Repo):
         '</lines></class>'
         '</classes></package></packages></coverage>\n')
 
-    def build(self, hits_second_line, failure=None, targets_file=None, extra=(), env_extra=None):
+    def build(self, hits_second_line, failure=None, targets_file=None, extra=(), env_extra=None, bare=False):
         """A repo with one shell script, one trivial test, and a stub kcov whose
         reports cover 1 or 2 of that script's 2 lines. `failure` makes the trivial
         test fail with that message, standing in for a red suite; `targets_file`,
@@ -81,7 +81,8 @@ class ShellCoverageRunsEndToEnd(Repo):
                 '    def test_it(self):\n'
                 f'        subprocess.run(["bash", {target!r}], check=True)\n'
                 + (f'        self.fail({failure!r})\n' if failure else ''))
-        report = self.COBERTURA.format(path=target, second=hits_second_line)
+        # `bare`: name the file as the real kcov does, relative to its source folder (batch run 15/11/2026).
+        report = self.COBERTURA.format(path=os.path.basename(target) if bare else target, second=hits_second_line)
         report_file = os.path.join(root, 'report.xml')
         with open(report_file, 'w', encoding='utf-8') as handle:
             handle.write(report)
@@ -147,6 +148,14 @@ class ShellCoverageRunsEndToEnd(Repo):
         self.assertNotIn('helper.sh', out)
         self.assertNotIn('at or above', out)
         self.assertEqual(3, code, out)
+
+    @KCOV_RUN
+    def test_a_traced_script_reported_by_its_bare_name_counts_as_measured(self):
+        # The real kcov writes `thing.sh`, not the path: the never-traced check must still see it as traced.
+        out, code = self.build(hits_second_line=1, bare=True)
+        self.assertNotIn('NOT MEASURED', out)
+        self.assertIn('at or above', out)
+        self.assertEqual(0, code, out)
 
     @KCOV_RUN
     def test_the_traced_run_count_is_reported(self):

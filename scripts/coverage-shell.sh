@@ -151,7 +151,7 @@ runs="$(find "$work/out" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')"
 expected="$(find scripts -name '*.sh' -not -path '*/tests/*' 2>/dev/null | sort)"
 
 python3 - "$work/out" "$min" "$runs" "$expected" <<'REPORT'
-import glob, sys, xml.etree.ElementTree as ET
+import glob, os, sys, xml.etree.ElementTree as ET
 
 out_dir, minimum, runs = sys.argv[1], float(sys.argv[2]), sys.argv[3]
 expected = [line for line in sys.argv[4].splitlines() if line]
@@ -187,7 +187,12 @@ for name in sorted(known):
     print(f"    {name.split('/')[-1]:<26} {covered:>4}/{total:<4} {100.0*covered/total:>6.1f}%")
 
 # A script in no report was never traced: NOT MEASURED, which blocks like a failure (#29).
-never = [rel for rel in expected if not any(name == rel or name.endswith('/' + rel) for name in known)]
+# kcov names a file relative to its source folder (the bare `gate-core.sh`, batch run 15/11/2026), so a report name
+# matches a script by its full relative path, a path ending in it, or - a bare name - by the file name.
+def reported(rel):
+    return any(name == rel or name.endswith('/' + rel) or ('/' not in name and name == os.path.basename(rel))
+               for name in known)
+never = [rel for rel in expected if not reported(rel)]
 for rel in never:
     print(f"  NOT MEASURED: no test runs {rel} - it is in no kcov report")
 if never:
