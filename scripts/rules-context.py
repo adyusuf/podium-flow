@@ -14,7 +14,7 @@ Usage:
 <part> is 1-based; <registered> is how many parts hooks.json registers for the event.
 A part past the end prints nothing. If CLAUDE.md needs more parts than are
 registered, the last registered part says so, so a rule is never dropped silently.
-Exit codes: 0 printed (or nothing to print) · 1 CLAUDE.md unreadable · 2 bad usage.
+Exit codes: 0 printed (or nothing to print) · 1 CLAUDE.md unreadable (one warning line on stdout) · 2 bad usage.
 """
 import json
 import os
@@ -127,6 +127,10 @@ def main(argv):
             text = handle.read()
     except OSError as error:
         print(f'rules-context: cannot read the global rules: {error}', file=sys.stderr)
+        # stderr reaches only the hook log; one stdout line tells the session it runs without its rules (F-034).
+        warning = f'[WARNING: the global working rules (podium plugin) could not be read from {RULES}: {error}]'
+        print(warning if mode == 'session' else json.dumps(
+            {'hookSpecificOutput': {'hookEventName': EVENTS[mode], 'additionalContext': warning}}, ensure_ascii=False))
         return 1
     out = output(mode, mode_parts(text, mode, registered), part, registered)
     if out:
