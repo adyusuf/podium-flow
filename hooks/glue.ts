@@ -153,11 +153,16 @@ export function createGlue() {
   const refreshSettings = ($: Engine) => settingsQueue(() => readSettings($))
   const refreshPromotion = ($: Engine) => promotionQueue(() => readPromotion($))
 
-  // `again` forgets the stamp first, so the file is read anew (/podium:panels).
+  // `again` forgets the stamp first, so the file is read anew (/podium:panels). Never rejects (it follows every tool call
+  // and must not fail one): a refresh that throws is said once in the log, and the queue goes on (F-048).
   let statusQueue: Promise<void> = Promise.resolve()
+  let refreshFailSaid = false
   function refreshStatus($: Engine, again = false): Promise<void> {
     if (again) memo.stamp = -1
-    statusQueue = statusQueue.then(() => readStatus($, memo)).catch(() => undefined)
+    statusQueue = statusQueue.then(() => readStatus($, memo)).catch(error => {
+      if (!refreshFailSaid) $.ui.log(`podium: the Status box could not refresh: ${String(error).slice(0, 200)}`)
+      refreshFailSaid = true
+    })
     return statusQueue
   }
 

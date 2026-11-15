@@ -166,3 +166,17 @@ test('a status script that fails to mark the session as waiting is said in the l
   await createGlue().waitAfterInterrupt(silent)
   expect(silent.logs).toEqual(['podium: marking the Status box as waiting failed: exit 3'])
 })
+
+test('a Status refresh that throws is said once in the log, never rejects, and the next refresh still reads (F-048)', async () => {
+  const $ = fake()
+  const glue = createGlue()
+  const env = $.env.get
+  $.env.get = () => Promise.reject(new Error('env unavailable'))
+  await glue.refreshStatus($)
+  await glue.refreshStatus($)
+  expect($.logs).toEqual(['podium: the Status box could not refresh: Error: env unavailable'])
+  $.env.get = env
+  $.files[FILE] = { mtimeMs: 10, text: TABLE }
+  await glue.refreshStatus($)
+  expect(($.store.get('status') as { rows: unknown[] }).rows.length).toBe(1)
+})
