@@ -47,14 +47,14 @@ test('a budget a file written before holds (100) is drawn as one more option, ch
     .toEqual(['none', '200', '[500]', '1000'])
 })
 
-test('the Status labels carry an (i) and a card: the budget line, the agent, its branches, a step with a note', () => {
+test('the Status labels carry an (i) and a card: the budget line, the state group, the agent, a step with a note', () => {
   const body = statusBody(ui, parseStatus(JSON.stringify({
     budget: '$1.00 spent of $200', rows: [{ item: 'a', state: 'running', note: 'a note' }, { item: 'b', state: 'done', agent: 'podium:qa x' }],
   })))
   const drawn = all(body, 'Text').filter(node => node.props.color !== 'inverseText').map(words)
-  // budget; this session, its To do, the noted step; the qa agent, its Completed.
-  expect(drawn.filter(text => text === '(i)').length).toBe(6)
-  for (const text of [STATUS_HELP.budget, STATUS_HELP.session, STATUS_HELP.subagent, STATUS_HELP.todo, STATUS_HELP.done, 'a note']) {
+  // budget; Running, this session, the noted step; Done (closed at start, so its agent is not drawn).
+  expect(drawn.filter(text => text === '(i)').length).toBe(5)
+  for (const text of [STATUS_HELP.budget, STATUS_HELP.run, STATUS_HELP.session, STATUS_HELP.done, 'a note']) {
     expect(cards(body)).toContain(text)
   }
 })

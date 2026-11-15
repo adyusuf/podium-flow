@@ -69,9 +69,12 @@ reopening them.
 
 - **Status.** The work's steps (what runs now and next stay in the status file but are not drawn): step · state · % · note, with no heading row (the step column is narrow and wraps). The state is one short word (todo,
   run, done, stuck, fail, skip), the % sits right after it, the note column holds every other detail (the state's own detail,
-  `--note`, an older row's figure), and `-> what blocks it` sits under the step; a running step is bold. Each agent
-  (this session first, then every subagent) is an accordion named in bold with its state and %; under it **To do** (what
-  runs and what is next, open) and **Completed** (closed at start; a `fail` row stays in To do until someone looks at it). A subagent's row is written by the hooks (SubagentStart, SubagentStop), never by the agent. The note is one line that does not wrap (the pane
+  `--note`, an older row's figure), and `-> what blocks it` sits under the step; a running step is bold. The steps are
+  grouped by state first, then by agent (user decision 15/11/2026), so a long list stays short: one accordion per state
+  group, in the order **Running**, **Stuck**, **Failed**, **To do** (also any state the box does not know), **Done** and
+  **Skipped**, each with its count and an (i) card saying what it holds; a group with no step is not drawn. Done and
+  Skipped start closed, the others open. Under a group, one accordion per agent (this session first, then every subagent
+  in the order it first wrote), named in bold with its count, open at start. A subagent's row is written by the hooks (SubagentStart, SubagentStop), never by the agent. The note is one line that does not wrap (the pane
   cannot scroll sideways): a long one is cut at the edge and shows whole in a card while the pointer is on the row. Claude
   writes the steps first, before any work, with `scripts/podium_status.py step`; a background gate or promotion writes
   its own ([`standards/00-working-method.md`](../standards/00-working-method.md) §1a, §10d).

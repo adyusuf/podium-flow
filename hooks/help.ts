@@ -39,10 +39,15 @@ export const ROW_HELP: Record<string, string> = {
 /** The Status box's labels (user decision 09/11/2026: every label of the pane has an (i) and a card). */
 export const STATUS_HELP = {
   budget: 'What this session has spent so far (tokens x API list price) against the Budget setting. Information only: work never stops on it.',
-  session: 'This session\'s steps, written before the work starts, with their state, measured % and notes.',
-  subagent: 'One subagent\'s steps, written by the hooks when it starts and stops; its name is its role.',
-  todo: 'Steps still to do: the running one in bold, then what comes next. A failed step stays here until someone looks at it.',
-  done: 'Steps that are finished or skipped. Closed at start; the arrow opens it.',
+  session: 'This session\'s steps in this group, written before the work starts, with their state, measured % and notes.',
+  subagent: 'One subagent\'s steps in this group, written by the hooks when it starts and stops; its name is its role.',
+  // The state groups (user decision 15/11/2026): what each holds.
+  run: 'Steps at work now, drawn in bold.',
+  stuck: 'Steps that are blocked; the line under a step says what blocks it.',
+  fail: 'Steps that ended in error. They stay here until someone looks at them.',
+  todo: 'Steps not started yet, and any step whose state the box does not know.',
+  done: 'Steps that are finished. Closed at start; the arrow opens it.',
+  skip: 'Steps that did not run or were skipped. Closed at start; the arrow opens it.',
 }
 
 /** A Promotion stage line's card, after the branch's own words. */

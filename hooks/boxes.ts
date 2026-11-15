@@ -52,14 +52,17 @@ export const outsideRepository = (repo: unknown) => repo === null
 /**
  * What starts folded, so the pane opens as a short card and not as one long list: two boxes, `claude`, which keeps
  * the Settings tab (folded = Session, the tab at start; the saved defaults are under System, opened when wanted), and
- * `steps`, the gate's steps under Gates (user decision 02/11/2026: an accordion, closed at start).
+ * `steps`, the gate's steps under Gates (user decision 02/11/2026: an accordion, closed at start); and the Status box's
+ * Done and Skipped groups (user decision 15/11/2026).
  */
-export const FOLDED_AT_START: Record<string, boolean> = { agents: true, promotion: true, claude: true, steps: true }
-/** What can fold: a box, `claude` (the Settings tab), `steps`, or a Status agent (`agent:<name>` and its `:todo`, `:done`). */
-export type FoldId = SectionId | 'claude' | 'steps' | `agent:${string}`
+export const FOLDED_AT_START: Record<string, boolean> = {
+  agents: true, promotion: true, claude: true, steps: true, 'state:done': true, 'state:skip': true,
+}
+/** What can fold: a box, `claude` (the Settings tab), `steps`, or a Status state group (`state:<group>`) and an agent in it (`state:<group>:<agent>`). */
+export type FoldId = SectionId | 'claude' | 'steps' | `state:${string}`
 
-/** Whether `id` is folded; a state saved before `id` could fold falls back to how it starts. */
-export const isFolded = (fold: Record<string, boolean>, id: FoldId) => fold[id] ?? FOLDED_AT_START[id] ?? id.endsWith(':done')
+/** Whether `id` is folded; a state saved before `id` could fold falls back to how it starts (open unless FOLDED_AT_START closes it). */
+export const isFolded = (fold: Record<string, boolean>, id: FoldId) => fold[id] ?? FOLDED_AT_START[id] ?? false
 /** The fold state after a press on `id`'s header: what it reads as now, turned over. */
 export const nextFold = (fold: Record<string, boolean>, id: FoldId) => ({ ...fold, [id]: !isFolded(fold, id) })
 /** The Settings tab: `folded` (the fold id `claude`, folded at start) means the Session tab; `toggle` switches tabs. It
