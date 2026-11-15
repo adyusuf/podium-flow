@@ -4,6 +4,7 @@ untested. Every test goes through the command line.
 """
 import json
 import os
+import subprocess
 import sys
 import unittest
 
@@ -108,6 +109,22 @@ class SetApplyUnset(base.Tool):
         self.assertEqual(1, code, err)
         self.assertIn('no-such.json', err)
         self.assertNotIn('Traceback', err)
+        self.assertFalse(os.path.exists(self.user))
+
+    def test_apply_of_text_that_is_not_utf_8_is_exit_1_and_writes_nothing(self):
+        # F-047 (found in phase 2): a file in a legacy code page ended in a UnicodeDecodeError traceback.
+        text = '{"mode": "B", "note": "\u015fi\u015fman"}'.encode('cp1254')
+        source = os.path.join(self.home, 'cp1254.json')
+        with open(source, 'wb') as handle:
+            handle.write(text)
+        env = dict(os.environ, PODIUM_CONFIG_USER=self.user, PODIUM_SESSION_DIR=os.path.join(self.home, 'sessions'))
+        for argument, stdin in ((source, None), ('-', text)):           # from a file and from stdin
+            result = subprocess.run(['python3', os.path.join(base.SCRIPTS, 'podium_config.py'), 'apply', argument],
+                                    cwd=self.repo, capture_output=True, env=env, input=stdin)
+            err = result.stderr.decode('utf-8', 'replace')
+            self.assertEqual(1, result.returncode, err)
+            self.assertNotIn('Traceback', err)
+            self.assertIn('not UTF-8', err)
         self.assertFalse(os.path.exists(self.user))
 
     def test_unset_on_the_project_and_the_user_layer_removes_only_that_key(self):

@@ -194,7 +194,16 @@ def main(argv):
             print('%s removed from %s' % (check_key, path))
             return 0
         if command == 'apply' and len(args) == 2:
-            raw = sys.stdin.read() if args[1] == '-' else open(args[1], encoding='utf-8').read()
+            if args[1] == '-':
+                data = sys.stdin.buffer.read()
+            else:
+                with open(args[1], 'rb') as handle:
+                    data = handle.read()
+            try:      # read as bytes and decoded here: text in another code page is exit 1, never a traceback (F-047)
+                raw = data.decode('utf-8')
+            except UnicodeDecodeError as error:
+                raise ConfigError('%s is not UTF-8 text (%s); nothing written' % (
+                    'stdin' if args[1] == '-' else args[1], error), 1)
             try:
                 incoming = json.loads(raw)
             except ValueError as error:
