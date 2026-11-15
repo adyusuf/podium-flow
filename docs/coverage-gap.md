@@ -18,8 +18,9 @@ the top and correct the numbers in the same commit as the tests that moved them.
 
 | Codebase | Coverage | State |
 |---|---|---|
-| Python scripts | **82%** (833 of 1,014 statements) | above the 80% threshold |
-| Shell scripts | **85.4%** (689 of 807 lines, 316 traced runs; measured 15/10/2026, `scripts/*.sh`) | above the 80% threshold |
+| Python scripts | **90%** (2,166 of 2,403 statements; measured 14/11/2026) | above the 80% threshold |
+| Shell scripts | **81.0%** (812 of 1,003 lines, 380 traced runs; measured 14/11/2026, `scripts/*.sh`) | above the 80% threshold |
+| TypeScript mod logic (`hooks/*.ts`) | **not measured** (14/11/2026): the suite fails type-check on the two `.not` assertions in `hooks/status.test.ts`, so `coverage.sh` exits 1 ([`test-inventory/findings.md`](test-inventory/findings.md) F-042) | blocks the coverage step |
 
 Neither figure is an average of the other. #29 forbids averaging codebases, and the
 gate reads them separately — either one below 80% closes it.
