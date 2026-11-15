@@ -2377,12 +2377,19 @@ point to was taken, and the user may reverse any of them:
 - **The guards** (F-001, F-002, F-045): forced, mirrored, deleting and pruning pushes, a push to main in any spelling,
   `git commit -n`, abbreviated long options, git options before the verb and a recursive `rm` with a dangerous target
   anywhere are blocked; a here-string is not a heredoc. The rm/DROP rules keep reading heredoc bodies (F-041): a
-  heredoc that only writes such text is blocked too, which fails safe.
+  heredoc that only writes such text is blocked too, which fails safe. After the batch's QA pass (16/11/2026) an option
+  also ends at a quote, `)`, `}` or `;` (`bash -c "git push --force"`, `(git push -f)`), may stand in quotes, a `;` or
+  `&` inside a quoted message no longer hides the option after it, and `"$HOME"/`, `~/.`, `/.`, `../*` and
+  `--recur` count. It stays a text match, a safety net and not a sandbox: a flag named inside a push or commit message
+  is still blocked (reword it), and a command built at run time (`eval`, a variable) is not seen.
 - **The steps guard** (F-003, F-004, F-005): bookkeeping is matched by whole path components, a git work tree under a
-  temp folder is code work, a `git commit` is seen behind wrappers and control words, Bash file writes stay out of scope;
+  temp folder is code work, a `git commit` is seen behind wrappers and control words (and, after QA 16/11/2026, in a `bash -c` script, by a
+  path, behind `xargs` and `timeout`), Bash file writes stay out of scope;
   under `block` a payload it cannot judge is refused, a call without a session id runs (`standards/00` §1a).
-- **The gate** (F-012, F-013, F-016): the secret scan and SAST can never be an accepted gap; `COVERAGE_MIN` below 80 is
-  raised to 80; CI prints what a committed settings file waives and never fails on it (#34) (`standards/13` §8a).
+- **The gate** (F-012, F-013, F-014, F-016, F-019): the secret scan and SAST can never be an accepted gap;
+  `COVERAGE_MIN` below 80 is raised to 80 and a decimal is rounded up (85.5 → 86); a shell script no test runs is NOT
+  MEASURED; pre-commit blocks on the size gate's exit code, so a project with `md-size-gate.sh` but no `md-budget.tsv`
+  has its commits stopped until it adds one; CI prints what a committed settings file waives and never fails on it (#34) (`standards/13` §8a).
   Projects whose `merge-gate.conf` accepted SAST or gitleaks now end GATE INCOMPLETE until they measure them.
 - **Commit-time, not gate steps** (F-023, F-024): `doc-check.py` reads this rule set's own layout, so it stays in
   pre-commit; `evidence-check.py` runs on demand on a role's report.
@@ -2392,7 +2399,9 @@ point to was taken, and the user may reverse any of them:
   `twins.txt` would raise false drift.
 - **The Status box** (user decision 15/11/2026, *"önce status sonra agenta göre kırıl … herkeste böyle çalışsın"*): the
   rows are grouped by state first (Running · Stuck · Failed · To do · Done · Skipped; Done and Skipped closed at start),
-  then by agent; it ships in the plugin, so every install gets it.
+  then by agent; it ships in the plugin, so every install gets it. The user confirmed the order on 16/11/2026
+  (*"önce status -> sonra agent -> sonra da görev kırılımları"*): state, then agent, then that agent's task breakdown -
+  the third level is the next piece of work, not part of this batch.
 **Measured.** Coverage before the batch: Python 90 %, shell 81.0 %, TypeScript not measured (the shim lacked `.not`,
 F-042); the batch figures are in `docs/coverage-gap.md`. Each package's narrow run and the batch's full run are in the
 register.
