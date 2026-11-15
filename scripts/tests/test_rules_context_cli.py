@@ -27,12 +27,31 @@ class Main(unittest.TestCase):
         self.assertEqual(payload['hookSpecificOutput']['hookEventName'], 'SubagentStart')
         self.assertEqual(payload['hookSpecificOutput']['additionalContext'], rc.render(SUBAGENT_PARTS, 2, 4))
 
-    def test_unreadable_rules_exit_1_and_print_nothing_to_stdout(self):
+    def test_unreadable_rules_exit_1_and_print_one_warning_line_to_stdout(self):
+        # F-034: the session must not start without its rules silently; stdout reaches the session, stderr only the log.
         with tempfile.TemporaryDirectory() as tmp:
-            code, out, err = run_main(['session', '1', '4'], rules_path=os.path.join(tmp, 'missing.md'))
+            missing = os.path.join(tmp, 'missing.md')
+            code, out, err = run_main(['session', '1', '4'], rules_path=missing)
         self.assertEqual(code, 1)
-        self.assertEqual(out, '')
+        self.assertEqual(out.count('\n'), 1, out)
+        self.assertTrue(out.startswith('[WARNING: the global working rules (podium plugin) could not be read'), out)
+        self.assertIn(missing, out)
         self.assertIn('cannot read the global rules', err)
+
+    def test_unreadable_rules_in_a_subagent_give_one_json_line_carrying_the_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out, _ = run_main(['subagent', '2', '4'], rules_path=os.path.join(tmp, 'missing.md'))
+        self.assertEqual(code, 1)
+        self.assertEqual(out.count('\n'), 1, out)
+        context = json.loads(out)['hookSpecificOutput']
+        self.assertEqual(context['hookEventName'], 'SubagentStart')
+        self.assertIn('could not be read', context['additionalContext'])
+
+    def test_unreadable_rules_warn_from_every_registered_part(self):
+        # Every hook of the event runs; the warning is one line per hook, so it is said whichever part runs.
+        with tempfile.TemporaryDirectory() as tmp:
+            outs = [run_main(['session', str(part), '4'], rules_path=os.path.join(tmp, 'x.md'))[1] for part in (1, 4)]
+        self.assertTrue(all(out.startswith('[WARNING') for out in outs), outs)
 
     def test_a_part_past_the_end_exits_0_and_prints_nothing(self):
         for mode in ('session', 'subagent'):
@@ -89,7 +108,8 @@ class Cli(unittest.TestCase):
             copy = os.path.join(scripts, 'rules-context.py')
             shutil.copy(SCRIPT, copy)
             code, out, err = run_cli('session', '1', '4', script=copy)
-        self.assertEqual((code, out), (1, ''))
+        self.assertEqual(code, 1)
+        self.assertTrue(out.startswith('[WARNING: the global working rules (podium plugin) could not be read'), out)
         self.assertIn('cannot read the global rules', err)
 
 

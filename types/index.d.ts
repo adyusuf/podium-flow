@@ -26,7 +26,8 @@ export type Settings = {
   saved?: { values: Record<string, boolean | string>; sources: Record<string, string> }
   agents: AgentRow[]
 }
-export type Stage = { branch: string; origin: string; unpushed: number; waived: string[] }
+/** `unreadable`: why a git call for the stage failed; the box then says "could not read" (additive, 15/11/2026). */
+export type Stage = { branch: string; origin: string; unpushed: number; waived: string[]; unreadable?: string }
 /** `outside`: the session's folder is in no git repository, so no code work happens there (additive, 01/11/2026). */
 export type Promotion = { stages: Stage[]; error?: string; outside?: boolean }
 /** One row of the session's status table: what it is, where it stands, the measured figure with its signal, what it waits on. */
