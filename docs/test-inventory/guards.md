@@ -65,4 +65,17 @@ py = `scripts/tests` (pytest) · deno = `hooks/*.test.ts` · engine = `hooks/reg
 
 ## 6. Run results (phase 3 ⇄ 4)
 
-Not run yet.
+Phase 2 (16/11/2026, batch `fix/ti-batch`): pytest scripts/tests 1049 tests green under coverage, deno hooks 147 passed; coverage Python 92 % · TypeScript 99 % · shell 81.8 % (bash scripts/coverage.sh, exit 0, merge 7e4a9dd); QA two passes, the second with no serious gap.
+
+## 7. Phase 2 — what closed each finding (16/11/2026)
+
+| Id | Priority | Status | Closed by |
+|---|---|---|---|
+| [F-001](findings.md) | 🔴 | fixed | f57ec6a, 6d7b2fa, 022c10f (QA) |
+| [F-002](findings.md) | 🔴 | fixed | f57ec6a |
+| [F-003](findings.md) | 🟡 | fixed | 7f27dff; scope a9722c4 |
+| [F-004](findings.md) | 🟡 | fixed | 7f27dff, 6d7b2fa, 80fa70c (QA); scope decided a9722c4 (standards/00 §1a) |
+| [F-005](findings.md) | 🟡 | fixed | 7f27dff; decided a9722c4 |
+| [F-006](findings.md) | 🟡 | fixed | d872dad |
+| [F-041](findings.md) | 🟢 | won't fix | by design: the rm/DROP rules keep reading heredoc bodies (safe direction), pinned by test in f57ec6a; decision a9722c4 |
+| [F-045](findings.md) | 🔴 | fixed | 6d7b2fa |

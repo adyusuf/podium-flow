@@ -2381,7 +2381,7 @@ point to was taken, and the user may reverse any of them:
   also ends at a quote, `)`, `}` or `;` (`bash -c "git push --force"`, `(git push -f)`), may stand in quotes, a `;` or
   `&` inside a quoted message no longer hides the option after it, and `"$HOME"/`, `~/.`, `/.`, `../*` and
   `--recur` count. It stays a text match, a safety net and not a sandbox: a flag named inside a push or commit message
-  is still blocked (reword it), and a command built at run time (`eval`, a variable) is not seen.
+  is still blocked (reword it), and a command built at run time (`eval`, a variable such as `$PWD` or `$(pwd)`) is not seen.
 - **The steps guard** (F-003, F-004, F-005): bookkeeping is matched by whole path components, a git work tree under a
   temp folder is code work, a `git commit` is seen behind wrappers and control words (and, after QA 16/11/2026, in a `bash -c` script, by a
   path, behind `xargs` and `timeout`), Bash file writes stay out of scope;
@@ -2403,5 +2403,6 @@ point to was taken, and the user may reverse any of them:
   (*"önce status -> sonra agent -> sonra da görev kırılımları"*): state, then agent, then that agent's task breakdown -
   the third level is the next piece of work, not part of this batch.
 **Measured.** Coverage before the batch: Python 90 %, shell 81.0 %, TypeScript not measured (the shim lacked `.not`,
-F-042); the batch figures are in `docs/coverage-gap.md`. Each package's narrow run and the batch's full run are in the
+F-042). After the batch (16/11/2026, `bash scripts/coverage.sh` exit 0 on merge 7e4a9dd): Python 92 %, TypeScript
+99 %, shell 81.8 % with no script NOT MEASURED - the figures are in `docs/coverage-gap.md`. Each package's narrow run and the batch's full run are in the
 register.

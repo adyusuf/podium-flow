@@ -18,12 +18,16 @@ the top and correct the numbers in the same commit as the tests that moved them.
 
 | Codebase | Coverage | State |
 |---|---|---|
-| Python scripts | **90%** (2,166 of 2,403 statements; measured 14/11/2026) | above the 80% threshold |
-| Shell scripts | **81.0%** (812 of 1,003 lines, 380 traced runs; measured 14/11/2026, `scripts/*.sh`) | above the 80% threshold |
-| TypeScript mod logic (`hooks/*.ts`) | **not measured** (14/11/2026): the suite fails type-check on the two `.not` assertions in `hooks/status.test.ts`, so `coverage.sh` exits 1 ([`test-inventory/findings.md`](test-inventory/findings.md) F-042) | blocks the coverage step |
+| Python scripts | **92%** (2,409 of 2,627 statements; measured 16/11/2026, after the test-inventory batch) | above the 80% threshold |
+| Shell scripts | **81.8%** (863 of 1,055 lines, 538 traced runs; measured 16/11/2026, `scripts/*.sh`; every script traced, none NOT MEASURED) | above the 80% threshold |
+| TypeScript mod logic (`hooks/*.ts`) | **99%** (908 of 910 lines; measured 16/11/2026; `hooks/register.tsx` is the one listed exclusion, engine glue - `standards/10` §7.2a) | above the 80% threshold |
 
-Neither figure is an average of the other. #29 forbids averaging codebases, and the
-gate reads them separately — either one below 80% closes it.
+All three from `bash scripts/coverage.sh` (exit 0) on the batch merge 7e4a9dd. Before the batch (14/11/2026): Python 90%,
+shell 81.0%, TypeScript not measured (the suite failed type-check on two `.not` assertions,
+[`test-inventory/findings.md`](test-inventory/findings.md) F-042, fixed by 2aab6c6).
+
+No figure is an average of another. #29 forbids averaging codebases, and the
+gate reads them separately — any one below 80% closes it.
 
 ## What is still thin
 
@@ -35,7 +39,8 @@ before trusting them:
 | `scripts/step-stats.py` + its three `step_stats_*.py` parts | **63%** over the four files (125 of 334 statements missed; `step-stats.py` itself 37%, measured 13/10/2026 after the split) | `compare_cuts`, `report` and `main` — the functions that WRITE the document — are still untested. The sanitiser and the attribution below them are covered, and the sanitiser is the half that must not leak |
 | `scripts/guard-destructive.sh` | **63.6%** | the hook that refuses `rm -rf`, force push and `DROP`. ⚠️ **The uncovered lines ARE tested** — `GuardFailsClosed` in `scripts/tests/test_guard_destructive.py` covers all of them, and mutation confirms it: `exit 0` in either branch turns those tests red. They do not COUNT because the cases are "the inspector is not beside the script" and "the inspector answers wrongly", which need a directory without the real inspector — so the tests run a copy, and a tracer credits the file it ran. The alternative is an env var that redirects the inspector: a way to redirect the guard, placed inside the guard. The unmeasured line is the cheaper problem |
 | `scripts/real-name-check.sh` | **75%** | the commit-message guard |
-| `scripts/coverage-shell.sh` | **88.4%** | the tracer wrapper: it measures, and is itself measured |
+| `scripts/gate-lib-panel.sh`, `gate-lib-node.sh`, `gate-lib.sh`, `gate-core.sh` | **17.4%, 46.8%, 68.8%, 76.5%** (16/11/2026) | the gate's own libraries, the thinnest shell files; why their lines go unreported has not been investigated. The shell total is above 80% because the smaller scripts are near 100% |
+| `scripts/coverage-shell.sh` | **89.4%** (16/11/2026) | the tracer wrapper: it measures, and is itself measured |
 
 `scripts/merge-gate.sh` used to head this table at 0%. It is at 100% now, and getting
 there took two attempts: the first set of tests passed every assertion while coverage

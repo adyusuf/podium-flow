@@ -78,4 +78,20 @@ py = `scripts/tests` (pytest) · deno = `hooks/*.test.ts` · engine = `hooks/reg
 
 ## 6. Run results (phase 3 ⇄ 4)
 
-Not run yet.
+Phase 2 (16/11/2026, batch `fix/ti-batch`): pytest scripts/tests 1049 tests green under coverage, deno hooks 147 passed; coverage Python 92 % · TypeScript 99 % · shell 81.8 % (bash scripts/coverage.sh, exit 0, merge 7e4a9dd); QA two passes, the second with no serious gap.
+
+## 7. Phase 2 — what closed each finding (16/11/2026)
+
+| Id | Priority | Status | Closed by |
+|---|---|---|---|
+| [F-012](findings.md) | 🔴 | fixed | 86da8b8, c1d5b9b |
+| [F-013](findings.md) | 🟡 | fixed | 71eb590 |
+| [F-014](findings.md) | 🟡 | fixed | 71eb590, 23d2b7f |
+| [F-015](findings.md) | 🟡 | fixed | 7c06316 |
+| [F-016](findings.md) | 🟡 | closed by decision | 7c06316 (CI prints what the committed settings waive); decision a9722c4 (standards/13 §8a) |
+| [F-017](findings.md) | 🟡 | fixed | 93b88ea |
+| [F-018](findings.md) | 🟡 | fixed | d0d674f |
+| [F-019](findings.md) | 🟡 | fixed | 334bcf2 |
+| [F-020](findings.md) | 🟢 | fixed | 86da8b8 |
+| [F-021](findings.md) | 🟢 | fixed | afbba4a |
+| [F-042](findings.md) | 🟡 | fixed | 2aab6c6 |

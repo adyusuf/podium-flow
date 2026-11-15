@@ -62,4 +62,16 @@ py = `scripts/tests` (pytest) · deno = `hooks/*.test.ts` · engine = `hooks/reg
 
 ## 6. Run results (phase 3 ⇄ 4)
 
-Not run yet.
+Phase 2 (16/11/2026, batch `fix/ti-batch`): pytest scripts/tests 1049 tests green under coverage, deno hooks 147 passed; coverage Python 92 % · TypeScript 99 % · shell 81.8 % (bash scripts/coverage.sh, exit 0, merge 7e4a9dd); QA two passes, the second with no serious gap.
+
+## 7. Phase 2 — what closed each finding (16/11/2026)
+
+| Id | Priority | Status | Closed by |
+|---|---|---|---|
+| [F-007](findings.md) | 🟡 | fixed | f077526 |
+| [F-008](findings.md) | 🟡 | fixed | a98d05b, 50045aa |
+| [F-009](findings.md) | 🟡 | fixed | d27cc9e |
+| [F-010](findings.md) | 🟡 | fixed | 40c72b6 |
+| [F-011](findings.md) | 🟢 | fixed | 468ba7d |
+| [F-043](findings.md) | 🟡 | fixed | dfe69b6 |
+| [F-044](findings.md) | 🟡 | fixed | 7c8b721 |
