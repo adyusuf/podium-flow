@@ -175,9 +175,14 @@ class Steps(unittest.TestCase):
                         # F-045: more wrappers and command starts
                         'sudo git commit -m x', 'sudo -u bob git commit -m x', 'exec git commit -m x',
                         'time git commit -m x', 'nohup git commit -m x', '! git commit -m x', '{ git commit -m x; }',
-                        'env -u GIT_DIR git commit -m x', 'env -u X A=1 git commit -m x'):
+                        'env -u GIT_DIR git commit -m x', 'env -u X A=1 git commit -m x',
+                        # QA 16/11/2026: a -c script, git by its path, a quoted -C or -c, xargs, timeout
+                        'bash -c "git commit -m x"', "sh -c 'git commit'", '/usr/bin/git commit -m x',
+                        'git -C "a b" commit -m x', 'git -c "a b=c" commit -m x', 'xargs git commit -m x',
+                        'timeout 5 git commit -m x'):
             self.assertEqual(2, code(command), command)
-        for command in ('echo "time to git commit"', 'echo "sudo git commit later"'):     # a mention is not a commit
+        for command in ('echo "time to git commit"', 'echo "sudo git commit later"',     # a mention is not a commit
+                        'git commit-tree HEAD^{tree}', 'echo git commit'):
             self.assertEqual(0, code(command), command)
         # By design (14/11/2026): a Bash file write is not judged by this guard; it holds Edit/Write/NotebookEdit and commits.
         for command in ('sed -i s/a/b/ scripts/x.py', 'echo x > scripts/x.py', 'printf x | tee scripts/x.py'):

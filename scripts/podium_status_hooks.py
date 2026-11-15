@@ -44,13 +44,17 @@ TEMP_ROOTS = tuple(os.path.normcase(path) for path in {os.path.realpath(tempfile
                                                         '/var/folders', '/private/var/folders'})
 # <any>/.claude/<name>: a project's mode and settings files, and the user's own ~/.claude/podium.json (adyusuf.json before).
 PROJECT_BOOKKEEPING = ('mode', 'mode-model', 'podium.json', 'adyusuf.json')
-# `git commit` where a command starts: the line's start, after ;, &, |, a newline, `(`, `$(`, a backtick, `{`, `!`, or
-# `then`, `do`, `else`, `elif`; behind `env [-u NAME] [VAR=…]`, `command`, `sudo`, `exec`, `time`, `nohup` or a VAR=value;
-# git options such as -C <dir> or -c k=v allowed (F-004, F-045). Bash file writes (sed -i, >, tee) are left out on
-# purpose: the guard holds Edit/Write/NotebookEdit and commits, and a test pins that scope.
-COMMIT = re.compile(r'(?:^|[;&|\n(`{!]|\b(?:then|do|else|elif)\s)\s*'
-                    r'(?:(?:env|command|sudo|exec|time|nohup)(?:\s+-u\s+\S+|\s+-\S+)*\s+|\w+=\S*\s+)*'
-                    r'git(?:\s+(?:-[Cc]\s+\S+|--(?:git-dir|work-tree|namespace)\s+\S+|-\S+))*\s+commit(?![-\w])')
+# `git commit` where a command starts: the line's start, after ;, &, |, a newline, `(`, `$(`, a backtick, `{`, `!`, the quote
+# of a `-c` script (`bash -c "git commit"`; a quoted mention is not a commit), or `then`, `do`, `else`, `elif`; behind `env [-u NAME] [VAR=…]`, `command`, `sudo`, `exec`,
+# `time`, `nohup`, `xargs`, `timeout <duration>` or a VAR=value; git by a path (`/usr/bin/git`); git options such as
+# -C <dir> (quoted, with spaces) or -c k=v allowed (F-004, F-045, QA 16/11/2026). Bash file writes (sed -i, >, tee) are
+# left out on purpose: the guard holds Edit/Write/NotebookEdit and commits, and a test pins that scope.
+_ARG = r'(?:"[^"]*"|\'[^\']*\'|\S+)'
+COMMIT = re.compile(r'(?:^|[;&|\n(`{!]|\s-c\s+["\']|\b(?:then|do|else|elif)\s)\s*'
+                    r'(?:(?:env|command|sudo|exec|time|nohup|xargs)(?:\s+-u\s+\S+|\s+-\S+)*\s+'
+                    r'|timeout(?:\s+-\S+)*\s+\S+\s+|\w+=\S*\s+)*'
+                    r'(?:[\w.~-]*/)*git(?:\s+(?:-[Cc]\s+' + _ARG + r'|--(?:git-dir|work-tree|namespace)\s+' + _ARG
+                    + r'|-\S+))*\s+commit(?![-\w])')
 
 
 def hook_text(event, payload, data=None):
