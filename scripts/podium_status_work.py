@@ -237,8 +237,10 @@ def edit_mark(path, deadline):
     """What git says now about a file the agent edited, asked in the file's own folder so it reaches its own repository."""
     folder, name = os.path.split(path)
     # --literal-pathspecs: `[id].tsx`, `*.md` or `:x.txt` is the file's name, never a pattern (QA 16/11/2026).
+    # --ignored=traditional: a file under an ignored folder (`build/`) is listed itself; `matching` printed only the
+    # folder, so the file got no mark, read as "no change left" (QA 16/11/2026).
     status = git(folder, deadline, '--literal-pathspecs', 'status', '--porcelain', '-z', '--untracked-files=all',
-                 '--ignored=matching', '--', name)
+                 '--ignored=traditional', '--', name)
     if status is None:
         return UNCHECKED
     # git prints the path from the repository's top: the file's record ends with its name.
