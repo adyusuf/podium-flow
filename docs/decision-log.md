@@ -2423,13 +2423,16 @@ shows no change left, and `(not checked)` when git cannot be asked (not a reposi
 commit sha is looked up with `cat-file --batch-check` in its folder and the edited files' folders, `(not verified)` when
 none knows it. A commit counts only where a `git commit` starts a command, read after heredoc bodies and quoted strings
 are taken out (a grep pattern, an echo or a heredoc that names it is not one; a `bash -c '...'` commit is therefore not
-seen - missed, never invented). Its sha comes from git's `[branch sha] subject` line (a detached HEAD too) or from the
+seen - missed rather than invented; rare non-commits still match - a `# ... git commit` comment, an escaped apostrophe outside
+quotes, `git commit --dry-run` - and show only as `commit, sha not printed (not verified)`, QA pass 3 L2). Its sha comes from git's `[branch sha] subject` line (a detached HEAD too) or from the
 first line of a `git log` that runs after it (`&&`, `;` or a new line between; never `||`, a pipe or `&`). If the commit
 failed that line is the older HEAD, so at the stop the sha's commit time (`git log --no-walk --ignore-missing`) must fall
 inside the tool call that printed it, ±120 s, else `(not verified)`. A commit that printed no sha is `commit, sha not
 printed (not verified)`. `git status` is asked with `--literal-pathspecs`, so `[id].tsx`, `*.md` or `:x.txt` is a name,
 never a pattern. Measured 16/11/2026 over 311 subagent transcripts: 310 of 489 successful `git commit` calls give a sha,
-179 printed none (17 of 492 before QA, and QA pass 2 found the interim 419 counted commands that only named it). The
+179 printed none (17 of 492 before QA, and QA pass 2 found the interim 419 counted commands that only named it).
+Open (QA pass 3, low): the log line is the output's first `sha subject` line, not necessarily `git log`'s own (L1); the
+commit-time check limits it to a real commit made within that call. The
 separator is taken out of every path, subject and report, so none can fake an entry, and the control filter now also takes
 out bidirectional marks (a file name could display reversed). While the agent runs, a list that dropped entries shows `… earlier` with no
 number (a file dropped and edited again would be counted twice); the stop writes the exact `… N earlier`. The field is
