@@ -27,6 +27,7 @@ cannot fake an entry; `clip` takes out control and bidirectional characters.
 import json
 import os
 import re
+import string
 import subprocess
 import time
 from datetime import datetime
@@ -45,6 +46,7 @@ NO_SHA = 'commit, sha not printed'
 UNCOMMITTED, IGNORED, UNCHECKED, UNVERIFIED = ' (uncommitted)', ' (ignored by git)', ' (not checked)', ' (not verified)'
 MAX_TRANSCRIPT = 64 * 1024 * 1024
 WINDOWS = os.name == 'nt'           # a path there may use either slash, in any case
+ASCII_FOLD = str.maketrans(string.ascii_uppercase, string.ascii_lowercase)
 GIT_SECONDS, GIT_BUDGET = 2, 4     # one git call, and all of them at a stop (the hook holds the session's lock)
 
 
@@ -68,10 +70,12 @@ def joined(items, marker='', live=False, dropped=0):
 
 def under(path, folder):
     """The rest of `path` after `folder` and one separator, or None when it is not inside it. On Windows either slash
-    separates and case does not count (open finding 16/11/2026: only a `/`-joined folder was taken off there)."""
+    separates and ASCII case does not count (open finding 16/11/2026: only a `/`-joined folder was taken off there; ASCII
+    only, so a Kelvin sign is never read as a K - QA 17/11/2026 F6)."""
     seps = '/\\' if WINDOWS else '/'
     folder = folder.rstrip(seps)
-    same = (lambda a, b: a.replace('\\', '/').lower() == b.replace('\\', '/').lower()) if WINDOWS else str.__eq__
+    same = (lambda a, b: a.replace('\\', '/').translate(ASCII_FOLD) == b.replace('\\', '/').translate(ASCII_FOLD)) \
+        if WINDOWS else str.__eq__
     if folder and len(path) > len(folder) + 1 and path[len(folder)] in seps and same(path[:len(folder)], folder):
         return path[len(folder) + 1:]
     return None

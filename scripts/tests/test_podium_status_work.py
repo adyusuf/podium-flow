@@ -139,13 +139,48 @@ class OpenFindings(unittest.TestCase):
                 self.assertEqual([('1111111', 'another commit')], work.commits_of(command, out))
 
     def test_the_subject_is_the_first_paragraph_on_one_line(self):
-        self.assertEqual('one two', work.subject('git commit -m "one\n  two\n\nbody"'))
+        # As git forms it (checked with git 2.x, QA 17/11/2026 F3): a line keeps its leading spaces, a blank or
+        # whitespace-only line ends the paragraph, several -m are paragraphs, bash unescapes only \\ \" \$ \` in "".
+        self.assertEqual('one   two', work.subject('git commit -m "one\n  two\n\nbody"'))
+        self.assertEqual('a', work.subject('git commit -m "a\n   \nb"'))
+        self.assertEqual('first', work.subject('git commit -m first -m second'))
+        self.assertEqual('path C:\\temp\\new', work.subject('git commit -m "path C:\\temp\\new"'))
+        self.assertEqual("don't panic", work.subject("git commit -m 'don'\\''t panic'"))
+        self.assertEqual('x', work.subject('git commit --author "A <a@b>" --message x'))
+        self.assertEqual('x y', work.subject('git commit \\\n  -m "x y"'))                  # a line continuation
+        self.assertEqual('x y', work.subject('git commit -m \\\n "x y"'))
+        self.assertEqual('x', work.subject('git commit -m "\n\nx"'))                       # leading blank lines go
+        self.assertEqual('real', work.subject('git commit --author "-mx <a@b>" -m real'))    # an option's value is no -m
+        self.assertEqual('$HOME', work.subject("git commit -m \"$(cat <<'EOF'\n$HOME\nEOF\n)\""))   # quoted tag
+        self.assertIsNone(work.subject('git commit -m "$(cat <<EOF\n$HOME\nEOF\n)"'))             # it expands
+        for command in ('git commit -C HEAD', 'git commit --fixup=abc -m x', 'git commit -qF - -m x', 'git commit -m',
+                        'git commit -t tpl.txt', 'git commit -q # -m later', "git commit -m 'unclosed",
+                        'git commit -m x$y', 'git commit -m "unclosed', 'git log -m', 'git commit -q'):
+            with self.subTest(command=command):
+                self.assertIsNone(work.subject(command))
         self.assertEqual('say "hi"', work.subject('git commit -m "say \\"hi\\""'))
         self.assertEqual('a$b', work.subject("git commit -m 'a$b'"))                    # single quotes do not expand
         self.assertEqual('word', work.subject('git commit -qm word && x'))
         self.assertIsNone(work.subject('git commit -m "$(git log -1)"'))
         self.assertIsNone(work.subject('git commit -m "   "'))
         self.assertIsNone(work.subject('git commit -F file'))
+
+    def test_only_the_commits_own_words_give_its_message(self):
+        # QA 17/11/2026 F1: a later or an earlier -m is not the commit's (one was seen in a real transcript).
+        out = '2ca7476 test(release): the real one\n0000000 older\n'
+        for command in ("git commit -q -F - <<'EOF'\nbody\nEOF\ngit log --oneline -3; python3 -m unittest discover",
+                        'git commit -qF ../m.txt && git log -m --oneline -1',
+                        'git commit --dry-run -m "a"; git commit -qm "test(release): the real one" && git log -1',
+                        'echo "next: git commit -m later"; git commit -qm "test(release): the real one" && git log -1'):
+            with self.subTest(command=command):
+                self.assertEqual([('2ca7476', 'test(release): the real one')], work.commits_of(command, out))
+
+    def test_a_decorated_log_line_still_matches_and_shows_without_its_decoration(self):
+        # QA 17/11/2026 F2: with log.decorate set, `git log --oneline` puts `(HEAD -> master)` before the subject.
+        command = 'git commit -qm "real e" && git log --oneline -1'
+        self.assertEqual([('9657adc', 'real e')], work.commits_of(command, '9657adc (HEAD -> master, tag: v(1)) real e\n'))
+        self.assertEqual([('9657adc', 'real   e')], work.commits_of(command, '9657adc real   e\n'))   # spaces by words
+        self.assertEqual([(None, '')], work.commits_of(command, '9657adc (HEAD -> master) real f\n'))
 
     def test_a_comment_an_escaped_quote_and_a_dry_run_are_not_commits(self):
         out = '[b 1a2b3c4] s'
@@ -156,6 +191,11 @@ class OpenFindings(unittest.TestCase):
         self.assertEqual([('1a2b3c4', 's')], work.commits_of("echo it\\'s && git commit -m x", out))
         self.assertEqual([('1a2b3c4', 's')], work.commits_of('git commit --dry-run; git commit -m y', out))
         self.assertEqual('echo a#b ', work.plain('echo a#b # c'))                       # # inside a word is no comment
+        # QA 17/11/2026 F4, F5: a comment is cut before a quote inside it is seen; `\ #` is no comment.
+        self.assertEqual([('1a2b3c4', 's')], work.commits_of("# don't push yet\ngit commit -m 'real d'", out))
+        self.assertEqual([('1a2b3c4', 's')], work.commits_of("git add . # it's ready\ngit commit -m \"x\"\necho 'done'", out))
+        self.assertEqual([('1a2b3c4', 's')], work.commits_of('echo a\\ #b; git commit -m x', out))   # `\ #` is no comment
+        self.assertEqual('echo ""', work.plain('echo "unclosed; git commit'))           # an unclosed quote runs on
 
     def test_on_windows_either_slash_and_any_case_take_the_folder_off(self):
         original = work.WINDOWS
@@ -165,6 +205,7 @@ class OpenFindings(unittest.TestCase):
         self.assertEqual('a.ts', work.shown_path('c:/R/a.ts', 'C:\\r\\'))
         self.assertEqual('C:\\repository\\a', work.shown_path('C:\\repository\\a', 'C:\\repo'))   # not a prefix match
         self.assertEqual('C:\\r\\', work.shown_path('C:\\r\\', 'C:\\r'))                     # the folder itself
+        self.assertEqual('C:\\\u212aa\\x.ts', work.shown_path('C:\\\u212aa\\x.ts', 'C:\\ka'))   # a Kelvin sign is no K (F6)
         work.WINDOWS = False                                                       # elsewhere \ is part of a name
         self.assertEqual('C:\\r\\a', work.shown_path('C:\\r\\a', 'C:\\r'))
         self.assertEqual('/R/a', work.shown_path('/R/a', '/r'))

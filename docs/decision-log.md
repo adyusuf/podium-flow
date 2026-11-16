@@ -2446,6 +2446,11 @@ work module would have passed 300 lines). L1: when the command shows the commit'
 `$(cat <<EOF ...)` body; read from the commit on, so an earlier `grep -m 1` is not it) the log line must carry that
 subject, else no sha is shown rather than another commit's; with no message to compare (`-F file`, `$MSG`) the first line
 and the time check stay. L2: `#` comments are taken out, a backslash-escaped character opens no quote, and a
-`git commit --dry-run` does not count. L3 was information only. Windows: `shown_path` takes either slash and ignores case
+`git commit --dry-run` does not count. QA pass 1 on that fix found it lost true shas (F1, one in a real transcript: a later
+`python3 -m unittest` was read as the message): the message is now read from the commit's own words only, by a word
+parser that resolves quotes as bash does and forms the subject as git does (a line keeps its leading spaces, a
+whitespace-only line ends the paragraph), a decorated log line still matches (F2, F3), and comments and quotes are taken
+out in one left-to-right scan (F4, F5). Measured over 359 subagent transcripts: 624 commits before and after, 18 shas
+corrected, none lost but a QA probe command's. L3 was information only. Windows: `shown_path` takes either slash and ignores case
 there, so the relative-path test runs on Windows too; only the `:x.txt` test stays skipped (Windows file names cannot hold
 `:`).
