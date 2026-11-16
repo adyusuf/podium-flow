@@ -2451,6 +2451,8 @@ and the time check stay. L2: `#` comments are taken out, a backslash-escaped cha
 parser that resolves quotes as bash does and forms the subject as git does (a line keeps its leading spaces, a
 whitespace-only line ends the paragraph), a decorated log line still matches (F2, F3), and comments and quotes are taken
 out in one left-to-right scan (F4, F5). Measured over 359 subagent transcripts: 624 commits before and after, 18 shas
-corrected, none lost but a QA probe command's. L3 was information only. Windows: `shown_path` takes either slash and ignores case
+corrected, none lost but a QA probe command's. QA pass 2: no serious gap; its two low findings were fixed too - a subject that
+itself starts with `(wip) ` keeps it (the decoration is taken off only when the line matches without it), and `-unormal`,
+`-Skey` and `"a\\$HOME"` are read as git and bash read them. L3 was information only. Windows: `shown_path` takes either slash and ignores case
 there, so the relative-path test runs on Windows too; only the `:x.txt` test stays skipped (Windows file names cannot hold
 `:`).

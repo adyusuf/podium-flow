@@ -26,6 +26,7 @@ WORD_BREAK = ' \t\n;&|()<>'
 # A double-quoted `$(cat <<TAG ... TAG)` body, the usual way a long commit message is given.
 CAT_BODY = re.compile(r'"\$\(cat\s+<<-?\s*([\'"]?)(\w+)\1[^\n]*\n(.*?)\n[ \t]*\2[ \t]*\n\s*\)"', re.S)
 SHORT_WITH_VALUE = 'mFCct'                  # git commit's short options that take a value (the rest of the word or the next)
+SHORT_OPTIONAL = 'uS'                       # ... and those whose value, if any, is the rest of the word (`-unormal`)
 LONG_WITH_VALUE = ('author', 'date', 'cleanup', 'trailer', 'template', 'pathspec-from-file')
 MESSAGE_ELSEWHERE = ('file', 'reuse-message', 'reedit-message', 'fixup', 'squash')
 DECORATION = re.compile(r'^\((?:[^()]|\([^()]*\))*\) ')      # `(HEAD -> main, tag: v1) ` with log.decorate set
@@ -99,7 +100,7 @@ def words(text):
         elif c == '"':
             found = DOUBLE_END.match(text, i + 1)
             inner = text[i + 1:found.end() - 1] if found else text[i + 1:]
-            known = known and found is not None and not re.search(r'(?<!\\)[$`]', inner)
+            known = known and found is not None and not re.search(r'[$`]', re.sub(r'\\[\\$`]', '', inner))
             word += re.sub(r'\\([\\"$`])|\\\n', lambda m: m.group(1) or '', inner)
             i = found.end() if found else len(text)
         else:
@@ -132,6 +133,8 @@ def subject(command):
                 messages.append((inline, known))
         elif value.startswith('-') and len(value) > 1:
             for at, letter in enumerate(value[1:], 2):
+                if letter in SHORT_OPTIONAL:
+                    break
                 if letter in SHORT_WITH_VALUE:
                     if letter in 'FCc':
                         return None
@@ -148,9 +151,13 @@ def subject(command):
     return ' '.join(paragraph) or None
 
 
-def same_subject(shown, wanted):
-    """A log line's subject is the wanted one, by words, with or without the `(HEAD -> ...)` decoration in front."""
-    return any(' '.join(one.split()) == ' '.join(wanted.split()) for one in (shown, DECORATION.sub('', shown)))
+def as_logged(shown, wanted):
+    """The log line's subject when it is the wanted one (by words), taken out of a `(HEAD -> ...)` decoration only when
+    the line matches without it - a subject that itself starts with `(wip) ` keeps it - or None when it is another's."""
+    if wanted is None:
+        return shown
+    same = (lambda one: ' '.join(one.split()) == ' '.join(wanted.split()))
+    return shown if same(shown) else DECORATION.sub('', shown) if same(DECORATION.sub('', shown)) else None
 
 
 def commits_of(command, output):
@@ -169,6 +176,5 @@ def commits_of(command, output):
     if not found and log and not re.search(r'[|&]', rest[:log.start() + 1].replace('&&', '')):
         wanted = subject(command[origin[commit.end() - len('commit')]:])      # the commit's own words, from `commit` on
         lines = ONELINE.findall(output)
-        found = [(sha, DECORATION.sub('', shown)) for sha, shown in lines
-                 if wanted is None or same_subject(shown, wanted)][:1]
+        found = [(sha, as_logged(shown, wanted)) for sha, shown in lines if as_logged(shown, wanted) is not None][:1]
     return found or [(None, '')]

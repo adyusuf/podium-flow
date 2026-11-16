@@ -151,6 +151,10 @@ class OpenFindings(unittest.TestCase):
         self.assertEqual('x y', work.subject('git commit -m \\\n "x y"'))
         self.assertEqual('x', work.subject('git commit -m "\n\nx"'))                       # leading blank lines go
         self.assertEqual('real', work.subject('git commit --author "-mx <a@b>" -m real'))    # an option's value is no -m
+        self.assertEqual('x', work.subject('git commit -unormal -m x'))                    # QA pass 2 P2: -u's own value
+        self.assertEqual('x', work.subject('git commit -Smykey -m x'))
+        self.assertEqual('a$b', work.subject('git commit -m "a\\$b"'))                     # an escaped $ stays literal
+        self.assertIsNone(work.subject('git commit -m "a\\\\$HOME"'))                     # after \\ the $ expands
         self.assertEqual('$HOME', work.subject("git commit -m \"$(cat <<'EOF'\n$HOME\nEOF\n)\""))   # quoted tag
         self.assertIsNone(work.subject('git commit -m "$(cat <<EOF\n$HOME\nEOF\n)"'))             # it expands
         for command in ('git commit -C HEAD', 'git commit --fixup=abc -m x', 'git commit -qF - -m x', 'git commit -m',
@@ -181,6 +185,10 @@ class OpenFindings(unittest.TestCase):
         self.assertEqual([('9657adc', 'real e')], work.commits_of(command, '9657adc (HEAD -> master, tag: v(1)) real e\n'))
         self.assertEqual([('9657adc', 'real   e')], work.commits_of(command, '9657adc real   e\n'))   # spaces by words
         self.assertEqual([(None, '')], work.commits_of(command, '9657adc (HEAD -> master) real f\n'))
+        # QA pass 2 P1: a subject that itself starts with parentheses keeps them; unknown messages show the line as given.
+        self.assertEqual([('abc1234', '(wip) fix it')],
+                         work.commits_of('git commit -qm "(wip) fix it" && git log -1', 'abc1234 (wip) fix it\n'))
+        self.assertEqual([('abc1234', '(HEAD -> b) x')], work.commits_of('git commit -qF m && git log -1', 'abc1234 (HEAD -> b) x\n'))
 
     def test_a_comment_an_escaped_quote_and_a_dry_run_are_not_commits(self):
         out = '[b 1a2b3c4] s'
