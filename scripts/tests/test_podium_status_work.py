@@ -106,8 +106,8 @@ class Commands(unittest.TestCase):
 
     def test_a_log_after_a_quiet_commit_gives_its_sha_only_when_it_runs_after_it(self):
         out = 'abcdef1 the subject\n0000000 older'
-        for command in ('git commit -qm x && git log --oneline -1', 'git commit -qm x; git log --oneline -1',
-                        'git commit -qm x\ngit log --oneline -1'):
+        for command in ('git commit -qm "the subject" && git log --oneline -1', "git commit -qm 'the subject'; git log -1",
+                        'git commit -qF msg.txt\ngit log --oneline -1'):
             with self.subTest(command=command):
                 self.assertEqual([('abcdef1', 'the subject')], work.commits_of(command, out))
         for command in ('git commit -qm x || git log --oneline -1', 'git commit -qm x | git log --oneline -1',
@@ -120,10 +120,59 @@ class Commands(unittest.TestCase):
         self.assertEqual([('1234567', 'real')], work.commits_of('git commit -m x && git log --oneline -1', out))
 
 
+class OpenFindings(unittest.TestCase):
+    """The layer 3 open findings closed on 17/11/2026: L1 and L2 of QA pass 3, and Windows paths."""
+
+    def test_the_log_line_is_the_commits_own_when_the_command_shows_its_message(self):
+        out = '1111111 another commit\nabcdef1 the subject\n'
+        for command in ('git commit -qm "the subject" && git log --oneline -2',
+                        "git commit -q -m 'the subject' && git log -2",
+                        'git commit -q --message="the subject" && git log -2',
+                        "git commit -q -m \"$(cat <<'EOF'\nthe subject\n\nthe body\nEOF\n)\" && git log --oneline -2",
+                        'grep -m 1 x f; git commit -qm "the subject" && git log -2'):     # an earlier -m is not it
+            with self.subTest(command=command):
+                self.assertEqual([('abcdef1', 'the subject')], work.commits_of(command, out))
+        # A message the log does not show gives no sha rather than another commit's; an unknown one keeps the first line.
+        self.assertEqual([(None, '')], work.commits_of('git commit -qm "not there" && git log -2', out))
+        for command in ('git commit -qF msg && git log -2', 'git commit -qm "$MSG" && git log -2'):
+            with self.subTest(command=command):
+                self.assertEqual([('1111111', 'another commit')], work.commits_of(command, out))
+
+    def test_the_subject_is_the_first_paragraph_on_one_line(self):
+        self.assertEqual('one two', work.subject('git commit -m "one\n  two\n\nbody"'))
+        self.assertEqual('say "hi"', work.subject('git commit -m "say \\"hi\\""'))
+        self.assertEqual('a$b', work.subject("git commit -m 'a$b'"))                    # single quotes do not expand
+        self.assertEqual('word', work.subject('git commit -qm word && x'))
+        self.assertIsNone(work.subject('git commit -m "$(git log -1)"'))
+        self.assertIsNone(work.subject('git commit -m "   "'))
+        self.assertIsNone(work.subject('git commit -F file'))
+
+    def test_a_comment_an_escaped_quote_and_a_dry_run_are_not_commits(self):
+        out = '[b 1a2b3c4] s'
+        for command in ('git status  # then git commit', '# git commit -m x', "echo it\\'s; echo 'x; git commit'",
+                        'git commit --dry-run -m x', 'git commit -m x --dry-run && echo ok'):
+            with self.subTest(command=command):
+                self.assertEqual([], work.commits_of(command, out))
+        self.assertEqual([('1a2b3c4', 's')], work.commits_of("echo it\\'s && git commit -m x", out))
+        self.assertEqual([('1a2b3c4', 's')], work.commits_of('git commit --dry-run; git commit -m y', out))
+        self.assertEqual('echo a#b ', work.plain('echo a#b # c'))                       # # inside a word is no comment
+
+    def test_on_windows_either_slash_and_any_case_take_the_folder_off(self):
+        original = work.WINDOWS
+        self.addCleanup(setattr, work, 'WINDOWS', original)
+        work.WINDOWS = True
+        self.assertEqual('src\\a.ts', work.shown_path('C:\\r\\src\\a.ts', 'C:\\r'))
+        self.assertEqual('a.ts', work.shown_path('c:/R/a.ts', 'C:\\r\\'))
+        self.assertEqual('C:\\repository\\a', work.shown_path('C:\\repository\\a', 'C:\\repo'))   # not a prefix match
+        self.assertEqual('C:\\r\\', work.shown_path('C:\\r\\', 'C:\\r'))                     # the folder itself
+        work.WINDOWS = False                                                       # elsewhere \ is part of a name
+        self.assertEqual('C:\\r\\a', work.shown_path('C:\\r\\a', 'C:\\r'))
+        self.assertEqual('/R/a', work.shown_path('/R/a', '/r'))
+
+
 class ToolCalls(unittest.TestCase):
-    @unittest.skipIf(os.name == 'nt', 'shown_path takes off only a "/"-joined folder (open finding, 16/11/2026)')
     def test_an_edit_is_keyed_by_its_absolute_path_and_shown_relative(self):
-        self.assertEqual([('edit', '/r/src/a.ts', 'edited src/a.ts', '/r')],
+        self.assertEqual([('edit', os.path.join('/r', 'src/a.ts'), 'edited src/a.ts', '/r')],
                          work.new_items('Edit', {'file_path': 'src/a.ts'}, None, '/r'))
         self.assertEqual([('edit', '/x/n.ipynb', 'edited /x/n.ipynb', '/r')],
                          work.new_items('NotebookEdit', {'notebook_path': '/x/n.ipynb'}, None, '/r'))
