@@ -3,9 +3,9 @@ list under a subagent's row, kept in the row's `work` field.
 
     edited <path>             a file the agent changed with Edit/Write/NotebookEdit, a call that did not fail
     commit <sha> <subject>    a commit a successful `git commit` printed - git's own `[branch sha] subject` line, or for
-                              `git commit -q ... && git log --oneline -1` the log's first line; `commit, sha not printed`
-                              when it printed neither. Only a `git commit` where a command starts counts: heredoc bodies
-                              and quoted text are taken out first, so a grep pattern or an echo that names it is not one
+                              `git commit -q ... && git log --oneline -1` the log's line (podium_status_commits.py);
+                              `commit, sha not printed` when it printed neither. Only a `git commit` where a command
+                              starts counts, so a grep pattern, an echo or a comment that names it is not one
     reported, not verified: <first sentence of its report>
                               only for an agent that edited and committed nothing (a review): its own words, never a
                               measurement
@@ -27,30 +27,26 @@ cannot fake an entry; `clip` takes out control and bidirectional characters.
 import json
 import os
 import re
+import string
 import subprocess
 import time
 from datetime import datetime
 
+from podium_status_commits import COMMIT, GIT_VERB, ONELINE, commits_of, plain, subject  # noqa: F401 (re-exported)
 from podium_status_rows import MAX_WORK, clip
 
 SEPARATOR = '␞'          # a printable character (the record-separator sign), so the row's clip keeps it
 MAX_ENTRIES = 5
 ENTRY = MAX_WORK // (MAX_ENTRIES + 1) - 1     # every entry, the `… N earlier` one and the separators fit MAX_WORK
 EDIT_TOOLS = ('Edit', 'Write', 'MultiEdit', 'NotebookEdit')
-# `git commit`'s first line: `[branch 1a2b3c4] subject`, `[main (root-commit) 1a2b3c4] s`, `[detached HEAD 1a2b3c4] s`.
-COMMIT = re.compile(r'^\[[^\]\n]+ ([0-9a-f]{7,40})\] (.+)$', re.M)
-ONELINE = re.compile(r'^([0-9a-f]{7,40}) (.+)$', re.M)
-# `git <verb>` where a command starts (as podium_status_hooks.COMMIT, on text with quotes and heredocs taken out): the
-# start, after ; & | a newline ( ` { ! or then/do/else/elif, behind env/command/sudo/exec/time/nohup/xargs or VAR=value,
-# git by a path, with its global options (`-C dir`, `-c k=v`, `--no-pager`).
-GIT_VERB = (r'(?:^|[;&|\n(`{!]|\b(?:then|do|else|elif)\s)\s*(?:(?:env|command|sudo|exec|time|nohup|xargs)(?:\s+-\S+)*\s+'
-            r'|\w+=\S*\s+)*(?:[\w.~-]*/)*git(?:\s+-[Cc]\s+\S+|\s+-\S+)*\s+%s(?![-\w])')
 SLACK = 120        # seconds of clock slack around a tool call when a commit's time is checked
 EARLIER = re.compile(r'^… (?:\d+ )?earlier$')
 REPORTED = 'reported, not verified: '
 NO_SHA = 'commit, sha not printed'
 UNCOMMITTED, IGNORED, UNCHECKED, UNVERIFIED = ' (uncommitted)', ' (ignored by git)', ' (not checked)', ' (not verified)'
 MAX_TRANSCRIPT = 64 * 1024 * 1024
+WINDOWS = os.name == 'nt'           # a path there may use either slash, in any case
+ASCII_FOLD = str.maketrans(string.ascii_uppercase, string.ascii_lowercase)
 GIT_SECONDS, GIT_BUDGET = 2, 4     # one git call, and all of them at a stop (the hook holds the session's lock)
 
 
@@ -72,13 +68,24 @@ def joined(items, marker='', live=False, dropped=0):
     return SEPARATOR.join(([marker] if marker else []) + items[-MAX_ENTRIES:])
 
 
+def under(path, folder):
+    """The rest of `path` after `folder` and one separator, or None when it is not inside it. On Windows either slash
+    separates and ASCII case does not count (open finding 16/11/2026: only a `/`-joined folder was taken off there; ASCII
+    only, so a Kelvin sign is never read as a K - QA 17/11/2026 F6)."""
+    seps = '/\\' if WINDOWS else '/'
+    folder = folder.rstrip(seps)
+    same = (lambda a, b: a.replace('\\', '/').translate(ASCII_FOLD) == b.replace('\\', '/').translate(ASCII_FOLD)) \
+        if WINDOWS else str.__eq__
+    if folder and len(path) > len(folder) + 1 and path[len(folder)] in seps and same(path[:len(folder)], folder):
+        return path[len(folder) + 1:]
+    return None
+
+
 def shown_path(path, cwd):
     """A path relative to the agent's folder when it is inside it, `~/...` under the home folder; a long one keeps its end."""
-    path, cwd, home = safe(path), str(cwd or '').rstrip('/'), os.path.expanduser('~')
-    if cwd and path.startswith(cwd + '/'):
-        path = path[len(cwd) + 1:]
-    elif path.startswith(home + '/'):
-        path = '~' + path[len(home):]
+    path, cwd, home = safe(path), str(cwd or ''), os.path.expanduser('~')
+    inside, at_home = under(path, cwd), under(path, home)
+    path = inside if inside is not None else '~/' + at_home if at_home is not None else path
     room = ENTRY - len('edited ') - len(IGNORED)          # room for the longest mark the stop may add
     return path if len(path) <= room else '…' + path[-(room - 1):]
 
@@ -102,37 +109,6 @@ def result_text(value):
     if isinstance(value, list):
         return '\n'.join(str(block.get('text') or '') for block in value if isinstance(block, dict))
     return ''
-
-
-def plain(command):
-    """The command with heredoc bodies dropped and every quoted string emptied: what is left is what the shell runs."""
-    kept, tag = [], None
-    for line in command.splitlines():
-        if tag is not None:
-            tag = None if line.strip() == tag else tag
-            continue
-        kept.append(line)
-        found = re.search(r"(?<!<)<<(?!<)-?\s*[\"']?([A-Za-z_]\w*)", line)
-        tag = found.group(1) if found else None
-    return re.sub(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'', '""', '\n'.join(kept))     # a quoted string may span lines
-
-
-def commits_of(command, output):
-    """(sha, subject) of each commit a successful `git commit` printed; (None, '') when it printed no sha. A log's first
-    line counts only when `git log` runs after the commit (`&&`, `;` or a new line between, never `||`, a pipe or `&`); if
-    the commit failed, that line is the older HEAD, and the stop's commit-time check marks it `(not verified)`."""
-    text = plain(command) if isinstance(command, str) else ''
-    commit = re.search(GIT_VERB % 'commit', text)
-    if commit is None:
-        return []
-    found = COMMIT.findall(output)
-    rest = text[commit.end():]
-    log = re.search(GIT_VERB % 'log', rest)
-    # The text up to `git log`, with the separator its match starts on: `&&`, `;` and new lines run it after the commit.
-    if not found and log and not re.search(r'[|&]', rest[:log.start() + 1].replace('&&', '')):
-        first = ONELINE.search(output)
-        found = [first.groups()] if first else []
-    return found or [(None, '')]
 
 
 def new_items(tool, given, result, cwd):
