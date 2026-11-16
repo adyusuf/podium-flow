@@ -48,7 +48,7 @@ except ImportError:  # Windows: no advisory lock; one writer at a time is then t
 
 # The rows and what is done to them live in podium_status_rows.py (beside this file); the names are re-exported here.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from podium_status_rows import (CLOSED, CONTROL, FIELDS, MAX_ROWS, MAX_TEXT, OPEN, STATES, STEP_FIELDS,  # noqa: E402,F401
+from podium_status_rows import (CLOSED, CONTROL, FIELDS, MAX_ROWS, MAX_TEXT, MAX_WORK, OPEN, STATES, STEP_FIELDS,  # noqa: E402,F401
                                 StatusError, clip, drop_row, given_percent, percent, put_row, rename_row,
                                 running_item, same, step_percent, trim)
 
@@ -83,7 +83,8 @@ def is_table(data):
 
 def normalise(data):
     """Keep only what a status table holds: string fields, rows that are objects, at most MAX_ROWS of them."""
-    rows = [dict({key: clip(row.get(key)) for key in FIELDS + STEP_FIELDS}, percent=step_percent(row))
+    rows = [dict({key: clip(row.get(key), MAX_WORK if key == 'work' else MAX_TEXT) for key in FIELDS + STEP_FIELDS},
+                 percent=step_percent(row))
             for row in data.get('rows', []) if isinstance(row, dict)]
     return {'now': clip(data.get('now')), 'next': clip(data.get('next')), 'rows': trim(rows),
             'updated': clip(data.get('updated')), 'budget': clip(data.get('budget'))}

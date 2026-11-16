@@ -7,6 +7,7 @@ exact name first and then by a prefix of it (user decision 05/11/2026), so a lon
 import re
 
 MAX_TEXT = 300
+MAX_WORK = 600       # a subagent's work list (layer 3, 16/11/2026): up to six short entries on one line
 MAX_ROWS = 50
 FIELDS = ('item', 'state', 'figure', 'waiting')
 # A step's own fields: a row written by `row` leaves them empty. `since` (epoch seconds) and `tools` (tool calls so far)
@@ -14,7 +15,7 @@ FIELDS = ('item', 'state', 'figure', 'waiting')
 # are measured from them.
 # `label` (`<description> (<model>)`), `spent` (seconds of the runs before this one) and `resumed` (how many times the
 # agent was resumed) are the subagent row's too (layer 2, 16/11/2026); a file written before them reads them as empty.
-STEP_FIELDS = ('percent', 'blocker', 'agent', 'note', 'since', 'tools', 'model', 'label', 'spent', 'resumed')
+STEP_FIELDS = ('percent', 'blocker', 'agent', 'note', 'since', 'tools', 'model', 'label', 'spent', 'resumed', 'work')
 # `failed` (05/11/2026) is a step that ended in error: not open (nothing is left to finish) and not closed (it must stay
 # visible until someone looks at it), so `trim` keeps it longer than a finished step.
 STATES = ('not started', 'running', 'done', 'blocked', 'did not run', 'failed')
@@ -27,10 +28,10 @@ class StatusError(Exception):
     """A refusal the command line reports with exit code 2."""
 
 
-def clip(text):
-    """One line of at most MAX_TEXT characters with no control characters: the box draws one line per field."""
+def clip(text, limit=MAX_TEXT):
+    """One line of at most `limit` characters with no control characters: the box draws one line per field."""
     flat = ' '.join(CONTROL.sub(' ', '' if text is None else str(text)).split())
-    return flat if len(flat) <= MAX_TEXT else flat[:MAX_TEXT - 1] + '…'
+    return flat if len(flat) <= limit else flat[:limit - 1] + '…'
 
 
 def percent(value):

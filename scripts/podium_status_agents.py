@@ -4,6 +4,8 @@
             `<description> (<model>)` from the agent's meta file; a resumed agent (SendMessage) reopens its own row,
             counts `resumed xN` and keeps its time and tool calls instead of starting from zero
     tick    PostToolUse of a subagent's tool call: the step's note is refreshed with the tool calls and the time so far
+    work    under the row, the agent's own work (layer 3): the files it edited, its commits, or its report marked as
+            not verified - podium_status_work.py
     stop    SubagentStop: the step is done or failed - failed when the payload says so or the agent's transcript ends on
             an API error (a usage limit: "rate limit"); never from the agent's own report. Its note is the duration, the
             tool calls and the output tokens; any other step of that agent still open is closed the same way
@@ -18,6 +20,7 @@ import os
 import re
 
 from podium_status_rows import CLOSED, clip, one_row, put_row
+from podium_status_work import add_live, from_transcript
 
 AGENT_STEP = 'task'            # the one step the hooks write for an agent
 FAILED_STATUS = ('failed', 'error', 'errored', 'cancelled', 'canceled', 'interrupted', 'aborted')
@@ -171,7 +174,7 @@ def start(data, payload, now):
         since = str(int(now))
     label = label_of(meta, model) or (old or {}).get('label', '')
     step = {'agent': agent, 'since': since, 'tools': str(tools), 'model': model, 'label': label, 'spent': str(spent),
-            'resumed': str(resumed) if resumed else '',
+            'resumed': str(resumed) if resumed else '', 'work': (old or {}).get('work', ''),
             'note': note_of(model, spent if old is not None else None, tools if old is not None else None, None, resumed)}
     return put_row(data, AGENT_STEP, 'running', '', '', step)
 
@@ -188,7 +191,7 @@ def tick(data, payload, now):
         return data
     row = dict(data['rows'][at])
     count = int(row['tools']) + 1 if str(row.get('tools') or '').isdigit() else 1
-    row.update(tools=str(count), note=note_of(row.get('model'), whole(row.get('spent')) + now - int(row['since']), count, None,
+    row.update(tools=str(count), work=add_live(row.get('work'), payload), note=note_of(row.get('model'), whole(row.get('spent')) + now - int(row['since']), count, None,
                                               whole(row.get('resumed'))))
     return dict(data, rows=[row if i == at else one for i, one in enumerate(data['rows'])])
 
@@ -218,6 +221,7 @@ def stop(data, payload, now):
     """Close the agent's step: done at 100%, or failed. Its other steps still open are closed the same way."""
     agent = agent_name(payload)
     facts = transcript_facts(str(payload.get('agent_transcript_path') or ''))
+    work = from_transcript(str(payload.get('agent_transcript_path') or ''))     # None: unreadable, the live list stays
     why = failure(payload, facts)
     # No % on an agent's row: nothing measures how much of its work is done, and "done 100" was read as a measurement.
     state, percent = ('failed', '') if why else ('done', '')
@@ -228,6 +232,7 @@ def stop(data, payload, now):
     seconds, calls, out = measured(payload, row, now, facts)
     label = label_of(meta_of(payload), model) or row.get('label', '')
     row.update(state=state, percent=percent, blocker=why, model=model, label=label, figure='',
+               work=row.get('work', '') if work is None else work,
                spent=str(int(seconds)) if seconds is not None else row.get('spent', ''),
                tools=str(calls) if calls is not None else row.get('tools', ''),   # a resume counts on from here
                note=note_of(model, seconds, calls, out, whole(row.get('resumed'))))
