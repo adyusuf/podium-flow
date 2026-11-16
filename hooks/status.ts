@@ -6,23 +6,36 @@ import { explained, helpCard, INDENT } from './controls'
 import { STATUS_HELP } from './help'
 
 /** A step (user decision 02/11/2026): `percent` done ('' when not given), `blocker`, `agent` ('' = this session) and, on a
- *  subagent's row, `label` - `<description> (<model>)`, the title its accordion shows (layer 2, 16/11/2026). */
-type StatusRow = { item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string; note: string; label: string }
+ *  subagent's row, `label` - `<description> (<model>)`, the title its accordion shows (layer 2, 16/11/2026) - and `work`,
+ *  the agent's own work list drawn under the row (layer 3, 16/11/2026; scripts/podium_status_work.py writes it). */
+type StatusRow = {
+  item: string; state: string; figure: string; waiting: string; percent: string; blocker: string; agent: string; note: string; label: string
+  work?: string[]
+}
 /** `budget` (user decision 06/11/2026): this session's measured spend against the panel's budget, one line; shown, never a stop. */
 export type StatusData = { now: string; next: string; rows: StatusRow[]; updated: string; budget: string }
 
 /** The same caps as scripts/podium_status.py: the file is read as untrusted text, so a foreign file cannot flood the box. */
 const MAX_ROWS = 50
 const MAX_TEXT = 300
+/** A work list: one field of entries joined by the record-separator sign, at most MAX_WORK characters, as the script writes it. */
+const MAX_WORK = 600
+const WORK_SEPARATOR = '\u241e'
+const MAX_WORK_ENTRIES = 6
 // eslint-disable-next-line no-control-regex
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g
+// Control characters, and the bidirectional marks that can show a file name reversed (as podium_status_rows.py).
+const CONTROL = /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g
 
 /** One line, no control characters (an escape sequence must not reach the terminal), at most MAX_TEXT characters. */
-function clean(value: unknown): string {
+function clean(value: unknown, limit = MAX_TEXT): string {
   if (typeof value !== 'string') return ''
   const flat = value.replace(CONTROL, ' ').split(/\s+/).filter(Boolean).join(' ')
-  return flat.length <= MAX_TEXT ? flat : `${flat.slice(0, MAX_TEXT - 1)}…`
+  return flat.length <= limit ? flat : `${flat.slice(0, limit - 1)}…`
 }
+
+/** A stored work list as its entries: at most MAX_WORK_ENTRIES, none empty. */
+export const workOf = (value: unknown): string[] =>
+  clean(value, MAX_WORK).split(WORK_SEPARATOR).map(entry => entry.trim()).filter(Boolean).slice(0, MAX_WORK_ENTRIES)
 
 /**
  * The status folder (user decision 01/11/2026): an absolute PODIUM_STATUS_DIR, else `.claude/podium-status` in the home
@@ -73,6 +86,8 @@ export function parseStatus(text: string): StatusData | null {
       // Over 100 reads as 100, as the script stores it (F-038).
       percent: /^\d{1,3}$/.test(clean(row.percent)) ? String(Math.min(100, Number(clean(row.percent)))) : '', blocker: clean(row.blocker),
       agent: clean(row.agent), note: clean(row.note), label: clean(row.label),
+      // `work` only where there is some: a row with none reads exactly as before layer 3.
+      ...(workOf(row.work).length > 0 ? { work: workOf(row.work) } : {}),
     }))
   return { now: clean(one.now), next: clean(one.next), rows: trim(rows), updated: clean(one.updated), budget: clean(one.budget) }
 }
@@ -198,7 +213,10 @@ export function statusBody(ui: Ui, data: StatusData | null, folds: AgentFolds = 
       // A note has its (i) after the row (user decision 09/11/2026); the pointer on either shows the whole note.
       noteOf(row) === '' ? cells : explained(ui, id, cells, noteOf(row)),
       helpCard(ui, id, noteOf(row)),
-      blocker(row) === '' ? null : h(ui.Box, { marginLeft: 2 }, h(ui.Text, { dimColor: true }, blocker(row)))]
+      blocker(row) === '' ? null : h(ui.Box, { marginLeft: 2 }, h(ui.Text, { dimColor: true }, blocker(row))),
+      // Layer 3 (16/11/2026): under an agent's step its own work, one dim line per entry, cut at the edge.
+      (row.work ?? []).length === 0 ? null : h(ui.Box, { flexDirection: 'column', marginLeft: 2 },
+        (row.work ?? []).map(entry => h(ui.Text, { dimColor: true, wrap: 'truncate-end' }, `· ${entry}`)))]
   })
   // A group or agent header: the arrow presses; the bold title carries its (i) and card, its count follows it dimmed.
   const header = (id: FoldId, hover: string, title: string, card: string, count: number) => [

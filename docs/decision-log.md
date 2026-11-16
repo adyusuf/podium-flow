@@ -2406,3 +2406,36 @@ point to was taken, and the user may reverse any of them:
 F-042). After the batch (16/11/2026, `bash scripts/coverage.sh` exit 0 on merge 7e4a9dd): Python 92 %, TypeScript
 99 %, shell 81.8 % with no script NOT MEASURED - the figures are in `docs/coverage-gap.md`. Each package's narrow run and the batch's full run are in the
 register.
+
+## Status layer 3: each agent's own work under its row (16/11/2026, user decision)
+
+The user approved the third level of the Status box (*"Yes, build layer 3"*, after the order *"önce status -> sonra agent
+-> sonra da görev kırılımları"*). Under a subagent's step the box lists its last five pieces of work. **Only what the
+harness recorded counts**: a file the agent changed with Edit/Write/NotebookEdit (a call that did not fail), and a commit
+its git command printed (`[branch sha] subject`). Subagents keep no task list of their own (none of 310 subagent
+transcripts on this machine used TodoWrite or a task tool), so the agent's plan cannot be shown; an agent that changed
+nothing (a review) shows the first sentence of its handed-back report instead, marked `reported, not verified` - its own
+words, never a measurement. At the stop the list is rebuilt from the whole transcript (a file edited again moves to the
+end) and git is asked about the five kept entries only, within 4 seconds in all and with `--no-optional-locks` (the hook
+holds the session's lock; a parallel agent's commit must never meet an `index.lock`): each edited file in its own folder
+(`git status --porcelain -z`, so quoted and non-ASCII names match) - `(uncommitted)`, `(ignored by git)`, no mark when git
+shows no change left, and `(not checked)` when git cannot be asked (not a repository, the folder gone, out of time); a
+commit sha is looked up with `cat-file --batch-check` in its folder and the edited files' folders, `(not verified)` when
+none knows it. A commit counts only where a `git commit` starts a command, read after heredoc bodies and quoted strings
+are taken out (a grep pattern, an echo or a heredoc that names it is not one; a `bash -c '...'` commit is therefore not
+seen - missed rather than invented; rare non-commits still match - a `# ... git commit` comment, an escaped apostrophe outside
+quotes, `git commit --dry-run` - and show only as `commit, sha not printed (not verified)`, QA pass 3 L2). Its sha comes from git's `[branch sha] subject` line (a detached HEAD too) or from the
+first line of a `git log` that runs after it (`&&`, `;` or a new line between; never `||`, a pipe or `&`). If the commit
+failed that line is the older HEAD, so at the stop the sha's commit time (`git log --no-walk --ignore-missing`) must fall
+inside the tool call that printed it, ±120 s, else `(not verified)`. A commit that printed no sha is `commit, sha not
+printed (not verified)`. `git status` is asked with `--literal-pathspecs`, so `[id].tsx`, `*.md` or `:x.txt` is a name,
+never a pattern. Measured 16/11/2026 over 311 subagent transcripts: 310 of 489 successful `git commit` calls give a sha,
+179 printed none (17 of 492 before QA, and QA pass 2 found the interim 419 counted commands that only named it).
+Open (QA pass 3, low): the log line is the output's first `sha subject` line, not necessarily `git log`'s own (L1); the
+commit-time check limits it to a real commit made within that call. The
+separator is taken out of every path, subject and report, so none can fake an entry, and the control filter now also takes
+out bidirectional marks (a file name could display reversed). While the agent runs, a list that dropped entries shows `… earlier` with no
+number (a file dropped and edited again would be counted twice); the stop writes the exact `… N earlier`. The field is
+capped at 600 characters (`MAX_WORK`), every other field stays at 300. Tests were not written: the configuration has
+unit tests off (#34); the module was run by hand on real transcripts and the hooks end to end with a temporary status
+folder, and the pane was type-checked.

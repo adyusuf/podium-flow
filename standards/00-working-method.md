@@ -403,7 +403,13 @@ deliverable.
   `failed` (a failed row stays, never dropped; a transcript ending on a usage limit is `failed: rate limit`, the agent's
   own report never sets the state) with the measured duration, tool calls and output tokens, and closes the agent's
   other open steps. A resumed agent (SendMessage) reopens its row with `resumed ×N`, its time and tool calls carried on.
-  The box groups by state, then by agent, then that agent's tasks (user decision 15-16/11/2026). A figure with no signal
+  The box groups by state, then by agent, then that agent's tasks (user decision 15-16/11/2026): under an agent's step its
+  last five pieces of work, read from what the harness recorded - files it edited and the commits a `git commit` printed
+  (only where it starts a command; the sha's commit time must fall inside that call);
+  at the stop git is asked in each file's own folder: `(uncommitted)`, `(ignored by git)`, `(not checked)` when git could
+  not be asked (an entry is never left looking clean unchecked), and a sha no repository knows is `(not verified)`; only
+  for an agent that changed nothing, the first line of its report, marked `reported, not verified`
+  (`podium_status_work.py`). A figure with no signal
   is left out (`podium_status_agents.py`).
   `drop` and `--after` take an exact step name or a unique prefix, `rename OLD NEW` renames in place, and `now` is the name
   of the step at work, never the user's raw message.
