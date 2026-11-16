@@ -2406,3 +2406,19 @@ point to was taken, and the user may reverse any of them:
 F-042). After the batch (16/11/2026, `bash scripts/coverage.sh` exit 0 on merge 7e4a9dd): Python 92 %, TypeScript
 99 %, shell 81.8 % with no script NOT MEASURED - the figures are in `docs/coverage-gap.md`. Each package's narrow run and the batch's full run are in the
 register.
+
+## Status layer 3: each agent's own work under its row (16/11/2026, user decision)
+
+The user approved the third level of the Status box (*"Yes, build layer 3"*, after the order *"önce status -> sonra agent
+-> sonra da görev kırılımları"*). Under a subagent's step the box lists its last five pieces of work. **Only what the
+harness recorded counts**: a file the agent changed with Edit/Write/NotebookEdit (a call that did not fail), and a commit
+its git command printed (`[branch sha] subject`). Subagents keep no task list of their own (none of 310 subagent
+transcripts on this machine used TodoWrite or a task tool), so the agent's plan cannot be shown; an agent that changed
+nothing (a review) shows the first sentence of its handed-back report instead, marked `reported, not verified` - its own
+words, never a measurement. At the stop the list is rebuilt from the whole transcript and git is asked once: an edited
+file still in `git status --short` is `(uncommitted)`, a sha git does not know is `(not verified)`; when git cannot be
+asked (the folder is gone) nothing is marked. While the agent runs, a list that dropped entries shows `… earlier` with no
+number (a file dropped and edited again would be counted twice); the stop writes the exact `… N earlier`. The field is
+capped at 600 characters (`MAX_WORK`), every other field stays at 300. Tests were not written: the configuration has
+unit tests off (#34); the module was run by hand on real transcripts and the hooks end to end with a temporary status
+folder, and the pane was type-checked.
