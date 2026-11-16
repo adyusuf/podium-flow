@@ -2415,9 +2415,17 @@ harness recorded counts**: a file the agent changed with Edit/Write/NotebookEdit
 its git command printed (`[branch sha] subject`). Subagents keep no task list of their own (none of 310 subagent
 transcripts on this machine used TodoWrite or a task tool), so the agent's plan cannot be shown; an agent that changed
 nothing (a review) shows the first sentence of its handed-back report instead, marked `reported, not verified` - its own
-words, never a measurement. At the stop the list is rebuilt from the whole transcript and git is asked once: an edited
-file still in `git status --short` is `(uncommitted)`, a sha git does not know is `(not verified)`; when git cannot be
-asked (the folder is gone) nothing is marked. While the agent runs, a list that dropped entries shows `… earlier` with no
+words, never a measurement. At the stop the list is rebuilt from the whole transcript (a file edited again moves to the
+end) and git is asked about the five kept entries only, within 4 seconds in all and with `--no-optional-locks` (the hook
+holds the session's lock; a parallel agent's commit must never meet an `index.lock`): each edited file in its own folder
+(`git status --porcelain -z`, so quoted and non-ASCII names match) - `(uncommitted)`, `(ignored by git)`, no mark when git
+shows no change left, and `(not checked)` when git cannot be asked (not a repository, the folder gone, out of time); a
+commit sha is looked up with `cat-file --batch-check` in its folder and the edited files' folders, `(not verified)` when
+none knows it. A commit is read from git's `[branch sha] subject` line (a detached HEAD too) or, for `git commit -q ... &&
+git log --oneline -1`, the log's first line; one that printed no sha is `commit, sha not printed (not verified)`. Measured
+16/11/2026 over 311 subagent transcripts: 419 of 501 successful `git commit` calls give a sha (17 of 492 before QA). The
+separator is taken out of every path, subject and report, so none can fake an entry, and the control filter now also takes
+out bidirectional marks (a file name could display reversed). While the agent runs, a list that dropped entries shows `… earlier` with no
 number (a file dropped and edited again would be counted twice); the stop writes the exact `… N earlier`. The field is
 capped at 600 characters (`MAX_WORK`), every other field stays at 300. Tests were not written: the configuration has
 unit tests off (#34); the module was run by hand on real transcripts and the hooks end to end with a temporary status

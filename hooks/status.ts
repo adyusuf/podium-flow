@@ -23,7 +23,8 @@ const MAX_WORK = 600
 const WORK_SEPARATOR = '\u241e'
 const MAX_WORK_ENTRIES = 6
 // eslint-disable-next-line no-control-regex
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g
+// Control characters, and the bidirectional marks that can show a file name reversed (as podium_status_rows.py).
+const CONTROL = /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g
 
 /** One line, no control characters (an escape sequence must not reach the terminal), at most MAX_TEXT characters. */
 function clean(value: unknown, limit = MAX_TEXT): string {
@@ -84,7 +85,9 @@ export function parseStatus(text: string): StatusData | null {
       item: clean(row.item), state: clean(row.state), figure: clean(row.figure), waiting: clean(row.waiting),
       // Over 100 reads as 100, as the script stores it (F-038).
       percent: /^\d{1,3}$/.test(clean(row.percent)) ? String(Math.min(100, Number(clean(row.percent)))) : '', blocker: clean(row.blocker),
-      agent: clean(row.agent), note: clean(row.note), label: clean(row.label), work: workOf(row.work),
+      agent: clean(row.agent), note: clean(row.note), label: clean(row.label),
+      // `work` only where there is some: a row with none reads exactly as before layer 3.
+      ...(workOf(row.work).length > 0 ? { work: workOf(row.work) } : {}),
     }))
   return { now: clean(one.now), next: clean(one.next), rows: trim(rows), updated: clean(one.updated), budget: clean(one.budget) }
 }

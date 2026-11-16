@@ -118,10 +118,11 @@ def transcript_facts(path):
                     model = model if str(message.get('model') or '<').startswith('<') else str(message['model'])
                 for block in message.get('content') if isinstance(message.get('content'), list) else []:
                     if isinstance(block, dict) and block.get('type') == 'tool_use':
-                        calls.add(block.get('id') or len(calls))
+                        ident = block.get('id')         # a malformed id (a list, an object) is counted, never hashed
+                        calls.add(ident if isinstance(ident, str) and ident else len(calls))
                 usage = message.get('usage')
                 if isinstance(usage, dict) and isinstance(usage.get('output_tokens'), int):
-                    key = message.get('id') or len(out)
+                    key = message.get('id') if isinstance(message.get('id'), str) and message.get('id') else len(out)
                     out[key] = max(out.get(key, 0), usage['output_tokens'])
         return {'calls': len(calls), 'out': sum(out.values()), 'model': model, 'error': error}
     except OSError:

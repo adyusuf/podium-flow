@@ -20,7 +20,8 @@ STEP_FIELDS = ('percent', 'blocker', 'agent', 'note', 'since', 'tools', 'model',
 # visible until someone looks at it), so `trim` keeps it longer than a finished step.
 STATES = ('not started', 'running', 'done', 'blocked', 'did not run', 'failed')
 OPEN, CLOSED = STATES[:2] + STATES[3:4], (STATES[2], STATES[4])      # a step still to finish, and one that is over
-CONTROL = re.compile('[\x00-\x1f\x7f-\x9f]')
+# Control characters, and the bidirectional marks that can show a file name reversed (QA 16/11/2026, layer 3).
+CONTROL = re.compile('[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]')
 WHOLE_PERCENT = re.compile(r'^\s*(\d{1,3})\s*%?\s*$')
 
 
