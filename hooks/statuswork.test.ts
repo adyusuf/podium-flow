@@ -49,6 +49,9 @@ test('under an agent step each entry is one dim line, cut at the edge, in order;
   const lines = all(statusBody(ui, data, OPEN), 'Text').filter(text => words(text).startsWith('· '))
   expect(lines.map(words)).toEqual(['· … earlier', '· edited a.ts', '· commit 1234567 m'])
   expect(lines.every(line => line.props.dimColor === true && line.props.wrap === 'truncate-end')).toBe(true)
+  // The list is indented under its step (QA F12, 16/11/2026).
+  const box = all(statusBody(ui, data, OPEN), 'Box').find(node => all(node, 'Text').map(words).join('') === lines.map(words).join(''))
+  expect(box?.props.marginLeft).toBe(2)
   // The list sits under its own step: the step's name is drawn before the first entry and the other step after the last.
   const texts = all(statusBody(ui, data, OPEN), 'Text').map(words)
   const at = (text: string) => texts.indexOf(text)

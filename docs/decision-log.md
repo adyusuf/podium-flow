@@ -2436,6 +2436,10 @@ commit-time check limits it to a real commit made within that call. The
 separator is taken out of every path, subject and report, so none can fake an entry, and the control filter now also takes
 out bidirectional marks (a file name could display reversed). While the agent runs, a list that dropped entries shows `… earlier` with no
 number (a file dropped and edited again would be counted twice); the stop writes the exact `… N earlier`. The field is
-capped at 600 characters (`MAX_WORK`), every other field stays at 300. Tests were not written: the configuration has
-unit tests off (#34); the module was run by hand on real transcripts and the hooks end to end with a temporary status
-folder, and the pane was type-checked.
+capped at 600 characters (`MAX_WORK`), every other field stays at 300. Tests were written afterwards at the user's
+request (16/11/2026, over the "unit tests: no" setting for that task): `test_podium_status_work.py`,
+`test_podium_status_work_git.py` (real repositories, the user's git configuration kept out) and `hooks/statuswork.test.ts`;
+branch coverage of the module 98% before QA's additions. QA on them found a product bug: `--ignored=matching` lists only an
+ignored folder, so a file under `build/` showed no mark ("no change left"); `--ignored=traditional` lists the file itself.
+Open (low): on Windows `shown_path` takes off only a `/`-joined folder, so a path shows absolute there; the test that
+expects the relative form is skipped on Windows, as is the `:x.txt` one.

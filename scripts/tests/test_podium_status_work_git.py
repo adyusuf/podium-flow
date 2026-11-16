@@ -5,12 +5,14 @@ commands, as test_podium_status_agents.py.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
 from datetime import datetime, timezone
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,6 +27,13 @@ def stamp(seconds):
     return datetime.fromtimestamp(seconds, timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
 
 
+def scratch(case):
+    """A temporary folder removed when the test ends."""
+    path = os.path.realpath(tempfile.mkdtemp())
+    case.addCleanup(shutil.rmtree, path, True)
+    return path
+
+
 def call(ident, name, given, at, cwd):
     return {'type': 'assistant', 'cwd': cwd, 'timestamp': stamp(at),
             'message': {'content': [{'type': 'tool_use', 'id': ident, 'name': name, 'input': given}]}}
@@ -36,15 +45,20 @@ def result(ident, at, content='', error=False):
 
 
 class RepoCase(unittest.TestCase):
-    """A repository with one commit: kept.txt, sub/deep.txt, [id].tsx, :x.txt and a .gitignore for ignored.log. No tests here."""
+    """A repository with one commit: kept.txt, sub/deep.txt, [id].tsx and a .gitignore for ignored.log and build/. No
+    tests here. The user's own git configuration stays out (a global excludesFile or hook would change what git says), and
+    git never climbs out of a temporary folder into a repository around it."""
     def setUp(self):
-        self.repo = os.path.realpath(tempfile.mkdtemp())
+        patch = mock.patch.dict(os.environ, {'GIT_CONFIG_GLOBAL': os.devnull, 'GIT_CONFIG_NOSYSTEM': '1'})
+        patch.start()
+        self.addCleanup(patch.stop)
+        self.repo = scratch(self)
+        os.environ['GIT_CEILING_DIRECTORIES'] = os.path.dirname(self.repo)
         self.git('init', '-q')
         self.write('kept.txt', 'a')
-        self.write('.gitignore', 'ignored.log\n')
+        self.write('.gitignore', 'ignored.log\nbuild/\n')
         self.write('sub/deep.txt', 'a')
         self.write('[id].tsx', 'a')
-        self.write(':x.txt', 'a')
         self.git('add', '-A')
         self.git('commit', '-qm', 'first')
         self.deadline = time.monotonic() + 30
@@ -70,20 +84,38 @@ class Marks(RepoCase):
         self.assertEqual(work.UNCOMMITTED, work.edit_mark(self.write('new.txt', 'x'), self.deadline))
         self.assertEqual(work.UNCOMMITTED, work.edit_mark(self.write('sub/deep.txt', 'b'), self.deadline))   # path from the top
         self.assertEqual(work.IGNORED, work.edit_mark(self.write('ignored.log', 'x'), self.deadline))
+        # A file under an ignored folder is listed itself, not only its folder (QA F1, 16/11/2026).
+        self.assertEqual(work.IGNORED, work.edit_mark(self.write('build/deep/out.js', 'x'), self.deadline))
+
+    def test_a_change_git_holds_beside_an_ignore_rule_is_still_uncommitted(self):
+        # `git rm --cached` of a file now ignored: two records, `D ` and `!!`; only all-ignored reads as ignored.
+        self.write('.gitignore', 'ignored.log\nbuild/\nkept.txt\n')
+        self.git('rm', '-q', '--cached', 'kept.txt')
+        self.assertEqual(work.UNCOMMITTED, work.edit_mark(os.path.join(self.repo, 'kept.txt'), self.deadline))
 
     def test_a_file_name_is_never_a_pattern(self):
         # `[id].tsx` as a pathspec matches i.tsx and d.tsx; the clean file itself must not take their change.
         self.write('i.tsx', 'changed')
         self.assertEqual('', work.edit_mark(os.path.join(self.repo, '[id].tsx'), self.deadline))
+
+    @unittest.skipIf(os.name == 'nt', 'a file name cannot hold ":" on Windows')
+    def test_a_file_name_is_never_magic(self):
         # `:x.txt` as a pathspec is x.txt (magic): the changed file itself must still be seen.
+        self.write(':x.txt', 'a')
+        self.git('add', '-A')
+        self.git('commit', '-qm', 'colon')
         self.assertEqual(work.UNCOMMITTED, work.edit_mark(self.write(':x.txt', 'changed'), self.deadline))
 
     def test_what_git_cannot_be_asked_about_is_not_checked(self):
-        outside = tempfile.mkdtemp()
+        outside = scratch(self)
         self.assertEqual(work.UNCHECKED, work.edit_mark(os.path.join(outside, 'a.txt'), self.deadline))     # no repository
         self.assertEqual(work.UNCHECKED, work.edit_mark('/no/such/folder/a.txt', self.deadline))
         self.assertEqual(work.UNCHECKED, work.edit_mark(os.path.join(self.repo, 'kept.txt'), time.monotonic() - 1))
         self.assertIsNone(work.git('', self.deadline, 'status'))
+        # git too slow or not started: not checked, never an exception that would leave the agent's row running.
+        for error in (subprocess.TimeoutExpired('git', 2), OSError('no git')):
+            with mock.patch.object(work.subprocess, 'run', side_effect=error):
+                self.assertEqual(work.UNCHECKED, work.edit_mark(os.path.join(self.repo, 'kept.txt'), self.deadline))
 
     def test_commit_times_finds_a_known_sha_by_its_prefix_and_skips_an_unknown_one(self):
         sha, when = self.head()
@@ -99,7 +131,8 @@ class Marks(RepoCase):
             return ('commit', key, 'commit x', self.repo, window)
         self.assertEqual(['commit x'], work.marked([item(sha[:7], (when - 1, when + 1))]))
         self.assertEqual(['commit x'], work.marked([item(sha[:7], None)]))                       # no times: the sha alone
-        self.assertEqual(['commit x'], work.marked([item(sha[:7], (when + work.SLACK, when + work.SLACK))]))   # edge
+        self.assertEqual(['commit x'], work.marked([item(sha[:7], (when + work.SLACK, when + work.SLACK))]))   # edges
+        self.assertEqual(['commit x'], work.marked([item(sha[:7], (when - work.SLACK - 5, when - work.SLACK))]))
         late = when + work.SLACK + 1
         self.assertEqual(['commit x' + work.UNVERIFIED], work.marked([item(sha[:7], (late, late + 5))]))
         early = when - work.SLACK - 6
@@ -117,7 +150,7 @@ class Marks(RepoCase):
 class Transcript(RepoCase):
     def transcript(self, lines, raw=()):
         self.count = getattr(self, 'count', 0) + 1
-        path = os.path.join(tempfile.mkdtemp(), 'agent-%d.jsonl' % self.count)
+        path = os.path.join(scratch(self), 'agent-%d.jsonl' % self.count)
         with open(path, 'w', encoding='utf-8') as handle:
             handle.write('\n'.join([json.dumps(line) for line in lines] + list(raw)) + '\n')
         return path
@@ -163,6 +196,26 @@ class Transcript(RepoCase):
             self.assertIsNone(work.from_transcript(path))
         finally:
             work.MAX_TRANSCRIPT = old
+        with mock.patch('builtins.open', side_effect=OSError('gone')):
+            self.assertIsNone(work.from_transcript(path))
+
+    def test_odd_lines_are_skipped_or_kept_without_breaking_the_stop(self):
+        # No timestamp: no window, the sha alone decides; a string block is skipped (QA F5, 16/11/2026).
+        sha, _ = self.head()
+        bare = {'type': 'assistant', 'cwd': self.repo, 'message': {'content': ['a string block', {'type': 'tool_use', 'id': 'c',
+                'name': 'Bash', 'input': {'command': 'git commit -m first'}}]}}
+        answer = {'type': 'user', 'message': {'content': [{'type': 'tool_result', 'tool_use_id': 'c', 'content': '[main %s] first' % sha[:7]}]}}
+        path = self.transcript([bare, answer])
+        self.assertIsNone(work.read_transcript(path)[0][0][4])
+        self.assertEqual('commit %s first' % sha[:7], work.from_transcript(path))
+
+    def test_a_line_without_cwd_keeps_the_folder_an_earlier_line_named(self):
+        first = call('a', 'Read', {'file_path': 'kept.txt'}, 0, self.repo)
+        edit = call('b', 'Edit', {'file_path': 'kept.txt'}, 0, self.repo)
+        del edit['cwd']
+        self.write('kept.txt', 'changed')
+        path = self.transcript([first, result('a', 0), edit, result('b', 0)])
+        self.assertEqual('edited kept.txt' + work.UNCOMMITTED, work.from_transcript(path))
 
 
 class Hooks(RepoCase):
@@ -174,6 +227,7 @@ class Hooks(RepoCase):
     def setUp(self):
         RepoCase.setUp(self)
         self.setUp_rows()
+        self.addCleanup(shutil.rmtree, self.dir, True)
 
     def test_the_live_list_grows_with_each_call_and_the_stop_marks_it(self):
         agent = base.DEVELOPER
