@@ -4,7 +4,8 @@ list under a subagent's row, kept in the row's `work` field.
     edited <path>             a file the agent changed with Edit/Write/NotebookEdit, a call that did not fail
     commit <sha> <subject>    a commit a successful `git commit` printed - git's own `[branch sha] subject` line, or for
                               `git commit -q ... && git log --oneline -1` the log's first line; `commit, sha not printed`
-                              when it printed neither
+                              when it printed neither. Only a `git commit` where a command starts counts: heredoc bodies
+                              and quoted text are taken out first, so a grep pattern or an echo that names it is not one
     reported, not verified: <first sentence of its report>
                               only for an agent that edited and committed nothing (a review): its own words, never a
                               measurement
@@ -15,7 +16,8 @@ edited again moves to the end), `… N earlier` first when more were seen, and g
 within GIT_BUDGET seconds in all:
     edited ...: `(uncommitted)` git still shows a change · `(ignored by git)` · no mark: git shows no change left ·
                 `(not checked)` git could not be asked (not a repository, the folder gone, out of time)
-    commit ...: `(not verified)` when no repository it could be in knows the sha (or none could be asked)
+    commit ...: `(not verified)` when no repository it could be in knows the sha (or none could be asked), or its
+                commit time is outside the tool call that printed it (another commit's sha, shown by a log)
 A live list that dropped entries shows `… earlier` with no number: it cannot count what it dropped.
 
 The field is one line of at most MAX_WORK characters: entries joined by SEPARATOR, each at most ENTRY characters with
@@ -27,6 +29,7 @@ import os
 import re
 import subprocess
 import time
+from datetime import datetime
 
 from podium_status_rows import MAX_WORK, clip
 
@@ -37,8 +40,12 @@ EDIT_TOOLS = ('Edit', 'Write', 'MultiEdit', 'NotebookEdit')
 # `git commit`'s first line: `[branch 1a2b3c4] subject`, `[main (root-commit) 1a2b3c4] s`, `[detached HEAD 1a2b3c4] s`.
 COMMIT = re.compile(r'^\[[^\]\n]+ ([0-9a-f]{7,40})\] (.+)$', re.M)
 ONELINE = re.compile(r'^([0-9a-f]{7,40}) (.+)$', re.M)
-# `git` with its global options (`-C dir`, `-c k=v`, `--no-pager`), then the subcommand.
-GIT_SUB = r'\bgit(?:\s+-[Cc]\s+\S+|\s+--?[\w-]+(?:=\S+)?)*\s+%s\b'
+# `git <verb>` where a command starts (as podium_status_hooks.COMMIT, on text with quotes and heredocs taken out): the
+# start, after ; & | a newline ( ` { ! or then/do/else/elif, behind env/command/sudo/exec/time/nohup/xargs or VAR=value,
+# git by a path, with its global options (`-C dir`, `-c k=v`, `--no-pager`).
+GIT_VERB = (r'(?:^|[;&|\n(`{!]|\b(?:then|do|else|elif)\s)\s*(?:(?:env|command|sudo|exec|time|nohup|xargs)(?:\s+-\S+)*\s+'
+            r'|\w+=\S*\s+)*(?:[\w.~-]*/)*git(?:\s+-[Cc]\s+\S+|\s+-\S+)*\s+%s(?![-\w])')
+SLACK = 120        # seconds of clock slack around a tool call when a commit's time is checked
 EARLIER = re.compile(r'^… (?:\d+ )?earlier$')
 REPORTED = 'reported, not verified: '
 NO_SHA = 'commit, sha not printed'
@@ -97,12 +104,32 @@ def result_text(value):
     return ''
 
 
+def plain(command):
+    """The command with heredoc bodies dropped and every quoted string emptied: what is left is what the shell runs."""
+    kept, tag = [], None
+    for line in command.splitlines():
+        if tag is not None:
+            tag = None if line.strip() == tag else tag
+            continue
+        kept.append(line)
+        found = re.search(r"(?<!<)<<(?!<)-?\s*[\"']?([A-Za-z_]\w*)", line)
+        tag = found.group(1) if found else None
+    return re.sub(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'', '""', '\n'.join(kept))     # a quoted string may span lines
+
+
 def commits_of(command, output):
-    """(sha, subject) of each commit a successful `git commit` printed; (None, '') when it printed no sha."""
-    if not isinstance(command, str) or not re.search(GIT_SUB % 'commit', command):
+    """(sha, subject) of each commit a successful `git commit` printed; (None, '') when it printed no sha. A log's first
+    line counts only when `git log` runs after the commit (`&&`, `;` or a new line between, never `||`, a pipe or `&`); if
+    the commit failed, that line is the older HEAD, and the stop's commit-time check marks it `(not verified)`."""
+    text = plain(command) if isinstance(command, str) else ''
+    commit = re.search(GIT_VERB % 'commit', text)
+    if commit is None:
         return []
     found = COMMIT.findall(output)
-    if not found and re.search(GIT_SUB % 'log', command):
+    rest = text[commit.end():]
+    log = re.search(GIT_VERB % 'log', rest)
+    # The text up to `git log`, with the separator its match starts on: `&&`, `;` and new lines run it after the commit.
+    if not found and log and not re.search(r'[|&]', rest[:log.start() + 1].replace('&&', '')):
         first = ONELINE.search(output)
         found = [first.groups()] if first else []
     return found or [(None, '')]
@@ -146,6 +173,14 @@ def first_line(report):
     return ''
 
 
+def epoch(stamp):
+    """A transcript timestamp (`2026-11-16T10:00:00.000Z`) as seconds since the epoch, None when it is not one."""
+    try:
+        return datetime.fromisoformat(str(stamp).replace('Z', '+00:00')).timestamp() if stamp else None
+    except ValueError:
+        return None
+
+
 def read_transcript(path):
     """(items in order, latest last; the agent's report) from its transcript; None when it cannot be read."""
     try:
@@ -167,14 +202,16 @@ def read_transcript(path):
                     ident = block.get('id') if block.get('type') == 'tool_use' else block.get('tool_use_id')
                     ident = ident if isinstance(ident, str) else None          # a malformed id is skipped, never hashed
                     if block.get('type') == 'tool_use' and ident:
-                        calls[ident] = (str(block.get('name') or ''), block.get('input'), cwd)
+                        calls[ident] = (str(block.get('name') or ''), block.get('input'), cwd, epoch(entry.get('timestamp')))
                         given = block.get('input') if isinstance(block.get('input'), dict) else {}
                         if block.get('name') == 'SubagentHandback' and isinstance(given.get('message'), str):
                             handback = given['message']
                     elif block.get('type') == 'tool_result' and ident in calls:
-                        tool, given, at = calls.pop(ident)
+                        tool, given, at, began = calls.pop(ident)
+                        ended = epoch(entry.get('timestamp'))
+                        window = (began, ended) if began is not None and ended is not None else None
                         for item in [] if block.get('is_error') else new_items(tool, given, block.get('content'), at):
-                            items = [one for one in items if one[:2] != item[:2]] + [item]   # again: moves to the end
+                            items = [one for one in items if one[:2] != item[:2]] + [item + (window,)]   # again: to the end
                     elif block.get('type') == 'text' and entry.get('type') == 'assistant' and isinstance(block.get('text'), str):
                         text = block['text']
         return items, handback or text          # the report handed back wins over the agent's last words
@@ -199,35 +236,43 @@ def git(folder, deadline, *args, stdin=None):
 def edit_mark(path, deadline):
     """What git says now about a file the agent edited, asked in the file's own folder so it reaches its own repository."""
     folder, name = os.path.split(path)
-    status = git(folder, deadline, 'status', '--porcelain', '-z', '--untracked-files=all', '--ignored=matching', '--', name)
+    # --literal-pathspecs: `[id].tsx`, `*.md` or `:x.txt` is the file's name, never a pattern (QA 16/11/2026).
+    status = git(folder, deadline, '--literal-pathspecs', 'status', '--porcelain', '-z', '--untracked-files=all',
+                 '--ignored=matching', '--', name)
     if status is None:
         return UNCHECKED
-    codes = [one[:2] for one in status.split('\0') if len(one) > 3]
+    # git prints the path from the repository's top: the file's record ends with its name.
+    codes = [one[:2] for one in status.split('\0') if len(one) > 3 and (one[3:] == name or one[3:].endswith('/' + name))]
     return IGNORED if codes and all(code == '!!' for code in codes) else UNCOMMITTED if codes else ''
 
 
-def known_commits(shas, folders, deadline):
-    """The shas that some folder's repository has as commits: one `cat-file --batch-check` per folder for those still unknown."""
-    left = sorted(set(shas))
+def commit_times(shas, folders, deadline):
+    """{sha: commit time} for the shas some folder's repository has as commits: one `git log --no-walk --ignore-missing`
+    per folder for those still unknown (an unknown sha is skipped, never an error)."""
+    found = {}
     for folder in folders:
+        left = sorted(set(shas) - set(found))
         if not left:
             break
-        out = git(folder, deadline, 'cat-file', '--batch-check', stdin=''.join('%s^{commit}\n' % sha for sha in left))
-        if out is not None:
-            answers = out.splitlines()
-            # `<sha> commit <size>` is a commit; `missing` or `ambiguous` is not one this repository can name.
-            left = [sha for at, sha in enumerate(left) if at >= len(answers) or answers[at].split(' ')[1:2] != ['commit']]
-    return set(shas) - set(left)
+        out = git(folder, deadline, 'log', '--no-walk', '--ignore-missing', '--format=%H %ct', *left, '--')
+        for line in (out or '').splitlines():
+            full, _, when = line.partition(' ')
+            found.update({sha: int(when) for sha in left if full.startswith(sha) and when.isdigit()})
+    return found
 
 
 def marked(items):
     """The kept items' shown texts with what git says now, within GIT_BUDGET seconds in all."""
     deadline = time.monotonic() + GIT_BUDGET
-    edits = {key: edit_mark(key, deadline) for kind, key, _, _ in items if kind == 'edit'}
-    folders = list(dict.fromkeys([folder for kind, _, _, folder in items if kind == 'commit'] +
+    edits = {key: edit_mark(key, deadline) for kind, key, _, _, _ in items if kind == 'edit'}
+    folders = list(dict.fromkeys([folder for kind, _, _, folder, _ in items if kind == 'commit'] +
                                  [os.path.dirname(key) for key in edits]))
-    known = known_commits([key for kind, key, _, _ in items if kind == 'commit' and key], folders, deadline)
-    return [shown + (edits[key] if kind == 'edit' else '' if key in known else UNVERIFIED) for kind, key, shown, _ in items]
+    times = commit_times([key for kind, key, _, _, _ in items if kind == 'commit' and key], folders, deadline)
+
+    def made_then(sha, window):        # the commit exists and was made while the call that printed it ran
+        return sha in times and (window is None or window[0] - SLACK <= times[sha] <= window[1] + SLACK)
+    return [shown + (edits[key] if kind == 'edit' else '' if made_then(key, window) else UNVERIFIED)
+            for kind, key, shown, _, window in items]
 
 
 def from_transcript(path):

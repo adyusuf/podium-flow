@@ -108,7 +108,7 @@ def transcript_facts(path):
                 try:
                     entry = json.loads(line) or {}
                     message = entry.get('message') or {}
-                except (ValueError, AttributeError):
+                except (ValueError, AttributeError, RecursionError):      # RecursionError: a deeply nested line
                     continue
                 if not isinstance(message, dict):
                     continue
